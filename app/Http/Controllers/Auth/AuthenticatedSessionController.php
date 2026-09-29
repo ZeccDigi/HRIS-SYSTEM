@@ -4,14 +4,10 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Mail\OtpVerificationMail;
-use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
@@ -30,32 +26,6 @@ class AuthenticatedSessionController extends Controller
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
-
-        // If the user is not authenticated after authenticate(), it means
-        // the account exists but is unverified — redirect to OTP verification.
-        if (! Auth::check()) {
-            $user = User::query()
-                ->where('email', $request->string('email'))
-                ->whereNull('email_verified_at')
-                ->first();
-
-            if ($user) {
-                // Generate a fresh OTP and send it
-                $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-                $user->update([
-                    'otp' => Hash::make($otp),
-                    'otp_expires_at' => now()->addMinutes(10),
-                ]);
-
-                Mail::to($user->email)->send(new OtpVerificationMail($otp));
-
-                session(['otp_user_id' => $user->id]);
-
-                return redirect()->route('register.verify-otp')
-                    ->with('status', 'Your account is not yet verified. A new verification code has been sent to your email.');
-            }
-        }
 
         if ($request->user() && ! $request->user()->privacy_consent) {
             $request->user()->forceFill([

@@ -5,7 +5,7 @@
         </h2>
 
         <p class="mt-1 text-sm text-gray-600">
-            {{ __("Update your account's profile information and email address.") }}
+            {{ __("Update your account profile information. Your HRIS Username is managed by HR.") }}
         </p>
     </header>
 
@@ -31,9 +31,9 @@
         @endif
 
         <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email', $user->email)" required autocomplete="username" />
-            <x-input-error class="mt-2" :messages="$errors->get('email')" />
+            <x-input-label for="hris_username" :value="__('HRIS Username')" />
+            <x-text-input id="hris_username" type="text" class="mt-1 block w-full bg-gray-50 text-gray-500" :value="$user->email" disabled />
+            <p class="mt-1 text-xs text-gray-500">{{ __("This is your HRIS sign-in username. It is not an email inbox.") }}</p>
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div>

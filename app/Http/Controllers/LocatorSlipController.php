@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Listeners\AuditLogListener;
 use App\Models\LocatorSlip;
 use App\Models\User;
 use App\Notifications\LocatorSlipNotification;
@@ -90,6 +91,13 @@ class LocatorSlipController extends Controller
             ));
         }
 
+        AuditLogListener::logActivity(
+            'Submit Locator Slip',
+            'Attendance',
+            "Submitted locator slip ({$locatorSlip->type}) to {$locatorSlip->destination} for {$locatorSlip->date_covered}",
+            Auth::user()
+        );
+
         return redirect()->route('locator-slips.index')->with('message', 'Locator slip submitted successfully.');
     }
 
@@ -154,6 +162,13 @@ class LocatorSlipController extends Controller
                 'Your locator slip for ' . $locatorSlip->date_covered . ' has been approved.'
             ));
 
+            AuditLogListener::logActivity(
+                'Approve Locator Slip',
+                'Attendance',
+                "Approved locator slip (#{$locatorSlip->control_no}) for employee " . trim(($locatorSlip->employee->firstname ?? '') . ' ' . ($locatorSlip->employee->lastname ?? '')),
+                $user
+            );
+
             return redirect()->back()->with('message', 'Locator slip approved.');
         }
 
@@ -179,6 +194,13 @@ class LocatorSlipController extends Controller
             'Locator Slip Rejected',
             'Your locator slip for ' . $locatorSlip->date_covered . ' has been rejected.'
         ));
+
+        AuditLogListener::logActivity(
+            'Reject Locator Slip',
+            'Attendance',
+            "Rejected locator slip (#{$locatorSlip->control_no}) for employee " . trim(($locatorSlip->employee->firstname ?? '') . ' ' . ($locatorSlip->employee->lastname ?? '')),
+            Auth::user()
+        );
 
         return redirect()->back()->with('message', 'Locator slip rejected.');
     }

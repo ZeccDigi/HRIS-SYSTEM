@@ -71,8 +71,19 @@
                 margin: 5mm;
             }
 
+            html,
             body {
+                width: 210mm !important;
+                min-height: 297mm !important;
+                margin: 0 !important;
                 background: #fff !important;
+                overflow: visible !important;
+            }
+
+            body * {
+                visibility: hidden !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
             }
 
             .no-print,
@@ -85,6 +96,28 @@
 
             .dtr-print-only {
                 display: block !important;
+                visibility: visible !important;
+                position: absolute !important;
+                top: 7mm !important;
+                left: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #fff !important;
+                border: 0 !important;
+                border-radius: 0 !important;
+            }
+
+            .dtr-print-only * {
+                visibility: visible !important;
+            }
+
+            .py-8,
+            .max-w-7xl {
+                padding: 0 !important;
+                margin: 0 !important;
+                max-width: none !important;
+                width: 100% !important;
             }
 
             .dtr-print-shell {
@@ -117,15 +150,23 @@
             }
 
             .dtr-preview-page {
-                width: 100% !important;
+                width: 196mm !important;
                 min-height: 0 !important;
                 padding: 0 !important;
+                margin: 0 auto !important;
                 border: 0 !important;
                 box-shadow: none !important;
             }
 
             .dtr-preview-grid {
-                gap: 3mm !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 3.5mm !important;
+            }
+
+            .dtr-form-copy {
+                width: 100% !important;
+                min-width: 0 !important;
+                overflow: hidden !important;
             }
 
             .dtr-late-summary,
@@ -136,6 +177,19 @@
 
         .dtr-print-only {
             display: none;
+        }
+
+        .dtr-screen-table {
+            table-layout: fixed;
+        }
+
+        .dtr-screen-table th,
+        .dtr-screen-table td {
+            overflow: hidden;
+            padding-left: 0.25rem !important;
+            padding-right: 0.25rem !important;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .dtr-preview-page {
@@ -250,7 +304,7 @@
         }
 
         .dtr-sign-line {
-            margin: 5mm auto 0;
+            margin: 7mm auto 0;
             width: 67%;
             border-bottom: 0.2mm solid #000;
             min-height: 3.8mm;
@@ -282,21 +336,21 @@
                 </div>
             @endif
 
-            <div class="no-print flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                    <h1 class="text-xl font-bold text-slate-900">
-                        {{ __('My Daily Time Record') }}
-                    </h1>
-                    <p class="mt-1 text-sm text-slate-500">
-                        {{ __('Review and print your monthly DTR.') }}
-                    </p>
+            <div class="dtr-screen-only px-1 sm:px-0">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-900">
+                            {{ __('My Daily Time Record') }}
+                        </h1>
+                        <p class="mt-1 text-sm text-slate-500">
+                            {{ __('Review and print your monthly DTR.') }}
+                        </p>
+                    </div>
                 </div>
-            </div>
 
-            <div class="no-print rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                <form method="GET" action="{{ route('my-dtr.index') }}" class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div class="flex flex-1 flex-col gap-4 sm:flex-row">
-                        <label class="relative block flex-1">
+                <form method="GET" action="{{ route('my-dtr.index') }}" class="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center">
+                    <div class="grid flex-1 gap-4 sm:grid-cols-2">
+                        <label class="relative block">
                             <span class="absolute -top-2 left-3 bg-white px-1 text-xs text-slate-500">Month</span>
                             <select name="month" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#2b428f]">
                                 @foreach($months as $num => $name)
@@ -305,7 +359,7 @@
                             </select>
                         </label>
 
-                        <label class="relative block flex-1">
+                        <label class="relative block">
                             <span class="absolute -top-2 left-3 bg-white px-1 text-xs text-slate-500">Year</span>
                             <select name="year" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#2b428f]">
                                 @for($year = $startYear; $year <= $endYear; $year++)
@@ -315,21 +369,20 @@
                         </label>
                     </div>
 
-                    <div class="flex gap-2">
-                        <button type="submit" style="background-color: #2b428f;" class="rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow">
+                    <div class="flex gap-2 lg:shrink-0">
+                        <button type="submit" style="background-color: #2b428f;" class="min-w-28 rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow">
                             {{ __('Select') }}
                         </button>
-                        <button type="button" onclick="window.print()" style="background-color: #2b428f;" class="rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow">
+                        <button type="button" onclick="window.print()" style="background-color: #2b428f;" class="min-w-28 rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow">
                             {{ __('Print') }}
                         </button>
                     </div>
                 </form>
             </div>
 
-            <div class="dtr-screen-only rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                <div class="overflow-x-auto">
-                    <div class="min-w-[1120px] rounded-lg border border-slate-200 bg-white p-5">
-                        <div class="text-center">
+            <div class="dtr-screen-only rounded-2xl bg-white px-6 py-7 shadow-sm ring-1 ring-slate-200">
+                <div>
+                    <div class="text-center">
                             <h2 class="text-base font-bold text-slate-900">
                                 Department of Migrant Workers - Region XI
                             </h2>
@@ -357,8 +410,8 @@
                             </div>
                         </div>
 
-                        <div class="mt-5 overflow-x-auto">
-                            <table class="w-full border-collapse text-center text-[11px] leading-tight">
+                        <div class="mt-5">
+                            <table class="dtr-screen-table w-full border-collapse text-center text-[10px] leading-tight">
                                 <thead>
                                     <tr class="bg-slate-50">
                                         <th rowspan="2" class="border border-slate-300 px-2 py-2">Date</th>
@@ -492,7 +545,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
             <div class="dtr-print-only dtr-print-shell">
                 <div>

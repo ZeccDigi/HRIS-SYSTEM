@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
+use App\Services\LeaveCreditService;
 
 class Employee extends Model
 {
@@ -23,12 +24,20 @@ class Employee extends Model
         'position',
         'account_role',
         'employment_status',
+        'service_start_date',
         'remarks',
         'user_id',
         'rfid_number',
         'profile_picture',
         'e_signature_path',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'service_start_date' => 'date',
+        ];
+    }
 
     public function user()
     {
@@ -109,6 +118,11 @@ class Employee extends Model
     public function leaveCredits()
     {
         return $this->hasMany(LeaveCredit::class);
+    }
+
+    public function leaveCreditTransactions()
+    {
+        return $this->hasMany(LeaveCreditTransaction::class);
     }
 
     public function salns(): HasMany
@@ -224,12 +238,6 @@ class Employee extends Model
      */
     public function ensureLeaveCredits(int $year): void
     {
-        $types = LeaveType::where('is_active', true)->get();
-        foreach ($types as $type) {
-            $this->leaveCredits()->firstOrCreate(
-                ['leave_type_id' => $type->id, 'year' => $year],
-                ['balance' => $type->days_per_year ?? 0]
-            );
-        }
+        app(LeaveCreditService::class)->ensureCredits($this, $year);
     }
 }

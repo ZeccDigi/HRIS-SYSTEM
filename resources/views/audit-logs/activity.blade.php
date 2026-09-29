@@ -4,7 +4,7 @@
     <div class="overflow-x-hidden py-12" x-data="{ 
         tab: 'activity', 
         pickerOpen: false,
-        selectedYear: '{{ $selectedYear }}',
+        selectedYear: '{{ $selectedYear ?: date('Y') }}',
         currentYear: {{ $selectedYear ? (int)$selectedYear : ($selectedDate ? (int)date('Y', strtotime($selectedDate)) : (int)date('Y')) }},
         currentMonth: {{ $selectedDate ? (date('n', strtotime($selectedDate)) - 1) : (date('n') - 1) }},
         selectedDateStr: '{{ $selectedDate }}',
@@ -189,9 +189,8 @@
                             "
                             class="block h-9 w-full rounded-xl border-gray-300 bg-white text-sm font-semibold text-gray-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
-                            <option value="">{{ __('Year') }}</option>
                             @foreach(range(date('Y'), 2024) as $y)
-                                <option value="{{ $y }}" {{ (string)$selectedYear === (string)$y ? 'selected' : '' }}>{{ $y }}</option>
+                                <option value="{{ $y }}" {{ (string)($selectedYear ?: date('Y')) === (string)$y ? 'selected' : '' }}>{{ $y }}</option>
                             @endforeach
                         </select>
                     </div>

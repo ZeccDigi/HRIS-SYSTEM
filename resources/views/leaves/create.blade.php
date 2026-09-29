@@ -363,6 +363,7 @@
                         <!-- Pay Option -->
                         <div>
                             <span class="block text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600">{{ __('Pay Option') }}</span>
+                            <p class="mt-1 text-xs font-medium text-slate-500">{{ __('If available credits are insufficient, the system will automatically save this request as Without Pay.') }}</p>
                             @php($payOption = old('is_paid', '1'))
                             <div class="mt-2 grid grid-cols-2 gap-3">
                                 <label class="flex cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50/40">

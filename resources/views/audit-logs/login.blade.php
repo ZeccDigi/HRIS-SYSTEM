@@ -6,7 +6,7 @@
         selectedAudit: null, 
         detailModalOpen: false,
         pickerOpen: false,
-        selectedYear: '{{ $selectedYear }}',
+        selectedYear: '{{ $selectedYear ?: date('Y') }}',
         currentYear: {{ $selectedYear ? (int)$selectedYear : ($selectedDate ? (int)date('Y', strtotime($selectedDate)) : (int)date('Y')) }},
         currentMonth: {{ $selectedDate ? (date('n', strtotime($selectedDate)) - 1) : (date('n') - 1) }},
         selectedDateStr: '{{ $selectedDate }}',
@@ -197,9 +197,8 @@
                             "
                             class="block h-9 w-full rounded-xl border-gray-300 bg-white text-sm font-semibold text-gray-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
-                            <option value="">{{ __('Year') }}</option>
                             @foreach(range(date('Y'), 2024) as $y)
-                                <option value="{{ $y }}" {{ (string)$selectedYear === (string)$y ? 'selected' : '' }}>{{ $y }}</option>
+                                <option value="{{ $y }}" {{ (string)($selectedYear ?: date('Y')) === (string)$y ? 'selected' : '' }}>{{ $y }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -261,11 +260,12 @@
                         <table class="min-w-full w-full table-fixed divide-y divide-gray-200">
                             <thead>
                                 <tr class="bg-gray-50">
-                                    <th class="w-[30%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('User') }}</th>
-                                    <th class="w-[15%] px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Role') }}</th>
-                                    <th class="w-[18%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Date') }}</th>
-                                    <th class="w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Time') }}</th>
-                                    <th class="w-[12%] px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Status') }}</th>
+                                    <th class="w-[26%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('User') }}</th>
+                                    <th class="w-[12%] px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Role') }}</th>
+                                    <th class="w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Date') }}</th>
+                                    <th class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Time') }}</th>
+                                    <th class="w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Time Spent') }}</th>
+                                    <th class="w-[10%] px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Status') }}</th>
                                     <th class="w-[10%] px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Actions') }}</th>
                                 </tr>
                             </thead>
@@ -290,6 +290,16 @@
                                         </td>
                                         <td class="px-4 py-4 text-sm text-gray-500">
                                             {{ $audit->login_at ? $audit->login_at->format('h:i A') : 'N/A' }}
+                                        </td>
+                                        <td class="px-4 py-4 text-xs font-semibold text-slate-700">
+                                            @if($audit->status === 'successful')
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-medium">
+                                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                    {{ $audit->duration }}
+                                                </span>
+                                            @else
+                                                <span class="text-gray-400">-</span>
+                                            @endif
                                         </td>
                                         <td class="px-4 py-4 text-center">
                                             @if($audit->status === 'successful')
@@ -496,6 +506,11 @@
                             <span class="font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md"
                                   :class="selectedAudit.status === 'successful' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'"
                                   x-text="selectedAudit.status"></span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-indigo-50/50 border border-indigo-100/80" x-show="selectedAudit.status === 'successful'">
+                            <span class="font-bold text-indigo-700 uppercase tracking-wider text-[10px]">{{ __('Time Spent (Duration)') }}</span>
+                            <span class="font-bold text-indigo-900" x-text="selectedAudit.duration || 'N/A'"></span>
                         </div>
 
                         <div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">

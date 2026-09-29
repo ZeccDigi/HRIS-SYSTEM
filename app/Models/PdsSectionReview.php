@@ -13,6 +13,11 @@ class PdsSectionReview extends Model
         'section_name',
         'status',
         'remarks',
-        'reviewed_by_id'
+        'reviewed_by_id',
+        'changed_fields',
+    ];
+
+    protected $casts = [
+        'changed_fields' => 'array',
     ];
 }

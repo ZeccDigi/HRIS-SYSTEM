@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Listeners\AuditLogListener;
 use Illuminate\Http\Request;
 
 use App\Models\Announcement;
@@ -188,6 +189,13 @@ class AnnouncementController extends Controller
 
         Notification::send(User::all(), new NewAnnouncementNotification($announcement));
 
+        AuditLogListener::logActivity(
+            'Post Announcement',
+            'System',
+            "Posted announcement: {$announcement->title}",
+            auth()->user()
+        );
+
         return redirect()->route('announcements.index')
             ->with('success', 'Announcement created successfully.');
     }
@@ -262,6 +270,13 @@ class AnnouncementController extends Controller
             Notification::send(User::all(), new NewAnnouncementNotification($announcement));
         }
 
+        AuditLogListener::logActivity(
+            'Update Announcement',
+            'System',
+            "Updated announcement: {$announcement->title}",
+            auth()->user()
+        );
+
         return redirect()->route('announcements.index')
             ->with('success', 'Announcement updated successfully.');
     }
@@ -276,6 +291,13 @@ class AnnouncementController extends Controller
         }
 
         $announcement->delete();
+
+        AuditLogListener::logActivity(
+            'Delete Announcement',
+            'System',
+            "Deleted announcement: {$announcement->title}",
+            auth()->user()
+        );
 
         return redirect()->route('announcements.index')
             ->with('success', 'Announcement deleted successfully.');

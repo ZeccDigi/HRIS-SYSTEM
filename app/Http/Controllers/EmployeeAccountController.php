@@ -25,7 +25,7 @@ class EmployeeAccountController extends Controller
     }
 
     /**
-     * Display a list of registered employee accounts pending HR approval.
+     * Display a list of employee login accounts pending HR approval.
      */
     public function index(): View
     {
@@ -98,8 +98,11 @@ class EmployeeAccountController extends Controller
 
         $user->update(['is_approved' => true]);
 
-        // Notify the user that their account has been approved
-        Mail::to($user->email)->send(new AccountApprovedMail($user->name));
+        $recoveryEmail = $user->employee->notification_email;
+
+        if ($recoveryEmail) {
+            Mail::to($recoveryEmail)->send(new AccountApprovedMail($user->name));
+        }
 
         return back()->with('success', 'Account for '.$user->display_name.' has been approved successfully.');
     }

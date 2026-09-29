@@ -73,6 +73,11 @@ class User extends Authenticatable
         return $this->hasOne(Employee::class);
     }
 
+    public function routeNotificationForMail(): ?string
+    {
+        return $this->employee?->notification_email;
+    }
+
     public function getProfilePictureUrlAttribute(): ?string
     {
         return $this->employee?->profile_picture_url;

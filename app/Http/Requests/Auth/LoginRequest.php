@@ -37,8 +37,8 @@ class LoginRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'email.ends_with' => 'Invalid email. Please use your official dmw.gov.ph email address.',
-            'email.lowercase' => 'Invalid email. Please use lowercase letters for your official dmw.gov.ph email address.',
+            'email.ends_with' => 'Invalid HRIS Username. Please use your @dmw.gov.ph HRIS login username.',
+            'email.lowercase' => 'Invalid HRIS Username. Please use lowercase letters for your HRIS login username.',
         ];
     }
 
@@ -65,7 +65,9 @@ class LoginRequest extends FormRequest
         if ($user instanceof User && $user->email_verified_at === null) {
             Auth::logout();
 
-            return;
+            throw ValidationException::withMessages([
+                'email' => 'Your HRIS account is not yet verified. Please contact HR to activate your account.',
+            ]);
         }
 
         // Block unapproved users — they cannot access the system at all

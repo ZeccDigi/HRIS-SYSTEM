@@ -1,8 +1,8 @@
 <x-app-layout>
     <x-slot name="title">{{ __('Employee Details') }} - {{ $employee->firstname }} {{ $employee->lastname }}</x-slot>
 
-    <div class="py-8" x-data="{ tab: 'pds', reviewModalOpen: false, currentSection: '', sectionData: null, reviewStatus: 'pending', reviewRemarks: '', salnModalOpen: false, selectedSaln: null }">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+    <div class="px-4 py-6 sm:px-5 lg:px-6" x-data="{ tab: 'pds', reviewModalOpen: false, currentSection: '', sectionData: null, changedFields: [], changedEntries: [], reviewStatus: 'pending', reviewRemarks: '', salnModalOpen: false, selectedSaln: null, isChangedField(key, index = null) { return this.changedFields.includes(key) || (index !== null && this.changedEntries.includes(index)); } }">
+        <div class="mx-auto w-full">
             <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <a href="{{ route('employees.index') }}" class="inline-flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -20,7 +20,7 @@
                 <div class="p-6 sm:p-8 flex flex-col md:flex-row md:items-center gap-6">
                     <div class="relative group">
                         <x-profile-avatar :employee="$employee" size="3xl" variant="indigo" rounded="2xl" class="shadow-xl" />
-                        @if(in_array(auth()->user()->role, ['admin', 'hrstaff', 'chief', 'regionaldirector']) || auth()->user()->employee?->id === $employee->id)
+                        @if(auth()->user()->employee?->id === $employee->id)
                             <label for="profile_picture_upload" class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-2xl opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity" title="{{ __('Upload Profile Picture') }}">
                                 <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             </label>
@@ -62,155 +62,125 @@
             <div class="space-y-6">
                 <!-- PDS Tab -->
                 <div x-show="tab === 'pds'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        <!-- Left Column: Quick Info -->
-                        <div class="lg:col-span-4 space-y-6">
-                            <div class="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">
-                                <h4 class="text-sm font-black text-gray-400 uppercase tracking-widest mb-6">{{ __('Contact Information') }}</h4>
-                                
-                                <div class="space-y-6">
-                                    <div class="flex items-start gap-4">
-                                        <div class="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center shrink-0">
-                                            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                        </div>
-                                        <div class="overflow-hidden">
-                                            <p class="text-xs font-bold text-gray-400 uppercase tracking-tighter">{{ __('Personal Email ') }}</p>
-                                            <p class="text-sm font-black text-gray-900 truncate">{{ $employee->notification_email ?? ($employee->pdsPersonal?->email_address ?? '---') }}</p>
-                                        </div>
-                                    </div>
+                    <div class="w-full space-y-6">
+                        <div class="bg-white border border-gray-100 p-6 sm:p-8 rounded-2xl shadow-sm">
+                            @php
+                                $sections = [
+                                    ['label' => 'Personal Information', 'filled' => (bool) $employee->pdsPersonal, 'icon' => 'user', 'data' => $employee->pdsPersonal],
+                                    ['label' => 'Family Background', 'filled' => (bool) $employee->pdsFamily, 'icon' => 'users', 'data' => $employee->pdsFamily],
+                                    ['label' => 'Educational Background', 'filled' => $employee->pdsEducation->count() > 0, 'icon' => 'academic-cap', 'data' => $employee->pdsEducation],
+                                    ['label' => 'Civil Service Eligibility', 'filled' => $employee->pdsEligibilities->count() > 0, 'icon' => 'badge-check', 'data' => $employee->pdsEligibilities],
+                                    ['label' => 'Work Experience', 'filled' => $employee->pdsWorkExperiences->count() > 0, 'icon' => 'briefcase', 'data' => $employee->pdsWorkExperiences],
+                                    ['label' => 'Questionnaire', 'filled' => (bool) $employee->pdsQuestionnaire, 'icon' => 'question-mark-circle', 'data' => $employee->pdsQuestionnaire],
+                                    ['label' => 'References', 'filled' => $employee->pdsReferences->count() >= 3, 'icon' => 'identification', 'data' => $employee->pdsReferences],
+                                ];
+                                $completedCount = collect($sections)->where('filled', true)->count();
+                                $totalSections = count($sections);
+                                $percentage = $totalSections > 0 ? round(($completedCount / $totalSections) * 100) : 0;
+                            @endphp
 
-                                    <div class="flex items-start gap-4">
-                                        <div class="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center shrink-0">
-                                            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h2.1a1 1 0 01.95.68l1.05 3.16a1 1 0 01-.45 1.17l-1.7.98a12 12 0 005.06 5.06l.98-1.7a1 1 0 011.17-.45l3.16 1.05a1 1 0 01.68.95V19a2 2 0 01-2 2h-1C8.37 21 3 15.63 3 9V5z"/></svg>
-                                        </div>
-                                        <div>
-                                            <p class="text-xs font-bold text-gray-400 uppercase tracking-tighter">{{ __('Mobile Number') }}</p>
-                                            <p class="text-sm font-black text-gray-900">{{ $employee->pdsPersonal?->mobile_no ?? '---' }}</p>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-start gap-4">
-                                        <div class="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center shrink-0">
-                                            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                        </div>
-                                        <div>
-                                            <p class="text-xs font-bold text-gray-400 uppercase tracking-tighter">{{ __('Residential Address') }}</p>
-                                            <p class="text-sm font-black text-gray-900 leading-tight">
-                                                @if($employee->pdsPersonal?->res_house_no)
-                                                    {{ $employee->pdsPersonal->res_house_no }}, {{ $employee->pdsPersonal->res_street }}, {{ $employee->pdsPersonal->res_barangay }}, {{ $employee->pdsPersonal->res_city }}, {{ $employee->pdsPersonal->res_province }}
-                                                @else
-                                                    ---
-                                                @endif
-                                            </p>
-                                        </div>
-                                    </div>
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-2">
+                                <div>
+                                    <h4 class="text-xl font-black text-gray-900">PDS Completion Status</h4>
+                                    <p class="text-sm text-gray-500 font-medium italic">Civil Service record sections compliance.</p>
+                                </div>
+                                <div class="bg-indigo-600 text-white px-5 py-2 rounded-xl shadow-md leading-none">
+                                    <span class="text-2xl font-black">{{ $percentage }}%</span>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Right Column: PDS Sections Completion -->
-                        <div class="lg:col-span-8 space-y-6">
-                            <div class="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">
-                                @php
-                                    $sections = [
-                                        ['label' => 'Personal Information', 'filled' => (bool) $employee->pdsPersonal, 'icon' => 'user', 'data' => $employee->pdsPersonal],
-                                        ['label' => 'Family Background', 'filled' => (bool) $employee->pdsFamily, 'icon' => 'users', 'data' => $employee->pdsFamily],
-                                        ['label' => 'Educational Background', 'filled' => $employee->pdsEducation->count() > 0, 'icon' => 'academic-cap', 'data' => $employee->pdsEducation],
-                                        ['label' => 'Civil Service Eligibility', 'filled' => $employee->pdsEligibilities->count() > 0, 'icon' => 'badge-check', 'data' => $employee->pdsEligibilities],
-                                        ['label' => 'Work Experience', 'filled' => $employee->pdsWorkExperiences->count() > 0, 'icon' => 'briefcase', 'data' => $employee->pdsWorkExperiences],
-                                        ['label' => 'Questionnaire', 'filled' => (bool) $employee->pdsQuestionnaire, 'icon' => 'question-mark-circle', 'data' => $employee->pdsQuestionnaire],
-                                        ['label' => 'References', 'filled' => $employee->pdsReferences->count() >= 3, 'icon' => 'identification', 'data' => $employee->pdsReferences],
-                                    ];
-                                    $completedCount = collect($sections)->where('filled', true)->count();
-                                    $totalSections = count($sections);
-                                    $percentage = $totalSections > 0 ? round(($completedCount / $totalSections) * 100) : 0;
-                                @endphp
-
-                                <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-2">
-                                    <div>
-                                        <h4 class="text-lg font-black text-gray-900">PDS Completion Status</h4>
-                                        <p class="text-sm text-gray-500 font-medium italic">Civil Service record sections compliance.</p>
-                                    </div>
-                                    <div class="bg-indigo-600 text-white px-5 py-2 rounded-xl shadow-md leading-none">
-                                        <span class="text-2xl font-black">{{ $percentage }}%</span>
-                                    </div>
+                            <!-- Progress Bar -->
+                            <div class="w-full bg-gray-100 rounded-full h-3 mb-8 overflow-hidden shadow-inner">
+                                <div class="bg-indigo-600 h-full rounded-full transition-all duration-1000 ease-out"
+                                    style="width: {{ $percentage }}%">
                                 </div>
+                            </div>
 
-                                <!-- Progress Bar -->
-                                <div class="w-full bg-gray-100 rounded-full h-3 mb-8 overflow-hidden shadow-inner">
-                                    <div class="bg-indigo-600 h-full rounded-full transition-all duration-1000 ease-out"
-                                        style="width: {{ $percentage }}%">
-                                    </div>
-                                </div>
-
-                                <!-- Section Grid -->
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    @foreach($sections as $section)
-                                        @php
-                                            $review = $employee->pdsSectionReviews->where('section_name', $section['label'])->first();
-                                            $reviewStatus = $review ? $review->status : 'pending';
-                                            $reviewRemarks = $review ? $review->remarks : '';
-                                        @endphp
-                                        <button @click="reviewModalOpen = true; currentSection = '{{ $section['label'] }}'; sectionData = {{ json_encode($section['data']) }}; reviewStatus = '{{ $reviewStatus }}'; reviewRemarks = '{{ addslashes($reviewRemarks) }}'" class="group flex items-center p-4 bg-gray-50 rounded-xl border border-gray-100 shadow-sm transition-all duration-200 hover:border-indigo-300 hover:shadow-md cursor-pointer relative overflow-hidden text-left focus:outline-none">
-                                            <!-- Hover indicator bar -->
-                                            <div class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                            
-                                            <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center mr-4 transition-transform group-hover:scale-110 {{ $section['filled'] ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-500' }}">
-                                                @if($section['filled'])
-                                                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                                                    </svg>
-                                                @else
-                                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                    </svg>
-                                                @endif
-                                            </div>
-                                            <div class="overflow-hidden flex-1">
-                                                <span class="block text-sm font-black truncate tracking-tight transition-colors {{ $section['filled'] ? 'text-gray-900 group-hover:text-emerald-700' : 'text-gray-400 group-hover:text-indigo-600' }}">{{ $section['label'] }}</span>
-                                                <div class="flex items-center justify-between mt-0.5">
-                                                    <div class="flex items-center gap-1.5 leading-none">
-                                                        <div class="w-1.5 h-1.5 rounded-full {{ $section['filled'] ? 'bg-emerald-500' : 'bg-gray-300 group-hover:bg-indigo-400' }}"></div>
-                                                        <span class="text-[9px] font-black uppercase tracking-widest transition-colors {{ $section['filled'] ? 'text-emerald-600' : 'text-gray-400 group-hover:text-indigo-500' }}">
-                                                            {{ $section['filled'] ? 'Saved' : 'Blank' }}
+                            <!-- Section Grid (Full Width Responsive) -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                @foreach($sections as $section)
+                                    @php
+                                        $review = $employee->pdsSectionReviews->where('section_name', $section['label'])->first();
+                                        $reviewStatus = $review ? $review->status : 'pending';
+                                        $reviewRemarks = $review ? $review->remarks : '';
+                                        $changed = $pdsReviewChangedFields[$section['label']] ?? ['fields' => [], 'entries' => []];
+                                    @endphp
+                                    <button @click="reviewModalOpen = true; currentSection = '{{ $section['label'] }}'; sectionData = {{ json_encode($section['data']) }}; changedFields = @js($changed['fields']); changedEntries = @js($changed['entries']); reviewStatus = '{{ $reviewStatus === 'rejected' ? 'rejected' : 'approved' }}'; reviewRemarks = '{{ addslashes($reviewRemarks) }}'" class="group flex items-center p-4 bg-gray-50 rounded-xl border border-gray-100 shadow-sm transition-all duration-200 hover:border-indigo-300 hover:shadow-md cursor-pointer relative overflow-hidden text-left focus:outline-none">
+                                        <!-- Hover indicator bar -->
+                                        <div class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                        
+                                        <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center mr-4 transition-transform group-hover:scale-110 {{ $section['filled'] ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-500' }}">
+                                            @if($section['filled'])
+                                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                                </svg>
+                                            @else
+                                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                            @endif
+                                        </div>
+                                        <div class="overflow-hidden flex-1">
+                                            <span class="block text-sm font-black truncate tracking-tight transition-colors {{ $section['filled'] ? 'text-gray-900 group-hover:text-emerald-700' : 'text-gray-400 group-hover:text-indigo-600' }}">{{ $section['label'] }}</span>
+                                            <div class="flex items-center justify-between mt-0.5">
+                                                <div class="flex items-center gap-1.5 leading-none">
+                                                    <div class="w-1.5 h-1.5 rounded-full {{ $section['filled'] ? 'bg-emerald-500' : 'bg-gray-300 group-hover:bg-indigo-400' }}"></div>
+                                                    <span class="text-[9px] font-black uppercase tracking-widest transition-colors {{ $section['filled'] ? 'text-emerald-600' : 'text-gray-400 group-hover:text-indigo-500' }}">
+                                                        {{ $section['filled'] ? 'Saved' : 'Blank' }}
+                                                    </span>
+                                                    @if($reviewStatus === 'approved')
+                                                        <span class="ml-2 text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-100 px-1 rounded">Approved</span>
+                                                    @elseif($reviewStatus === 'rejected')
+                                                        <span class="ml-2 text-[9px] font-black uppercase tracking-widest text-red-600 bg-red-100 px-1 rounded">Rejected</span>
+                                                    @endif
+                                                    @if(count($changed['fields']) || count($changed['entries']))
+                                                        <span class="ml-2 inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-red-600">
+                                                            <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                                                            Updated
                                                         </span>
-                                                        @if($reviewStatus === 'approved')
-                                                            <span class="ml-2 text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-100 px-1 rounded">Approved</span>
-                                                        @elseif($reviewStatus === 'rejected')
-                                                            <span class="ml-2 text-[9px] font-black uppercase tracking-widest text-red-600 bg-red-100 px-1 rounded">Rejected</span>
-                                                        @endif
-                                                    </div>
-                                                    <svg class="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
-                                                    </svg>
+                                                    @endif
                                                 </div>
+                                                <svg class="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
+                                                </svg>
                                             </div>
-                                        </button>
-                                    @endforeach
-                                </div>
+                                        </div>
+                                    </button>
+                                @endforeach
+                            </div>
 
-                                <div class="mt-8 flex justify-center">
-                                    <a href="{{ route('pds.index') }}" class="text-indigo-600 hover:text-indigo-900 text-sm font-bold flex items-center gap-2">
-                                        {{ __('View Full PDS Record') }}
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                                    </a>
-                                </div>
+                            <div class="mt-8 flex justify-center">
+                                <a href="{{ route('employees.pds.show', $employee) }}" class="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-5 py-2.5 text-sm font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-xs">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                    {{ __('View Full PDS Record (Review)') }}
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                                </a>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Leave Credits Tab -->
-                <div x-show="tab === 'leave-credits'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;">
+                <div x-show="tab === 'leave-credits'" x-data="{ leaveCreditSearch: '' }" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;">
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-                        <div class="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                             <div>
                                 <h3 class="text-xl font-black text-gray-900 tracking-tight">{{ __('Leave Credits') }}</h3>
                                 <p class="text-sm font-medium text-gray-500">{{ __('Current year balances for this employee.') }}</p>
                             </div>
-                            <span class="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                {{ now()->year }}
-                            </span>
+                            <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto">
+                                <div class="relative w-full sm:w-80">
+                                    <svg class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1 0 6.05 6.05a7.5 7.5 0 0 0 10.6 10.6Z" />
+                                    </svg>
+                                    <input
+                                        type="search"
+                                        x-model.debounce.150ms="leaveCreditSearch"
+                                        placeholder="{{ __('Search leave type, basis, balance...') }}"
+                                        class="h-11 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-sm font-semibold text-slate-700 shadow-sm transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-indigo-100"
+                                    >
+                                </div>
+                            </div>
                         </div>
 
                         <div class="overflow-x-auto rounded-xl border border-gray-100">
@@ -218,8 +188,10 @@
                                 <thead class="bg-gray-50">
                                     <tr>
                                         <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Leave Type') }}</th>
-                                        <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Entitlement') }}</th>
+                                        <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Earned') }}</th>
+                                        <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Used') }}</th>
                                         <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Available Balance') }}</th>
+                                        <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('As Of') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 bg-white">
@@ -227,29 +199,46 @@
                                         @php
                                             $entitlement = $credit->leaveType?->days_per_year ?? 0;
                                             $percentage = $entitlement > 0 ? min(100, ($credit->balance / $entitlement) * 100) : 0;
+                                            $searchText = strtolower(collect([
+                                                $credit->leaveType?->name,
+                                                $credit->leaveType?->legal_basis,
+                                                number_format((float) $credit->earned, 3),
+                                                number_format((float) $credit->used, 3),
+                                                number_format((float) $credit->balance, 3),
+                                                $credit->accrued_as_of?->format('M d, Y'),
+                                            ])->filter()->implode(' '));
                                         @endphp
-                                        <tr class="hover:bg-gray-50/70 transition-colors">
+                                        <tr
+                                            x-show="@js($searchText).includes(leaveCreditSearch.toLowerCase().trim())"
+                                            class="hover:bg-gray-50/70 transition-colors"
+                                        >
                                             <td class="px-6 py-4 align-middle">
                                                 <div class="text-sm font-bold text-gray-900">{{ $credit->leaveType?->name ?? __('Leave Type') }}</div>
                                                 @if($credit->leaveType?->legal_basis)
                                                     <div class="mt-1 max-w-xl truncate text-xs italic text-gray-400">{{ $credit->leaveType->legal_basis }}</div>
                                                 @endif
                                             </td>
-                                            <td class="px-6 py-4 align-middle text-sm font-medium text-gray-600">
-                                                {{ number_format($entitlement, 1) }} {{ Str::plural('day', $entitlement) }}
+                                            <td class="px-6 py-4 align-middle text-sm font-bold text-gray-700">
+                                                {{ number_format((float) $credit->earned, 3) }}
+                                            </td>
+                                            <td class="px-6 py-4 align-middle text-sm font-bold text-gray-700">
+                                                {{ number_format((float) $credit->used, 3) }}
                                             </td>
                                             <td class="px-6 py-4 align-middle">
                                                 <div class="flex items-center gap-4">
                                                     <div class="w-36 overflow-hidden rounded-full bg-gray-100 h-2">
                                                         <div class="h-full rounded-full bg-indigo-600" style="width: {{ $percentage }}%"></div>
                                                     </div>
-                                                    <span class="text-sm font-black text-gray-900">{{ number_format($credit->balance, 1) }} {{ Str::plural('day', $credit->balance) }}</span>
+                                                    <span class="text-sm font-black text-gray-900">{{ number_format((float) $credit->balance, 3) }} {{ Str::plural('day', $credit->balance) }}</span>
                                                 </div>
+                                            </td>
+                                            <td class="px-6 py-4 align-middle text-sm font-medium text-gray-500">
+                                                {{ $credit->accrued_as_of?->format('M d, Y') ?? '-' }}
                                             </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="3" class="px-6 py-10 text-center text-sm font-medium text-gray-400">
+                                            <td colspan="5" class="px-6 py-10 text-center text-sm font-medium text-gray-400">
                                                 {{ __('No leave credits found for this employee.') }}
                                             </td>
                                         </tr>
@@ -318,12 +307,12 @@
         
         <!-- PDS Review Modal -->
         <div x-show="reviewModalOpen" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="flex items-end justify-center min-h-screen px-3 pb-16 pt-4 text-center sm:block sm:p-0">
                 <div x-show="reviewModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" @click="reviewModalOpen = false"></div>
 
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-                <div x-show="reviewModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-100">
+                <div x-show="reviewModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:w-[92vw] sm:max-w-5xl border border-gray-100">
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 max-h-[80vh] overflow-y-auto">
                         <div class="sm:flex sm:items-start">
                             <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
@@ -336,18 +325,33 @@
                                 
                                 <!-- Data Viewer -->
                                 <div class="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200 text-sm">
-                                    <h4 class="font-bold text-gray-700 mb-2">Section Data:</h4>
+                                    <div class="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                        <h4 class="font-bold text-gray-700">Section Data:</h4>
+                                        <div class="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-red-600" x-show="changedFields.length || changedEntries.length">
+                                            <span class="h-2 w-2 rounded-full bg-red-500"></span>
+                                            Changed after last review
+                                        </div>
+                                    </div>
                                     <template x-if="sectionData">
                                         <div class="space-y-1">
                                             <template x-if="Array.isArray(sectionData) && sectionData.length > 0">
                                                 <div>
                                                     <template x-for="(item, index) in sectionData" :key="index">
-                                                        <div class="mb-4 pb-2 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
-                                                            <div class="font-bold text-gray-500 text-xs mb-1 uppercase tracking-wider" x-text="'Entry ' + (index + 1)"></div>
+                                                        <div class="mb-4 pb-2 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0" :class="changedEntries.includes(index) ? 'border-l-4 border-red-400 bg-red-50/60 pl-3 pr-2' : ''">
+                                                            <div class="mb-1 flex items-center gap-2">
+                                                                <div class="font-bold text-gray-500 text-xs uppercase tracking-wider" :class="changedEntries.includes(index) ? 'text-red-700' : ''" x-text="'Entry ' + (index + 1)"></div>
+                                                                <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-red-700" x-show="changedEntries.includes(index)">
+                                                                    <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                                                                    Updated
+                                                                </span>
+                                                            </div>
                                                             <template x-for="(value, key) in item" :key="key">
                                                                 <div class="grid grid-cols-3 gap-2 py-1" x-show="key !== 'id' && key !== 'employee_id' && key !== 'created_at' && key !== 'updated_at'">
-                                                                    <div class="col-span-1 font-bold text-gray-600 capitalize truncate" x-text="key.replace(/_/g, ' ')"></div>
-                                                                    <div class="col-span-2 text-gray-900" x-text="value === null ? '---' : value"></div>
+                                                                    <div class="col-span-1 font-bold text-gray-600 capitalize truncate" :class="isChangedField(key, index) ? 'text-red-700' : ''">
+                                                                        <span class="mr-1 inline-block h-2 w-2 rounded-full bg-red-500" x-show="isChangedField(key, index)"></span>
+                                                                        <span x-text="key.replace(/_/g, ' ')"></span>
+                                                                    </div>
+                                                                    <div class="col-span-2 text-gray-900" :class="isChangedField(key, index) ? 'font-bold text-red-700' : ''" x-text="value === null ? '---' : value"></div>
                                                                 </div>
                                                             </template>
                                                         </div>
@@ -357,9 +361,12 @@
                                             <template x-if="!Array.isArray(sectionData)">
                                                 <div>
                                                     <template x-for="(value, key) in sectionData" :key="key">
-                                                        <div class="grid grid-cols-3 gap-2 py-1 border-b border-gray-100 last:border-0" x-show="key !== 'id' && key !== 'employee_id' && key !== 'created_at' && key !== 'updated_at'">
-                                                            <div class="col-span-1 font-bold text-gray-600 capitalize truncate" x-text="key.replace(/_/g, ' ')"></div>
-                                                            <div class="col-span-2 text-gray-900" x-text="value === null || value === '' ? '---' : value"></div>
+                                                        <div class="grid grid-cols-3 gap-2 py-1 border-b border-gray-100 last:border-0" :class="isChangedField(key) ? 'bg-red-50/70' : ''" x-show="key !== 'id' && key !== 'employee_id' && key !== 'created_at' && key !== 'updated_at'">
+                                                            <div class="col-span-1 font-bold text-gray-600 capitalize truncate" :class="isChangedField(key) ? 'text-red-700' : ''">
+                                                                <span class="mr-1 inline-block h-2 w-2 rounded-full bg-red-500" x-show="isChangedField(key)"></span>
+                                                                <span x-text="key.replace(/_/g, ' ')"></span>
+                                                            </div>
+                                                            <div class="col-span-2 text-gray-900" :class="isChangedField(key) ? 'font-bold text-red-700' : ''" x-text="value === null || value === '' ? '---' : value"></div>
                                                         </div>
                                                     </template>
                                                 </div>
@@ -372,14 +379,13 @@
                                 </div>
 
                                 <!-- Review Form -->
-                                <form id="review-form" action="{{ route('pds-reviews.store', $employee) }}" method="POST" class="mt-6 space-y-4">
+                                <form id="review-form" action="{{ route('pds-reviews.store', $employee) }}" method="POST" class="mt-6 space-y-4" onsubmit="const remarks = this.elements['remarks']; if (this.elements['status'].value === 'rejected' && !remarks.value.trim()) { remarks.setCustomValidity('Remarks are required when rejecting this section.'); remarks.reportValidity(); event.preventDefault(); return false; } remarks.setCustomValidity('');">
                                     @csrf
                                     <input type="hidden" name="section_name" x-model="currentSection">
                                     
                                     <div>
                                         <label class="block text-sm font-bold text-gray-700 mb-1">Status</label>
                                         <select name="status" x-model="reviewStatus" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
-                                            <option value="pending">Pending</option>
                                             <option value="approved">Approve</option>
                                             <option value="rejected">Reject</option>
                                         </select>
@@ -407,12 +413,12 @@
 
         <!-- SALN Details Modal -->
         <div x-show="salnModalOpen" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="flex items-end justify-center min-h-screen px-3 pb-16 pt-4 text-center sm:block sm:p-0">
                 <div x-show="salnModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" @click="salnModalOpen = false"></div>
 
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-                <div x-show="salnModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full border border-gray-100">
+                <div x-show="salnModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:w-[92vw] sm:max-w-6xl border border-gray-100">
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 max-h-[80vh] overflow-y-auto">
                         <div class="flex items-center justify-between mb-6 border-b border-gray-100 pb-4">
                             <h3 class="text-2xl font-black text-gray-900 flex items-center gap-3" id="modal-title">

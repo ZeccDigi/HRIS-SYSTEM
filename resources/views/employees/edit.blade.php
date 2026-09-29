@@ -45,9 +45,9 @@
                                     <x-input-error class="mt-2" :messages="$errors->get('contact_number')" />
                                 </div>
                                 <div>
-                                    <x-input-label for="notification_email" :value="__('Notification Email')" />
-                                    <x-text-input id="notification_email" name="notification_email" type="email" class="mt-1 block w-full" :value="old('notification_email', $employee->notification_email)" placeholder="employee@gmail.com" />
-                                    <p class="mt-1 text-xs text-gray-500">{{ __('Use an existing email where the employee can receive account details.') }}</p>
+                                    <x-input-label for="notification_email" :value="__('Recovery / OTP Email')" />
+                                    <x-text-input id="notification_email" name="notification_email" type="email" class="mt-1 block w-full" :value="old('notification_email', $employee->notification_email)" placeholder="juandelacruz@gmail.com" />
+                                    <p class="mt-1 text-xs text-gray-500">{{ __('Enter an active email address where the employee can receive account details, OTP verification codes, and security notifications.') }}</p>
                                     <x-input-error class="mt-2" :messages="$errors->get('notification_email')" />
                                 </div>
                                 <div>
@@ -110,19 +110,25 @@
                                     </select>
                                     <x-input-error class="mt-2" :messages="$errors->get('employment_status')" />
                                 </div>
+                                <div>
+                                    <x-input-label for="service_start_date" :value="__('Service Start Date')" />
+                                    <x-text-input id="service_start_date" name="service_start_date" type="date" class="mt-1 block w-full" :value="old('service_start_date', optional($employee->service_start_date)->format('Y-m-d') ?? $employee->service_start_date)" />
+                                    <p class="mt-1 text-xs text-gray-500">{{ __('Used as the starting point for organization leave-credit accrual. If blank, the employee record creation date is used.') }}</p>
+                                    <x-input-error class="mt-2" :messages="$errors->get('service_start_date')" />
+                                </div>
                             </div>
                         </div>
 
                         <div class="pt-4">
                             <div class="mb-5">
                                 <h3 class="text-lg font-medium text-gray-900 mb-1">{{ __('Account Access') }}</h3>
-                                <p class="text-sm text-gray-500">{{ __('Official login email is created during employee account setup. Edit only the notification email above if account messages should be sent elsewhere.') }}</p>
+                                <p class="text-sm text-gray-500">{{ __('The HRIS username is used only for system sign-in. Account messages are sent to the Recovery / OTP Email above.') }}</p>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <x-input-label for="official_login_email" :value="__('Official Login Email')" />
-                                    <input id="official_login_email" type="text" class="mt-1 block w-full rounded-md border-gray-200 bg-gray-50 text-sm text-gray-500 shadow-sm" value="{{ $employee->user?->email ?? __('No login account linked') }}" readonly>
-                                    <p class="mt-1 text-xs text-gray-500">{{ __('This is the @dmw.gov.ph login email. It is not edited here to avoid accidentally breaking account access.') }}</p>
+                                    <x-input-label for="hris_username" :value="__('HRIS Username')" />
+                                    <input id="hris_username" type="text" class="mt-1 block w-full rounded-md border-gray-200 bg-gray-50 text-sm text-gray-500 shadow-sm" value="{{ $employee->user?->email ?? __('No login account linked') }}" readonly>
+                                    <p class="mt-1 text-xs text-gray-500">{{ __("This is the employee's username for signing in to the HRIS. The @dmw.gov.ph suffix is part of the login username and is not an email inbox.") }}</p>
                                 </div>
                             </div>
                         </div>

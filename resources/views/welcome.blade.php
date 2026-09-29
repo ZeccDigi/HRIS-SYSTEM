@@ -38,9 +38,6 @@
                         <a href="{{ url('/dashboard') }}" class="font-medium text-gray-600 hover:text-[#0038a8] dark:text-gray-400 dark:hover:text-white transition">Dashboard</a>
                     @else
                         <a href="{{ route('login') }}" class="font-medium text-gray-600 hover:text-[#0038a8] dark:text-gray-400 dark:hover:text-white transition">Log in</a>
-                        @if (Route::has('register'))
-                            <a href="#" data-consent-href="{{ route('register.consent') }}" class="font-medium bg-[#0038a8] text-white px-5 py-2 rounded-full hover:bg-[#002a7a] transition shadow-md hover:shadow-lg register-link">Register</a>
-                        @endif
                     @endauth
                 </nav>
             @endif
@@ -88,11 +85,6 @@
                                     Access Portal
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
                                 </a>
-                                @if (Route::has('register'))
-                                    <a href="#" data-consent-href="{{ route('register.consent') }}" class="w-full sm:w-auto px-8 py-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-semibold rounded-xl border border-gray-200 dark:border-gray-700 hover:border-[#0038a8] dark:hover:border-[#fcd116] transition hover:shadow-md flex items-center justify-center register-link">
-                                        Create Account
-                                    </a>
-                                @endif
                             @endauth
                         @endif
                     </div>
@@ -119,86 +111,5 @@
         <footer class="w-full py-8 text-center text-sm text-gray-500 dark:text-gray-400 relative z-20">
             &copy; {{ date('Y') }} Department of Migrant Workers Philippines. All rights reserved.
         </footer>
-
-        <div id="privacyModal" class="fixed inset-0 z-50 hidden items-center justify-center px-4">
-            <div class="absolute inset-0 bg-black/50" id="privacyBackdrop"></div>
-            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 sm:p-8">
-                <div class="flex items-start justify-between gap-4">
-                    <h3 class="text-lg font-bold text-gray-800">Data Privacy Act of 2012 Consent</h3>
-                    <button type="button" class="text-gray-400 hover:text-gray-600" id="privacyClose">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-                <div class="mt-4 space-y-4 text-sm text-gray-700 leading-relaxed max-h-[50vh] overflow-y-auto pr-1">
-                    <p>
-                        Data Privacy Act of 2012, I consent to the following terms and conditions on the collection, use,
-                        processing and disclosure of my personal data: I am aware that the Department of Migrant Workers
-                        has collected and stored my personal data upon accomplishment of this form. These data include
-                        my full name, contact details like addresses, and landline/mobile numbers. I express my consent
-                        for the Department of Migrant Workers to collect, store my personal information. I hereby affirm
-                        my right to be informed, object to processing, access, and rectify and to suspend or withdraw my
-                        personal data pursuant to the provisions of the RA 10173 and its implementing rules and regulations.
-                    </p>
-                    <p>
-                        By clicking the Agree button below, I warrant that I have read, understood all of the above
-                        provisions, and agreed with its full implementation.
-                    </p>
-                    <p>
-                        Read the full text of the law at
-                        <a href="https://privacy.gov.ph/data-privacy-act/" target="_blank" rel="noopener noreferrer" class="text-blue-700 font-semibold hover:underline">privacy.gov.ph/data-privacy-act</a>.
-                    </p>
-                </div>
-                <div class="mt-6 flex items-center justify-end gap-3">
-                    <button type="button"
-                            class="px-4 py-2.5 text-sm font-semibold text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
-                            id="privacyCancel">
-                        Cancel
-                    </button>
-                    <button type="button"
-                            class="px-4 py-2.5 text-sm font-bold text-white bg-[#0038a8] rounded-lg hover:bg-[#002a7a]"
-                            id="privacyAgree">
-                        Agree
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <script>
-            const registerLinks = document.querySelectorAll('.register-link');
-            const privacyModal = document.getElementById('privacyModal');
-            const privacyBackdrop = document.getElementById('privacyBackdrop');
-            const privacyClose = document.getElementById('privacyClose');
-            const privacyCancel = document.getElementById('privacyCancel');
-            const privacyAgree = document.getElementById('privacyAgree');
-            let consentTarget = null;
-
-            function openPrivacyModal(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                event.stopImmediatePropagation();
-                consentTarget = event.currentTarget.getAttribute('data-consent-href');
-                privacyModal.classList.remove('hidden');
-                privacyModal.classList.add('flex');
-            }
-
-            function closePrivacyModal() {
-                privacyModal.classList.add('hidden');
-                privacyModal.classList.remove('flex');
-            }
-
-            registerLinks.forEach((link) => {
-                link.addEventListener('click', openPrivacyModal);
-            });
-            privacyBackdrop.addEventListener('click', closePrivacyModal);
-            privacyClose.addEventListener('click', closePrivacyModal);
-            privacyCancel.addEventListener('click', closePrivacyModal);
-            privacyAgree.addEventListener('click', () => {
-                if (consentTarget) {
-                    window.location.href = consentTarget;
-                }
-            });
-        </script>
     </body>
 </html>

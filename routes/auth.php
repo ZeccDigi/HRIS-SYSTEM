@@ -7,36 +7,10 @@ use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
-use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    Route::get('register/consent', function (Request $request) {
-        return redirect()->route('login')
-            ->with('status', 'Registration is handled by Human Resource personnel.');
-    })->name('register.consent');
-
-    Route::get('register', function () {
-        return redirect()->route('login')
-            ->with('status', 'Registration is handled by Human Resource personnel.');
-    })->name('register');
-
-    Route::post('register', function () {
-        return redirect()->route('login')
-            ->with('status', 'Registration is handled by Human Resource personnel.');
-    });
-
-    Route::get('register/verify-otp', [RegisteredUserController::class, 'showOtpForm'])
-        ->name('register.verify-otp');
-
-    Route::post('register/verify-otp', [RegisteredUserController::class, 'verifyOtp'])
-        ->name('register.verify-otp.submit');
-
-    Route::post('register/resend-otp', [RegisteredUserController::class, 'resendOtp'])
-        ->name('register.resend-otp');
-
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 

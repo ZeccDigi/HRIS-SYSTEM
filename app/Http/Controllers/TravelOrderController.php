@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Listeners\AuditLogListener;
 use App\Models\Employee;
 use App\Models\TravelOrder;
 use App\Models\User;
@@ -119,6 +120,13 @@ class TravelOrderController extends Controller
             'New Travel Authority',
             "{$employeeName} submitted a travel authority to {$travelOrder->places_of_travel} for Record Officer review."
         ));
+
+        AuditLogListener::logActivity(
+            'Submit Travel Order',
+            'Attendance',
+            "Submitted travel order ({$travelOrder->ta_number}) to {$travelOrder->places_of_travel} from {$travelOrder->travel_date_start} to {$travelOrder->travel_date_end}",
+            auth()->user()
+        );
 
         return redirect()->route('travel-orders.index')->with('success', 'Travel authority created successfully.');
     }
@@ -256,6 +264,13 @@ class TravelOrderController extends Controller
             ? 'Travel authority updated successfully.'
             : 'Travel authority rejected.';
 
+        AuditLogListener::logActivity(
+            ucfirst($validated['status']) . ' Travel Order',
+            'Attendance',
+            ucfirst($validated['status']) . " travel order ({$travelOrder->ta_number}) for employee " . trim(($travelOrder->employee->firstname ?? '') . ' ' . ($travelOrder->employee->lastname ?? '')),
+            auth()->user()
+        );
+
         return redirect()->route('hr.travel-orders.index', ['tab' => 'pending'])->with('success', $message);
     }
 
@@ -286,6 +301,13 @@ class TravelOrderController extends Controller
             'tar_status' => 'submitted',
             'tar_remarks' => $validated['tar_remarks'] ?? null,
         ]);
+
+        AuditLogListener::logActivity(
+            'Submit Travel Report',
+            'Attendance',
+            "Submitted travel accomplishment report for travel order ({$travelOrder->ta_number})",
+            auth()->user()
+        );
 
         return redirect()->route('travel-orders.index')->with('success', 'Travel accomplishment report submitted successfully.');
     }

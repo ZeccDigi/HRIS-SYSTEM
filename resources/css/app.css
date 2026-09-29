@@ -164,7 +164,7 @@
         height: 5px;
     }
     ::-webkit-scrollbar-track {
-        background: transparent;
+        backgroundd: transparent;
     }
     ::-webkit-scrollbar-thumb {
         background: #95c0f8;

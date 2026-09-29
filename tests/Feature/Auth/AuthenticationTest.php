@@ -1,8 +1,6 @@
 <?php
 
-use App\Mail\OtpVerificationMail;
 use App\Models\User;
-use Illuminate\Support\Facades\Mail;
 
 test('login screen can be rendered', function () {
     $response = $this->get('/login');
@@ -42,9 +40,7 @@ test('users can logout', function () {
     $response->assertRedirect('/');
 });
 
-test('unverified users are redirected to OTP verification', function () {
-    Mail::fake();
-
+test('unverified users cannot authenticate', function () {
     $user = User::factory()->unverified()->create([
         'password' => 'password',
     ]);
@@ -55,11 +51,5 @@ test('unverified users are redirected to OTP verification', function () {
     ]);
 
     $this->assertGuest();
-    $response->assertRedirect(route('register.verify-otp'));
-    $response->assertSessionHas('status');
-
-    // A new OTP should have been sent
-    Mail::assertSent(OtpVerificationMail::class, function ($mail) use ($user) {
-        return $mail->hasTo($user->email);
-    });
+    $response->assertSessionHasErrors('email');
 });

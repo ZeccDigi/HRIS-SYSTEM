@@ -2,7 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Listeners\AuditLogListener;
+use App\Models\Employee;
+use App\Models\User;
 use App\Models\UtilityOption;
+use App\Notifications\PdsUpdatedNotification;
+use App\Services\PdsExcelExporter;
 use App\Services\PdsPdfExporter;
 use App\Support\UtilityOptionRegistry;
 use Illuminate\Http\RedirectResponse;
@@ -12,6 +17,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PdsController extends Controller
 {
@@ -47,6 +53,23 @@ class PdsController extends Controller
             return redirect()
                 ->route('pds.index')
                 ->with('error', 'Could not generate PDF. Run: composer require barryvdh/laravel-dompdf - '.$e->getMessage());
+        }
+    }
+
+    public function downloadExcel(PdsExcelExporter $exporter): BinaryFileResponse|RedirectResponse
+    {
+        $employee = Auth::user()->employee;
+
+        if (! $employee) {
+            abort(404);
+        }
+
+        try {
+            return $exporter->download($employee);
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('pds.index')
+                ->with('error', 'Could not generate Excel PDS. '.$e->getMessage());
         }
     }
 
@@ -132,6 +155,50 @@ class PdsController extends Controller
         return view('pds.edit', compact('employee', 'utilityOptionSets', 'locationOptionSets', 'cityZipCodes'));
     }
 
+    public function showForHr(Employee $employee): View
+    {
+        $employee->load([
+            'user',
+            'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation',
+            'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks',
+            'pdsTrainings', 'pdsOthers', 'pdsQuestionnaire', 'pdsReferences', 'pdsGovId',
+            'pdsSectionReviews',
+        ]);
+
+        UtilityOptionRegistry::ensureDefaults();
+
+        $utilityOptionSets = [
+            'name_extensions' => UtilityOption::listFor('name_extensions', null, $employee->pdsPersonal?->name_extension),
+            'civil_statuses' => UtilityOption::listFor('civil_statuses', null, $employee->pdsPersonal?->civil_status),
+            'blood_types' => UtilityOption::listFor('blood_types', null, $employee->pdsPersonal?->blood_type),
+            'citizenship_types' => UtilityOption::listFor('citizenship_types', null, $employee->pdsPersonal?->citizenship_type),
+            'countries' => UtilityOption::listFor('countries', null, $employee->pdsPersonal?->citizenship_country),
+            'education_levels' => UtilityOption::listFor('education_levels'),
+            'highest_levels' => UtilityOption::listFor('highest_levels'),
+            'eligibility_titles' => UtilityOption::listFor('eligibility_titles'),
+            'salary_grades' => UtilityOption::listFor('salary_grades'),
+            'step_increments' => UtilityOption::listFor('step_increments'),
+            'appointment_statuses' => UtilityOption::listFor('appointment_statuses'),
+            'government_service_options' => UtilityOption::listFor('government_service_options'),
+            'government_id_types' => UtilityOption::listFor('government_id_types', null, $employee->pdsGovId?->id_type),
+        ];
+
+        $locationOptionSets = [
+            'countries' => UtilityOption::listFor('countries', null, $employee->pdsPersonal?->citizenship_country)->values(),
+            'ph_regions' => UtilityOption::query()->active()->forGroup('ph_regions')->orderBy('sort_order')->orderBy('label')->get(['label', 'value', 'parent_value']),
+            'ph_provinces' => UtilityOption::query()->active()->forGroup('ph_provinces')->orderBy('sort_order')->orderBy('label')->get(['label', 'value', 'parent_value']),
+            'ph_cities' => UtilityOption::query()->active()->forGroup('ph_cities')->orderBy('sort_order')->orderBy('label')->get(['label', 'value', 'parent_value']),
+            'ph_barangays' => UtilityOption::query()->active()->forGroup('ph_barangays')->orderBy('sort_order')->orderBy('label')->get(['label', 'value', 'parent_value']),
+        ];
+
+        $cityZipCodes = $this->cityZipCodes();
+        $isReadOnly = true;
+        $pdsReviewUpdates = $this->pdsReviewUpdates($employee);
+        $pdsReviewChangedInputNames = $this->pdsReviewChangedInputNames($employee);
+
+        return view('pds.edit', compact('employee', 'utilityOptionSets', 'locationOptionSets', 'cityZipCodes', 'isReadOnly', 'pdsReviewUpdates', 'pdsReviewChangedInputNames'));
+    }
+
     public function update(Request $request): RedirectResponse
     {
         $employee = Auth::user()->employee;
@@ -198,7 +265,7 @@ class PdsController extends Controller
             'family.mother_maiden_surname' => 'nullable|string',
             'children.*.fullname' => 'nullable|string',
             'children.*.date_of_birth' => 'nullable|date',
-            'education.*.level' => 'nullable|string',
+            'education.*.level' => 'required_with:education.*.school_name|nullable|string',
             'education.*.school_name' => 'nullable|string',
             'eligibility.*.title' => 'nullable|string',
             'work_experience.*.position_title' => 'nullable|string',
@@ -215,9 +282,20 @@ class PdsController extends Controller
             'gov_id.date_place_issuance' => 'nullable|string',
             'pds_photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'pds_signature' => 'nullable|image|mimes:png|max:2048',
+        ], [
+            'education.*.level.required_with' => 'The Level field (e.g., Elementary, Secondary, College) is required when a School Name is provided in Educational Background.',
         ]);
 
-        DB::transaction(function () use ($employee, $request) {
+        $employee->load([
+            'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation',
+            'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks',
+            'pdsTrainings', 'pdsOthers', 'pdsQuestionnaire', 'pdsReferences', 'pdsGovId',
+            'pdsSectionReviews',
+        ]);
+
+        $changedFieldsBySection = $this->changedFieldsBySection($employee, $request);
+
+        DB::transaction(function () use ($employee, $request, $changedFieldsBySection) {
             $employee->pdsPersonal()->updateOrCreate(['employee_id' => $employee->id], $request->input('personal', []));
             $employee->pdsFamily()->updateOrCreate(['employee_id' => $employee->id], $request->input('family', []));
             $employee->pdsQuestionnaire()->updateOrCreate(['employee_id' => $employee->id], $request->input('questionnaire', []));
@@ -259,7 +337,7 @@ class PdsController extends Controller
 
             $employee->pdsEducation()->delete();
             foreach ($request->input('education', []) as $edu) {
-                if (! empty($edu['school_name'])) {
+                if (! empty($edu['school_name']) && ! empty($edu['level'])) {
                     $employee->pdsEducation()->create($edu);
                 }
             }
@@ -317,9 +395,367 @@ class PdsController extends Controller
                     $employee->pdsReferences()->create($ref);
                 }
             }
+
+            foreach ($changedFieldsBySection as $sectionName => $changedFields) {
+                $this->markPdsSectionChanged($employee, $sectionName, $changedFields);
+            }
         });
 
+        AuditLogListener::logActivity(
+            'Update PDS',
+            'Employees',
+            'Updated Personal Data Sheet (PDS) for ' . trim(($employee->firstname ?? '') . ' ' . ($employee->lastname ?? '')),
+            Auth::user()
+        );
+
+        // Notify HR users (ADMIN / HRSTAFF) about the PDS update
+        $hrUsers = User::whereHas('employee', function ($q) {
+            $q->whereIn('account_role', ['ADMIN', 'HRSTAFF', 'admin', 'hrstaff', 'hr staff']);
+        })->get();
+
+        $employeeName = trim(($employee->firstname ?? '') . ' ' . ($employee->lastname ?? ''));
+        foreach ($hrUsers as $hrUser) {
+            if ($hrUser->id !== Auth::id()) {
+                $hrUser->notify(new PdsUpdatedNotification(
+                    employee: $employee,
+                    title: 'PDS Updated',
+                    message: "{$employeeName} updated their Personal Data Sheet."
+                ));
+            }
+        }
+
         return redirect()->route('pds.edit')->with('success', 'Personal Data Sheet successfully updated.');
+    }
+
+    private function pdsReviewUpdates(Employee $employee): array
+    {
+        $reviews = $employee->pdsSectionReviews->keyBy('section_name');
+
+        return [
+            'personal' => $this->labelsForChangedFields($reviews->get('Personal Information')?->changed_fields ?? [], $this->personalFieldLabels(), null, false),
+            'family' => array_merge(
+                $this->labelsForChangedFields($reviews->get('Family Background')?->changed_fields ?? [], $this->familyFieldLabels(), null, false),
+                $this->labelsForChangedFields($reviews->get('Family Background')?->changed_fields ?? [], $this->childFieldLabels(), 'children.')
+            ),
+            'education' => $this->labelsForChangedFields($reviews->get('Educational Background')?->changed_fields ?? [], $this->educationFieldLabels()),
+            'eligibility' => $this->labelsForChangedFields($reviews->get('Civil Service Eligibility')?->changed_fields ?? [], $this->eligibilityFieldLabels()),
+            'work' => $this->labelsForChangedFields($reviews->get('Work Experience')?->changed_fields ?? [], $this->workFieldLabels()),
+            'voluntary' => $this->labelsForChangedFields($reviews->get('Voluntary Work')?->changed_fields ?? [], $this->voluntaryFieldLabels()),
+            'training' => $this->labelsForChangedFields($reviews->get('Training')?->changed_fields ?? [], $this->trainingFieldLabels()),
+            'otherinfo' => array_merge(
+                $this->labelsForChangedFields($reviews->get('Other Information')?->changed_fields ?? [], $this->otherFieldLabels()),
+                $this->labelsForChangedFields($reviews->get('References')?->changed_fields ?? [], $this->referenceFieldLabels(), 'references.')
+            ),
+            'declaration' => array_merge(
+                $this->labelsForChangedFields($reviews->get('References')?->changed_fields ?? [], $this->questionnaireFieldLabels(), 'questionnaire.'),
+                $this->labelsForChangedFields($reviews->get('References')?->changed_fields ?? [], $this->governmentIdFieldLabels(), 'gov_id.')
+            ),
+        ];
+    }
+
+    private function changedFieldsBySection(Employee $employee, Request $request): array
+    {
+        return [
+            'Personal Information' => array_merge(
+                $this->changedKeysFromInput($employee->pdsPersonal, $request->input('personal', []), array_keys($this->personalFieldLabels())),
+                $request->hasFile('pds_photo') ? ['pds_photo'] : []
+            ),
+            'Family Background' => array_merge(
+                $this->changedKeysFromInput($employee->pdsFamily, $request->input('family', []), array_keys($this->familyFieldLabels())),
+                $this->changedKeysFromRows($employee->pdsChildren, $request->input('children', []), array_keys($this->childFieldLabels()), 'children')
+            ),
+            'Educational Background' => $this->changedKeysFromRows($employee->pdsEducation, $request->input('education', []), array_keys($this->educationFieldLabels())),
+            'Civil Service Eligibility' => $this->changedKeysFromRows($employee->pdsEligibilities, $request->input('eligibility', []), array_keys($this->eligibilityFieldLabels())),
+            'Work Experience' => $this->changedKeysFromRows($employee->pdsWorkExperiences, $request->input('work_experience', []), array_keys($this->workFieldLabels())),
+            'Voluntary Work' => $this->changedKeysFromRows($employee->pdsVoluntaryWorks, $request->input('voluntary', []), array_keys($this->voluntaryFieldLabels())),
+            'Training' => $this->changedKeysFromRows($employee->pdsTrainings, $request->input('training', []), array_keys($this->trainingFieldLabels())),
+            'Other Information' => $this->changedKeysFromRows($employee->pdsOthers, $request->input('others', []), array_keys($this->otherFieldLabels())),
+            'References' => array_merge(
+                $this->changedKeysFromRows($employee->pdsReferences, $request->input('references', []), array_keys($this->referenceFieldLabels()), 'references'),
+                $this->changedKeysFromInput($employee->pdsQuestionnaire, $request->input('questionnaire', []), array_keys($this->questionnaireFieldLabels()), 'questionnaire'),
+                $this->changedKeysFromInput($employee->pdsGovId, $request->input('gov_id', []), array_keys($this->governmentIdFieldLabels()), 'gov_id'),
+                $request->hasFile('pds_signature') ? ['gov_id.signature_path'] : []
+            ),
+        ];
+    }
+
+    private function changedKeysFromInput($record, array $input, array $fields, ?string $prefix = null): array
+    {
+        $changed = [];
+
+        foreach ($fields as $field) {
+            if (! array_key_exists($field, $input)) {
+                continue;
+            }
+
+            if ($this->normalizePdsValue($record?->{$field} ?? null) !== $this->normalizePdsValue($input[$field] ?? null)) {
+                $changed[] = $prefix ? "{$prefix}.{$field}" : $field;
+            }
+        }
+
+        return $changed;
+    }
+
+    private function changedKeysFromRows($rows, array $inputRows, array $fields, ?string $prefix = null): array
+    {
+        $changed = [];
+        $existingRows = $rows->values();
+        $inputRows = array_values($inputRows);
+        $maxRows = max($existingRows->count(), count($inputRows));
+
+        for ($index = 0; $index < $maxRows; $index++) {
+            $record = $existingRows->get($index);
+            $input = $inputRows[$index] ?? [];
+
+            foreach ($fields as $field) {
+                $oldValue = $record?->{$field} ?? null;
+                $newValue = $input[$field] ?? null;
+
+                if ($this->normalizePdsValue($oldValue) !== $this->normalizePdsValue($newValue)) {
+                    $changed[] = $prefix ? "{$prefix}.{$index}.{$field}" : "{$index}.{$field}";
+                }
+            }
+        }
+
+        return $changed;
+    }
+
+    private function normalizePdsValue($value): string
+    {
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        return trim((string) ($value ?? ''));
+    }
+
+    private function markPdsSectionChanged(Employee $employee, string $sectionName, array $changedFields): void
+    {
+        $changedFields = array_values(array_unique(array_filter($changedFields)));
+
+        if (empty($changedFields)) {
+            return;
+        }
+
+        $review = $employee->pdsSectionReviews()->firstOrNew(['section_name' => $sectionName]);
+        $existingFields = in_array($review->status, ['pending', 'rejected'], true) ? ($review->changed_fields ?? []) : [];
+
+        $review->status = 'pending';
+        $review->changed_fields = array_values(array_unique(array_merge($existingFields, $changedFields)));
+        $review->reviewed_by_id = null;
+        $review->save();
+    }
+
+    private function labelsForChangedFields(array $changedFields, array $fieldLabels, ?string $prefix = null, bool $includeDottedFields = true): array
+    {
+        return collect($changedFields)
+            ->filter(function ($field) use ($prefix, $includeDottedFields) {
+                if ($prefix) {
+                    return str_starts_with($field, $prefix);
+                }
+
+                return $includeDottedFields || ! str_contains($field, '.');
+            })
+            ->map(function ($field) use ($fieldLabels, $prefix) {
+                $field = $prefix ? substr($field, strlen($prefix)) : $field;
+                $baseField = str_contains($field, '.') ? substr($field, strrpos($field, '.') + 1) : $field;
+
+                return $fieldLabels[$baseField] ?? $this->humanizeChangedField($baseField);
+            })
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function pdsReviewChangedInputNames(Employee $employee): array
+    {
+        $reviews = $employee->pdsSectionReviews->keyBy('section_name');
+        $inputNames = [];
+
+        foreach ($reviews->get('Personal Information')?->changed_fields ?? [] as $field) {
+            if ($field === 'pds_photo') {
+                $inputNames[] = 'pds_photo';
+                continue;
+            }
+
+            $inputNames[] = "personal[{$field}]";
+        }
+
+        foreach ($reviews->get('Family Background')?->changed_fields ?? [] as $field) {
+            if (str_starts_with($field, 'children.')) {
+                $inputNames[] = $this->inputNameFromDottedField($field, 'children');
+                continue;
+            }
+
+            $inputNames[] = "family[{$field}]";
+        }
+
+        $rowSectionMap = [
+            'Educational Background' => 'education',
+            'Civil Service Eligibility' => 'eligibility',
+            'Work Experience' => 'work_experience',
+            'Voluntary Work' => 'voluntary',
+            'Training' => 'training',
+            'Other Information' => 'others',
+        ];
+
+        foreach ($rowSectionMap as $sectionName => $inputPrefix) {
+            foreach ($reviews->get($sectionName)?->changed_fields ?? [] as $field) {
+                $inputNames[] = $this->inputNameFromDottedField($field, $inputPrefix);
+            }
+        }
+
+        foreach ($reviews->get('References')?->changed_fields ?? [] as $field) {
+            if (str_starts_with($field, 'references.')) {
+                $inputNames[] = $this->inputNameFromDottedField($field, 'references');
+            } elseif (str_starts_with($field, 'questionnaire.')) {
+                $inputNames[] = 'questionnaire['.substr($field, strlen('questionnaire.')).']';
+            } elseif (str_starts_with($field, 'gov_id.')) {
+                $inputNames[] = 'gov_id['.substr($field, strlen('gov_id.')).']';
+            }
+        }
+
+        return array_values(array_unique(array_filter($inputNames)));
+    }
+
+    private function inputNameFromDottedField(string $field, string $inputPrefix): ?string
+    {
+        $field = str_starts_with($field, "{$inputPrefix}.") ? substr($field, strlen($inputPrefix) + 1) : $field;
+        $parts = explode('.', $field);
+
+        if (count($parts) < 2) {
+            return null;
+        }
+
+        return "{$inputPrefix}[{$parts[0]}][{$parts[1]}]";
+    }
+
+    private function humanizeChangedField(string $field): string
+    {
+        return str($field)->replace('_', ' ')->title()->toString();
+    }
+
+    private function personalFieldLabels(): array
+    {
+        return [
+            'surname' => 'Surname',
+            'firstname' => 'First name',
+            'middlename' => 'Middle name',
+            'name_extension' => 'Name extension',
+            'date_of_birth' => 'Date of birth',
+            'place_of_birth' => 'Place of birth',
+            'sex' => 'Sex',
+            'civil_status' => 'Civil status',
+            'height_m' => 'Height',
+            'weight_kg' => 'Weight',
+            'blood_type' => 'Blood type',
+            'gsis_id_no' => 'GSIS ID no.',
+            'pagibig_id_no' => 'Pag-IBIG ID no.',
+            'philhealth_no' => 'PhilHealth no.',
+            'sss_no' => 'SSS no.',
+            'tin_no' => 'TIN no.',
+            'agency_employee_no' => 'Agency employee no.',
+            'umid_no' => 'UMID ID no.',
+            'philsys_no' => 'PhilSys no.',
+            'citizenship' => 'Citizenship',
+            'citizenship_type' => 'Citizenship type',
+            'citizenship_country' => 'Citizenship country',
+            'res_house_no' => 'Residential house/block/lot no.',
+            'res_street' => 'Residential street',
+            'res_subdivision' => 'Residential subdivision/village',
+            'res_region' => 'Residential region',
+            'res_province' => 'Residential province',
+            'res_city' => 'Residential city/municipality',
+            'res_barangay' => 'Residential barangay',
+            'res_zip_code' => 'Residential ZIP code',
+            'perm_house_no' => 'Permanent house/block/lot no.',
+            'perm_street' => 'Permanent street',
+            'perm_subdivision' => 'Permanent subdivision/village',
+            'perm_region' => 'Permanent region',
+            'perm_province' => 'Permanent province',
+            'perm_city' => 'Permanent city/municipality',
+            'perm_barangay' => 'Permanent barangay',
+            'perm_zip_code' => 'Permanent ZIP code',
+            'telephone_no' => 'Telephone no.',
+            'mobile_no' => 'Mobile no.',
+            'email_address' => 'Email address',
+            'pds_photo' => 'Official photo',
+        ];
+    }
+
+    private function familyFieldLabels(): array
+    {
+        return [
+            'spouse_surname' => 'Spouse surname',
+            'spouse_firstname' => 'Spouse first name',
+            'spouse_middlename' => 'Spouse middle name',
+            'spouse_extension' => 'Spouse extension',
+            'spouse_occupation' => 'Spouse occupation',
+            'spouse_employer' => 'Spouse employer',
+            'spouse_business_address' => 'Spouse business address',
+            'spouse_telephone_no' => 'Spouse telephone no.',
+            'father_surname' => 'Father surname',
+            'father_firstname' => 'Father first name',
+            'father_middlename' => 'Father middle name',
+            'father_extension' => 'Father extension',
+            'mother_maiden_surname' => 'Mother maiden surname',
+            'mother_firstname' => 'Mother first name',
+            'mother_middlename' => 'Mother middle name',
+        ];
+    }
+
+    private function childFieldLabels(): array
+    {
+        return ['fullname' => 'Child name', 'date_of_birth' => 'Child date of birth'];
+    }
+
+    private function educationFieldLabels(): array
+    {
+        return ['level' => 'Education level', 'school_name' => 'School name', 'course' => 'Course', 'period_from' => 'Education period from', 'period_to' => 'Education period to', 'highest_level' => 'Highest level', 'year_graduated' => 'Year graduated', 'honors' => 'Honors'];
+    }
+
+    private function eligibilityFieldLabels(): array
+    {
+        return ['title' => 'Eligibility title', 'rating' => 'Rating', 'date_of_exam' => 'Date of examination', 'place_of_exam' => 'Place of examination', 'license_number' => 'License number', 'license_validity' => 'License validity'];
+    }
+
+    private function workFieldLabels(): array
+    {
+        return ['date_from' => 'Work date from', 'date_to' => 'Work date to', 'position_title' => 'Position title', 'company' => 'Department/agency/company', 'monthly_salary' => 'Monthly salary', 'salary_grade' => 'Salary grade', 'appointment_status' => 'Appointment status', 'is_gov_service' => 'Government service'];
+    }
+
+    private function voluntaryFieldLabels(): array
+    {
+        return ['organization_name' => 'Organization name', 'date_from' => 'Voluntary work date from', 'date_to' => 'Voluntary work date to', 'number_of_hours' => 'Number of hours', 'position' => 'Position/nature of work'];
+    }
+
+    private function trainingFieldLabels(): array
+    {
+        return ['title' => 'Training title', 'date_from' => 'Training date from', 'date_to' => 'Training date to', 'number_of_hours' => 'Number of hours', 'type' => 'Training type', 'conducted_by' => 'Conducted/sponsored by', 'attachment_path' => 'Training attachment'];
+    }
+
+    private function otherFieldLabels(): array
+    {
+        return ['type' => 'Other information type', 'description' => 'Other information details'];
+    }
+
+    private function referenceFieldLabels(): array
+    {
+        return ['name' => 'Reference name', 'address' => 'Reference address', 'telephone_no' => 'Reference telephone no.'];
+    }
+
+    private function questionnaireFieldLabels(): array
+    {
+        return ['q34_a' => 'Question 34-A', 'q34_b' => 'Question 34-B', 'q34_details' => 'Question 34 details', 'q35_a' => 'Question 35-A', 'q35_b' => 'Question 35-B', 'q35_details' => 'Question 35 details', 'q35_date_filed' => 'Question 35 date filed', 'q35_status' => 'Question 35 status', 'q36' => 'Question 36', 'q36_details' => 'Question 36 details', 'q37' => 'Question 37', 'q37_details' => 'Question 37 details', 'q38_a' => 'Question 38-A', 'q38_a_details' => 'Question 38-A details', 'q38_b' => 'Question 38-B', 'q38_b_details' => 'Question 38-B details', 'q39' => 'Question 39', 'q39_details' => 'Question 39 details', 'q40_a' => 'Question 40-A', 'q40_a_details' => 'Question 40-A details', 'q40_b' => 'Question 40-B', 'q40_b_details' => 'Question 40-B details', 'q40_c' => 'Question 40-C', 'q40_c_details' => 'Question 40-C details'];
+    }
+
+    private function governmentIdFieldLabels(): array
+    {
+        return ['id_type' => 'Government ID type', 'id_no' => 'Government ID number', 'date_place_issuance' => 'ID date/place of issuance', 'signature_path' => 'Signature'];
     }
 
     private function cityZipCodes(): array

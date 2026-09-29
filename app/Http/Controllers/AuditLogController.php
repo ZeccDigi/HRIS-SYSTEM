@@ -20,7 +20,8 @@ class AuditLogController extends Controller
         $status = strtolower((string) $request->input('status'));
         $module = trim((string) $request->input('module'));
         $selectedDate = $request->input('date');
-        $selectedYear = $request->input('year');
+        $selectedYear = $request->has('year') && $request->input('year') !== '' ? $request->input('year') : date('Y');
+
 
         // -----------------------
         // 1. LOGIN AUDIT QUERY

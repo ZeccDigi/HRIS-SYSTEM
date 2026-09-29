@@ -64,7 +64,7 @@
 
                 <!-- Credits Summary Tab -->
                 <div x-show="tab === 'credits'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                         @foreach($credits->filter(function ($credit) {
                             $leaveName = Str::lower(trim($credit->leaveType?->name ?? ''));
 
@@ -76,13 +76,25 @@
                                 
                             ], true);
                         }) as $credit)
-                            <div
-                                class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 ring-1 ring-black/5 transform hover:scale-105 transition-all duration-300">
-                                <div class="text-[10px] font-black uppercase text-blue-900 tracking-widest mb-1">
-                                    {{ $credit->leaveType->name }}</div>
-                                <div class="flex items-baseline gap-1">
-                                    <span class="text-3xl font-black text-gray-900">{{ number_format($credit->balance, 1) }}</span>
-                                    <span class="text-xs font-bold text-gray-400 capitalize">{{ __('Days Left') }}</span>
+                            <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+                                <div class="min-h-[2.5rem] text-[10px] font-black uppercase text-blue-900 tracking-widest">
+                                    {{ $credit->leaveType->name }}
+                                </div>
+                                <div class="mt-2 flex items-end justify-between gap-3">
+                                    <div>
+                                        <div class="text-3xl font-black leading-none text-gray-900">{{ number_format((float) $credit->balance, 3) }}</div>
+                                        <div class="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-400">{{ __('Days Left') }}</div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-gray-100 bg-gray-50/70">
+                                    <div class="border-r border-gray-100 px-3 py-2.5">
+                                        <div class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ __('Earned') }}</div>
+                                        <div class="mt-1 text-sm font-black text-gray-900">{{ number_format((float) $credit->earned, 3) }}</div>
+                                    </div>
+                                    <div class="px-3 py-2.5">
+                                        <div class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ __('Used') }}</div>
+                                        <div class="mt-1 text-sm font-black text-gray-900">{{ number_format((float) $credit->used, 3) }}</div>
+                                    </div>
                                 </div>
                                 <div class="mt-4 w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
                                     @php

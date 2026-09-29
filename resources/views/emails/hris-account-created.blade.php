@@ -19,9 +19,11 @@
                 <p style="margin:0 0 16px;">HR has created your DMW HRIS account. You may now log in using the details below.</p>
 
                 <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;margin:22px 0;">
-                    <p style="margin:0 0 10px;"><strong>Login Email:</strong> {{ $email }}</p>
+                    <p style="margin:0 0 10px;"><strong>HRIS Username:</strong> {{ $hrisUsername }}</p>
                     <p style="margin:0;"><strong>Temporary Password:</strong> {{ $temporaryPassword }}</p>
                 </div>
+
+                <p style="margin:0 0 16px;color:#4b5563;font-size:13px;">The @dmw.gov.ph value above is only your HRIS sign-in username. It is not an email inbox.</p>
 
                 <p style="margin:0 0 16px;color:#991b1b;font-weight:600;">For your security, you will be asked to change this temporary password after logging in.</p>
 

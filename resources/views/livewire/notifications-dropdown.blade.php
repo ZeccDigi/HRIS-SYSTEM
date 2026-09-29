@@ -51,6 +51,7 @@
                         'travel_order' => 'bg-sky-100',
                         'cto_request' => 'bg-purple-100',
                         'announcement' => 'bg-amber-100',
+                        'pds_updated' => 'bg-emerald-100',
                         default => 'bg-gray-100'
                     };
                     $textColor = match($type) {
@@ -59,6 +60,7 @@
                         'travel_order' => 'text-sky-600',
                         'cto_request' => 'text-purple-600',
                         'announcement' => 'text-amber-600',
+                        'pds_updated' => 'text-emerald-600',
                         default => 'text-gray-600'
                     };
                     $borderColor = match($type) {
@@ -67,6 +69,7 @@
                         'travel_order' => 'border-sky-200',
                         'cto_request' => 'border-purple-200',
                         'announcement' => 'border-amber-200',
+                        'pds_updated' => 'border-emerald-200',
                         default => 'border-gray-200'
                     };
                 @endphp
@@ -76,7 +79,11 @@
                     @endif
                     <div class="flex items-start gap-3">
                         <div class="shrink-0 w-10 h-10 rounded-full {{ $bgColor }} flex items-center justify-center {{ $textColor }} group-hover:scale-110 transition-transform duration-300 shadow-sm border {{ $borderColor }}">
-                            @if($type === 'leave_request')
+                            @if($type === 'pds_updated')
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
+                                </svg>
+                            @elseif($type === 'leave_request')
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                 </svg>

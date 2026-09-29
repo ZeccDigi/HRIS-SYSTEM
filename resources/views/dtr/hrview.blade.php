@@ -41,66 +41,93 @@
                     rawScans: []
                 }"
             >
-                <div class="no-print flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
+                <div class="no-print flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="max-w-xl">
                         <h1 class="text-2xl font-black tracking-tight text-slate-900">
                             {{ __('Daily Attendance Monitoring') }}
                         </h1>
                         <p class="mt-1 flex items-center gap-2 text-sm font-medium text-slate-500">
                             <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                            <span>{{ \Carbon\Carbon::parse($selectedDate)->format('l, F j, Y') }}</span>
+                            <span>{{ \Carbon\Carbon::parse($selectedDate)->format('F j, Y') }}</span>
                         </p>
                     </div>
 
-                    <div class="flex flex-col items-end gap-3">
-                        <div class="flex items-center gap-2">
-                            <label for="attendance_year" class="text-sm font-semibold text-slate-700">
-                                {{ __('Year') }}
-                            </label>
+                    <div class="relative w-full max-w-sm lg:ml-auto lg:w-80" @click.outside="activePicker = false">
+                            <button
+                                id="attendance_date_picker"
+                                type="button"
+                                @click.stop="toggleDatePicker()"
+                                class="flex h-11 w-full items-center justify-between rounded-xl border border-gray-100 bg-gray-50/50 px-4 text-left text-sm font-bold text-gray-900 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                :class="activePicker ? 'border-indigo-500 ring-2 ring-indigo-500' : 'hover:border-indigo-200'"
+                            >
+                                <span x-text="formatDate(date)"></span>
+                                <svg class="h-5 w-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </button>
 
-                            @php
-                                $currentYear = now()->year;
-                                $selectedYear = \Carbon\Carbon::parse($selectedDate)->year;
-                            @endphp
-
-                            <div class="relative">
+                            <div x-show="activePicker" x-transition x-cloak @click.stop class="absolute right-0 z-50 mt-2 w-full rounded-2xl border border-gray-100 bg-white p-4 shadow-2xl">
+                            <div class="mb-3 space-y-2">
                                 <select
-                                    id="attendance_year"
-                                    x-model="year"
-                                    @change="changeYear()"
-                                    class="h-10 w-28 appearance-none rounded-lg border-slate-300 bg-white pl-4 pr-9 text-sm shadow-sm focus:border-[#2b428f] focus:ring-[#2b428f]"
+                                    :value="String(calendarYear)"
+                                    @change.stop="calendarYear = Number($event.target.value); changeCalendarYear()"
+                                    x-effect="$el.value = String(calendarYear)"
+                                    autocomplete="off"
+                                    class="h-8 w-full rounded-lg border-gray-100 bg-gray-50 px-3 text-xs font-black text-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                 >
-                                    @for ($yearOption = $currentYear; $yearOption >= $currentYear - 4; $yearOption--)
-                                        <option value="{{ $yearOption }}">{{ $yearOption }}</option>
-                                    @endfor
-
-                                    @if($selectedYear > $currentYear || $selectedYear < $currentYear - 4)
-                                        <option value="{{ $selectedYear }}">{{ $selectedYear }}</option>
-                                    @endif
+                                    <template x-for="year in calendarYears()" :key="year">
+                                        <option :value="String(year)" x-text="year"></option>
+                                    </template>
                                 </select>
-
-                                <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500">
-                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6" />
-                                    </svg>
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" @click.stop="moveMonth(-1)" class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-indigo-50 hover:text-indigo-700">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                        </svg>
+                                    </button>
+                                    <div class="min-w-0 flex-1 truncate text-center text-xs font-black uppercase tracking-widest text-gray-700" x-text="monthName"></div>
+                                    <button type="button" @click.stop="moveMonth(1)" class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-indigo-50 hover:text-indigo-700">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="mb-4 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-                            <a href="{{ request()->fullUrlWithQuery(['date' => \Carbon\Carbon::parse($selectedDate)->subDay()->format('Y-m-d')]) }}" class="flex items-center gap-1 rounded-lg px-4 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50">
-                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                                {{ __('Prev') }}
-                            </a>
-                            <a href="{{ request()->fullUrlWithQuery(['date' => \Carbon\Carbon::parse($selectedDate)->addDay()->format('Y-m-d')]) }}" class="flex items-center gap-1 rounded-lg px-4 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50">
-                                {{ __('Next') }}
-                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                            </a>
+                            <div class="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                <span>Sun</span>
+                                <span>Mon</span>
+                                <span>Tue</span>
+                                <span>Wed</span>
+                                <span>Thu</span>
+                                <span>Fri</span>
+                                <span>Sat</span>
+                            </div>
+
+                            <div class="grid grid-cols-7 gap-1">
+                                <template x-for="day in calendarDays()" :key="day.key">
+                                    <div>
+                                        <template x-if="day.blank">
+                                            <span class="block h-9"></span>
+                                        </template>
+                                        <template x-if="!day.blank">
+                                            <button
+                                                type="button"
+                                                x-text="day.day"
+                                                @click.stop="selectDate(day.value)"
+                                                class="flex h-9 w-full items-center justify-center rounded-lg text-xs font-black transition"
+                                                :class="day.selected ? 'bg-indigo-600 text-white shadow-md' : (day.today ? 'border border-indigo-200 bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-indigo-50 hover:text-indigo-700')"
+                                            ></button>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+
                         </div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div class="mt-6 grid grid-cols-2 gap-5 md:grid-cols-4">
                     <div class="flex flex-col justify-between rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm">
                         <span class="text-[9px] font-black uppercase tracking-wider text-slate-400">
                             {{ __('Total Employees') }}
@@ -138,8 +165,8 @@
                     </div>
                 </div>
 
-                <div class="no-print border-b border-slate-200 bg-slate-50/70 p-2">
-                    <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                <div class="no-print mt-5 border-b border-slate-200 bg-slate-50/70 p-3">
+                    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
                         <div class="relative min-w-0 sm:flex-1">
                             <label for="attendance_search" class="sr-only">{{ __('Search attendance records') }}</label>
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
@@ -189,7 +216,7 @@
                     </div>
                 </div>
 
-                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div class="overflow-x-auto">
                         <table class="w-full border-collapse text-left text-[11px] leading-tight">
                             <thead>
@@ -442,9 +469,19 @@
                 division: config.division || 'all',
                 employmentStatus: config.employmentStatus || 'all',
                 date: config.date,
-                year: String(new Date(`${config.date}T00:00:00`).getFullYear()),
+                activePicker: false,
+                calendarMonth: new Date(`${config.date}T00:00:00`),
+                calendarYear: new Date(`${config.date}T00:00:00`).getFullYear(),
+                todayDate: new Date().toISOString().slice(0, 10),
+                monthNames: [
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December',
+                ],
                 rows: [],
                 noResults: false,
+                get monthName() {
+                    return this.monthNames[this.calendarMonth.getMonth()];
+                },
 
                 init() {
                     this.rows = Array.from(document.querySelectorAll('[data-attendance-row]'));
@@ -475,30 +512,94 @@
                     this.noResults = this.rows.length > 0 && visibleCount === 0;
                 },
 
+                toggleDatePicker() {
+                    this.calendarMonth = new Date(`${this.date}T00:00:00`);
+                    this.calendarYear = this.calendarMonth.getFullYear();
+                    this.activePicker = ! this.activePicker;
+                },
 
+                moveMonth(offset) {
+                    this.calendarMonth = new Date(this.calendarMonth.getFullYear(), this.calendarMonth.getMonth() + offset, 1);
+                    this.calendarYear = this.calendarMonth.getFullYear();
+                },
 
-                changeYear() {
-                    const currentDate = new Date(`${this.date}T00:00:00`);
-                    const selectedYear = Number(this.year);
-                    const month = currentDate.getMonth();
-                    const day = currentDate.getDate();
+                changeCalendarYear() {
+                    this.calendarMonth = new Date(Number(this.calendarYear), this.calendarMonth.getMonth(), 1);
+                },
 
-                    const targetDate = new Date(selectedYear, month, day);
+                calendarYears() {
+                    const selectedYear = new Date(`${this.date}T00:00:00`).getFullYear();
+                    const currentYear = new Date().getFullYear();
+                    const minYear = Math.min(selectedYear, currentYear - 4);
+                    const maxYear = Math.max(selectedYear, currentYear);
+                    const years = [];
 
-                    // Handle dates such as February 29 when the selected year is not a leap year.
-                    if (targetDate.getMonth() !== month) {
-                        targetDate.setDate(0);
+                    for (let year = maxYear; year >= minYear; year--) {
+                        years.push(year);
                     }
 
-                    const formattedDate = [
-                        targetDate.getFullYear(),
-                        String(targetDate.getMonth() + 1).padStart(2, '0'),
-                        String(targetDate.getDate()).padStart(2, '0'),
-                    ].join('-');
+                    return years;
+                },
 
+                calendarDays() {
+                    const year = this.calendarMonth.getFullYear();
+                    const month = this.calendarMonth.getMonth();
+                    const firstDay = new Date(year, month, 1);
+                    const lastDay = new Date(year, month + 1, 0);
+                    const days = [];
+
+                    for (let index = 0; index < firstDay.getDay(); index++) {
+                        days.push({ key: `blank-${index}`, blank: true });
+                    }
+
+                    for (let day = 1; day <= lastDay.getDate(); day++) {
+                        const value = this.dateValue(new Date(year, month, day));
+                        days.push({
+                            key: value,
+                            blank: false,
+                            day,
+                            value,
+                            selected: value === this.date,
+                            today: value === this.todayDate,
+                        });
+                    }
+
+                    return days;
+                },
+
+                selectDate(value) {
+                    this.date = value;
+                    this.activePicker = false;
+                    this.goToDate(value);
+                },
+
+                goToDate(value) {
                     const url = new URL(window.location.href);
-                    url.searchParams.set('date', formattedDate);
+                    url.searchParams.set('date', value);
+                    url.searchParams.set('search', this.search);
+                    url.searchParams.set('division', this.division);
+                    url.searchParams.set('employment_status', this.employmentStatus);
                     window.location.href = url.toString();
+                },
+
+                dateValue(date) {
+                    return [
+                        date.getFullYear(),
+                        String(date.getMonth() + 1).padStart(2, '0'),
+                        String(date.getDate()).padStart(2, '0'),
+                    ].join('-');
+                },
+
+                formatDate(value) {
+                    if (!value) {
+                        return 'Select date';
+                    }
+
+                    return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                    });
                 },
 
 

@@ -14,7 +14,7 @@ class HrisAccountCreatedMail extends Mailable
 
     public function __construct(
         public string $userName,
-        public string $email,
+        public string $hrisUsername,
         public string $temporaryPassword,
     ) {}
 

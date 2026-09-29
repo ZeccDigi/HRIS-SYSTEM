@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Listeners\AuditLogListener;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
 use App\Notifications\LeaveRequestNotification;
 use App\Notifications\LeaveStatusUpdatedNotification;
+use App\Services\LeaveCreditService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -250,20 +252,7 @@ class LeaveApplicationController extends Controller
                     $leaveApplication->rd_remarks = $remarks;
                     $leaveApplication->status = 'approved'; // Final Approval
 
-                    // Deduct Leave Credits
-                    $year = Carbon::parse($leaveApplication->start_date)->year;
-                    $leaveApplication->employee?->ensureLeaveCredits($year);
-                    $leaveCredit = $leaveApplication->employee?->leaveCredits()
-                        ->where('leave_type_id', $leaveApplication->leave_type_id)
-                        ->where('year', $year)
-                        ->first();
-
-                    if ($leaveCredit) {
-                        $days = (float) $leaveApplication->number_of_days;
-                        $leaveCredit->used_credits = (float) $leaveCredit->used_credits + $days;
-                        $leaveCredit->remaining_credits = max(0, (float) $leaveCredit->total_credits - (float) $leaveCredit->used_credits);
-                        $leaveCredit->save();
-                    }
+                    app(LeaveCreditService::class)->applyApprovedLeave($leaveApplication);
                 }
             }
 
@@ -279,6 +268,19 @@ class LeaveApplicationController extends Controller
                 $leaveApplication->employee->user->notify(new LeaveStatusUpdatedNotification($leaveApplication, $statusText));
             }
         });
+
+        $actionVerb = match ($validated['status']) {
+            'approved' => $role === 'regionaldirector' ? 'Approved' : 'Verified/Recommended',
+            'rejected' => 'Rejected',
+            default => 'Updated',
+        };
+
+        AuditLogListener::logActivity(
+            $actionVerb . ' Leave Application',
+            'Leaves',
+            $actionVerb . ' leave application (#' . $leaveApplication->id . ') for ' . trim(($leaveApplication->employee->firstname ?? '') . ' ' . ($leaveApplication->employee->lastname ?? '')),
+            auth()->user()
+        );
 
         return redirect()->route('leave-applications.index')->with('success', __('Leave application updated successfully.'));
     }

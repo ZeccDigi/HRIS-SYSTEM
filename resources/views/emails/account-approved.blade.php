@@ -42,7 +42,7 @@
                 </div>
 
                 <p style="margin: 20px 0 0; color: #374151; font-size: 15px; line-height: 1.6;">
-                    You can now log in and access the system using the email and password you registered with.
+                    You can now log in and access the system using the account credentials provided by HR.
                 </p>
 
                 {{-- Login Button --}}

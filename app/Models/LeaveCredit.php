@@ -10,8 +10,23 @@ class LeaveCredit extends Model
         'employee_id',
         'leave_type_id',
         'balance',
+        'earned',
+        'used',
+        'adjusted',
         'year',
+        'accrued_as_of',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'balance' => 'decimal:3',
+            'earned' => 'decimal:3',
+            'used' => 'decimal:3',
+            'adjusted' => 'decimal:3',
+            'accrued_as_of' => 'date',
+        ];
+    }
 
     public function employee()
     {
@@ -21,5 +36,11 @@ class LeaveCredit extends Model
     public function leaveType()
     {
         return $this->belongsTo(LeaveType::class);
+    }
+
+    public function transactions()
+    {
+        return $this->hasMany(LeaveCreditTransaction::class, 'leave_type_id', 'leave_type_id')
+            ->where('employee_id', $this->employee_id);
     }
 }

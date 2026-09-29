@@ -106,16 +106,16 @@
                     value=""
                 >
 
-                {{-- Email --}}
+                {{-- HRIS Username --}}
                 <div class="mb-4">
                     <input
                         type="email"
                         name="email"
                         id="email"
                         value="{{ old('email') }}"
-                        placeholder="name@dmw.gov.ph"
+                        placeholder="example@dmw.gov.ph"
                         pattern="^[^@\s]+@dmw\.gov\.ph$"
-                        title="Invalid email. Please use your official dmw.gov.ph email address."
+                        title="Invalid email."
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg
                                focus:outline-none focus:ring-2 focus:ring-blue-800
                                transition duration-200
@@ -128,8 +128,7 @@
                         id="emailError"
                         class="hidden block text-red-500 text-xs mt-1"
                     >
-                        Invalid email. Please use your official dmw.gov.ph
-                        email address.
+                        Invalid email.
                     </span>
 
                     @error('email')
@@ -146,7 +145,7 @@
                             type="password"
                             name="password"
                             id="password"
-                            placeholder="Password"
+                            placeholder="password"
                             class="w-full px-4 py-3 pr-11 border border-gray-300
                                    rounded-lg focus:outline-none focus:ring-2
                                    focus:ring-blue-800 transition duration-200

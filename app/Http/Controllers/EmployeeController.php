@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Listeners\AuditLogListener;
 use App\Mail\HrisAccountCreatedMail;
 use App\Models\Employee;
 use App\Models\UtilityOption;
@@ -99,12 +100,11 @@ class EmployeeController extends Controller
      */
     public function create(): View
     {
-        $users = User::whereDoesntHave('employee')->get();
         $roles = ['employee', 'hrstaff', 'recordofficer', 'chief', 'regionaldirector', 'admin'];
         $divisionOptions = $this->divisionOptions();
         $employmentStatuses = ['Regular', 'Job Order', 'Contract of Service'];
 
-        return view('employees.create', compact('users', 'roles', 'divisionOptions', 'employmentStatuses'));
+        return view('employees.create', compact('roles', 'divisionOptions', 'employmentStatuses'));
     }
 
     /**
@@ -112,24 +112,34 @@ class EmployeeController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $request->merge([
+            'hris_username' => Str::lower(trim((string) $request->input('hris_username'))),
+        ]);
+
         $validated = $request->validate([
             'lastname' => 'required|string|max:255',
             'firstname' => 'required|string|max:255',
             'middlename' => 'nullable|string|max:255',
             'contact_number' => 'nullable|string|max:20',
-            'notification_email' => 'nullable|required_with:account_email|email|max:255',
+            'notification_email' => 'required|email|max:255',
             'division' => ['required', 'string', Rule::in($this->divisionOptions())],
             'position' => 'required|string|max:255',
             'account_role' => 'required|string|in:employee,hrstaff,recordofficer,chief,regionaldirector,admin',
             'employment_status' => 'nullable|string|in:Regular,Job Order,Contract of Service',
-            'user_id' => 'nullable|exists:users,id|unique:employees,user_id',
-            'account_email' => 'nullable|email|max:255|ends_with:@dmw.gov.ph|unique:users,email',
+            'service_start_date' => 'nullable|date',
+            'hris_username' => ['required', 'string', 'max:64', 'regex:/^[a-z0-9._-]+$/'],
             'rfid_number' => 'nullable|string|max:255|unique:employees,rfid_number',
+        ], [
+            'notification_email.required' => 'The Recovery / OTP Email field is required.',
+            'hris_username.required' => 'The HRIS Username field is required.',
+            'hris_username.regex' => 'The HRIS Username may only contain lowercase letters, numbers, dots, underscores, and hyphens.',
         ]);
 
-        if (! empty($validated['user_id']) && ! empty($validated['account_email'])) {
+        $loginUsername = $validated['hris_username'].'@dmw.gov.ph';
+
+        if (User::where('email', $loginUsername)->exists()) {
             return back()
-                ->withErrors(['account_email' => 'Choose either a linked user account or create a new login account, not both.'])
+                ->withErrors(['hris_username' => 'This HRIS Username is already assigned to another employee.'])
                 ->withInput();
         }
 
@@ -137,27 +147,24 @@ class EmployeeController extends Controller
         $temporaryPassword = null;
         $notificationEmail = null;
 
-        DB::transaction(function () use (&$validated, &$createdAccount, &$temporaryPassword, &$notificationEmail) {
-            if (! empty($validated['account_email'])) {
-                $temporaryPassword = Str::password(12, true, true, false, false);
-                $notificationEmail = $validated['notification_email'];
-                $user = User::create([
-                    'name' => trim($validated['firstname'].' '.$validated['lastname']),
-                    'email' => $validated['account_email'],
-                    'password' => $temporaryPassword,
-                    'email_verified_at' => now(),
-                    'is_approved' => true,
-                    'must_change_password' => true,
-                    'account_status' => 'active',
-                    'privacy_consent' => false,
-                ]);
+        DB::transaction(function () use (&$validated, &$createdAccount, &$temporaryPassword, &$notificationEmail, $loginUsername) {
+            $temporaryPassword = Str::password(12, true, true, false, false);
+            $notificationEmail = $validated['notification_email'];
+            $user = User::create([
+                'name' => trim($validated['firstname'].' '.$validated['lastname']),
+                'email' => $loginUsername,
+                'password' => $temporaryPassword,
+                'email_verified_at' => now(),
+                'is_approved' => true,
+                'must_change_password' => true,
+                'account_status' => 'active',
+                'privacy_consent' => false,
+            ]);
 
-                $validated['user_id'] = $user->id;
-                $createdAccount = $user;
-            }
+            $validated['user_id'] = $user->id;
+            $createdAccount = $user;
 
-            unset($validated['account_email']);
-
+            unset($validated['hris_username']);
             Employee::create($validated);
         });
 
@@ -171,16 +178,23 @@ class EmployeeController extends Controller
             } catch (Throwable $exception) {
                 Log::warning('Unable to send HRIS account creation email.', [
                     'user_id' => $createdAccount->id,
-                    'email' => $createdAccount->email,
+                    'hris_username' => $createdAccount->email,
                     'notification_email' => $notificationEmail,
                     'message' => $exception->getMessage(),
                 ]);
 
                 return redirect()->route('employees.index')
                     ->with('success', 'Employee created successfully.')
-                    ->with('error', 'The login account was created, but the account email could not be sent. Please check the mail settings.');
+                    ->with('error', 'The login account was created, but the account details could not be sent to the Recovery / OTP Email. Please check the mail settings.');
             }
         }
+
+        AuditLogListener::logActivity(
+            'Create Employee',
+            'Employees',
+            'Created new employee record for ' . trim(($validated['firstname'] ?? '') . ' ' . ($validated['lastname'] ?? '')),
+            auth()->user()
+        );
 
         return redirect()->route('employees.index')->with('success', 'Employee created successfully.');
     }
@@ -199,7 +213,57 @@ class EmployeeController extends Controller
             'pdsSectionReviews', 'salns', 'leaveCredits.leaveType'
         ]);
 
-        return view('employees.show', compact('employee'));
+        $pdsReviewChangedFields = $this->pdsReviewChangedFields($employee);
+
+        return view('employees.show', compact('employee', 'pdsReviewChangedFields'));
+    }
+
+    private function pdsReviewChangedFields(Employee $employee): array
+    {
+        $reviews = $employee->pdsSectionReviews->keyBy('section_name');
+
+        return [
+            'Personal Information' => $this->changedReviewPayload($reviews->get('Personal Information')),
+            'Family Background' => $this->changedReviewPayload($reviews->get('Family Background')),
+            'Educational Background' => $this->changedReviewPayload($reviews->get('Educational Background')),
+            'Civil Service Eligibility' => $this->changedReviewPayload($reviews->get('Civil Service Eligibility')),
+            'Work Experience' => $this->changedReviewPayload($reviews->get('Work Experience')),
+            'Voluntary Work' => $this->changedReviewPayload($reviews->get('Voluntary Work')),
+            'Training' => $this->changedReviewPayload($reviews->get('Training')),
+            'Questionnaire' => $this->changedReviewPayload($reviews->get('Questionnaire')),
+            'References' => $this->changedReviewPayload($reviews->get('References')),
+        ];
+    }
+
+    private function changedReviewPayload($review): array
+    {
+        $changedFields = collect($review?->changed_fields ?? []);
+
+        if ($changedFields->isEmpty()) {
+            return ['fields' => [], 'entries' => []];
+        }
+
+        $entries = $changedFields
+            ->map(function ($field) {
+                $field = str_contains($field, '.') && ! is_numeric(strtok($field, '.'))
+                    ? substr($field, strpos($field, '.') + 1)
+                    : $field;
+
+                return preg_match('/^(\d+)\./', $field, $matches) ? (int) $matches[1] : null;
+            })
+            ->filter(fn ($index) => $index !== null)
+            ->unique()
+            ->values()
+            ->all();
+
+        $fields = $changedFields
+            ->filter(fn ($field) => ! preg_match('/(^|\.)(\d+)\./', $field))
+            ->map(fn ($field) => str_contains($field, '.') ? substr($field, strrpos($field, '.') + 1) : $field)
+            ->unique()
+            ->values()
+            ->all();
+
+        return ['fields' => $fields, 'entries' => $entries];
     }
 
     /**
@@ -301,16 +365,26 @@ class EmployeeController extends Controller
             'firstname' => 'required|string|max:255',
             'middlename' => 'nullable|string|max:255',
             'contact_number' => 'nullable|string|max:20',
-            'notification_email' => 'nullable|email|max:255',
+            'notification_email' => 'required|email|max:255',
             'division' => ['required', 'string', Rule::in($this->divisionOptions())],
             'position' => 'required|string|max:255',
             'account_role' => 'required|string|in:employee,hrstaff,recordofficer,chief,regionaldirector,admin',
             'employment_status' => 'nullable|string|in:Regular,Job Order,Contract of Service',
+            'service_start_date' => 'nullable|date',
             'user_id' => 'nullable|exists:users,id|unique:employees,user_id,' . $employee->id,
             'rfid_number' => 'nullable|string|max:255|unique:employees,rfid_number,' . $employee->id,
+        ], [
+            'notification_email.required' => 'The Recovery / OTP Email field is required.',
         ]);
 
         $employee->update($validated);
+
+        AuditLogListener::logActivity(
+            'Update Employee',
+            'Employees',
+            'Updated employee record for ' . trim(($employee->firstname ?? '') . ' ' . ($employee->lastname ?? '')),
+            auth()->user()
+        );
 
         return redirect()->route('employees.index')->with('success', 'Employee updated successfully.');
     }
@@ -327,6 +401,13 @@ class EmployeeController extends Controller
 
             $employee->delete();
         });
+
+        AuditLogListener::logActivity(
+            'Delete Employee',
+            'Employees',
+            'Archived employee record for ' . trim(($employee->firstname ?? '') . ' ' . ($employee->lastname ?? '')),
+            auth()->user()
+        );
 
         return redirect()->route('employees.index')->with('success', 'Employee archived and login access disabled successfully.');
     }
@@ -372,8 +453,8 @@ class EmployeeController extends Controller
      */
     public function uploadProfilePicture(Request $request, Employee $employee): RedirectResponse
     {
-        // Only allow admins, HR staff, regional directors, chiefs, or the employee themselves to update it.
-        if (!in_array(auth()->user()->role, ['admin', 'hrstaff', 'chief', 'regionaldirector']) && auth()->user()->employee?->id !== $employee->id) {
+        // Profile photos are self-service only; HR/admin roles can view records but cannot replace another employee's image.
+        if (auth()->user()->employee?->id !== $employee->id) {
             abort(403);
         }
 

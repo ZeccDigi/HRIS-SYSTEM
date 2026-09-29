@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Listeners\AuditLogListener;
 use App\Models\CtoRequest;
 use App\Models\Employee;
 use App\Models\User;
@@ -105,8 +106,9 @@ class CtoController extends Controller
         ]);
 
         $remarks = $validated['remarks'] ?? null;
+        $wasFullyApproved = $ctoRequest->status === 'approved';
 
-        DB::transaction(function () use ($validated, $ctoRequest, $role, $employeeId, $isHR, $remarks) {
+        DB::transaction(function () use ($validated, $ctoRequest, $role, $employeeId, $isHR, $remarks, $wasFullyApproved) {
             if ($validated['status'] === 'rejected') {
                 if ($isHR) {
                     $ctoRequest->hrstaff_status = 'rejected';
@@ -161,6 +163,20 @@ class CtoController extends Controller
                     $ctoRequest->rd_remarks = $remarks;
                     $ctoRequest->status = 'approved';
 
+                    if (! $wasFullyApproved && $ctoRequest->employee) {
+                        $newBalance = $ctoRequest->cto_balance_after;
+
+                        if ($newBalance === null) {
+                            $currentBalance = (float) $ctoRequest->employee->cto_balance;
+                            $hours = (float) $ctoRequest->hours;
+                            $newBalance = $ctoRequest->type === 'use'
+                                ? max(0, $currentBalance - $hours)
+                                : $currentBalance + $hours;
+                        }
+
+                        $ctoRequest->employee->update(['cto_balance' => $newBalance]);
+                    }
+
                     if ($ctoRequest->employee?->user) {
                         $ctoRequest->employee->user->notify(new CtoRequestNotification($ctoRequest, 'cto_fully_approved', 'Your CTO request has been fully approved.'));
                     }
@@ -169,6 +185,15 @@ class CtoController extends Controller
 
             $ctoRequest->save();
         });
+
+        $actionVerb = ucfirst($validated['status']);
+
+        AuditLogListener::logActivity(
+            $actionVerb . ' CTO Request',
+            'Leaves',
+            $actionVerb . ' CTO request (#' . $ctoRequest->id . ') for employee ' . trim(($ctoRequest->employee->firstname ?? '') . ' ' . ($ctoRequest->employee->lastname ?? '')),
+            auth()->user()
+        );
 
         return redirect()->back()->with('success', __('CTO request updated successfully.'));
     }

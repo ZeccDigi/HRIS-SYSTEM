@@ -149,7 +149,7 @@
                                     <tr class="hover:bg-gray-50 transition-colors duration-200">
                                         <td class="px-4 py-4">
                                             <div class="truncate text-sm font-medium text-gray-900">{{ $employee->lastname }}, {{ $employee->firstname }} {{ $employee->middlename ?? '-' }}</div>
-                                            <div class="truncate text-xs text-gray-400">{{ $employee->notification_email ?? __('No notification email') }}</div>
+                                            <div class="truncate text-xs text-gray-400">{{ $employee->notification_email ?? __('No recovery email') }}</div>
                                         </td>
                                         <td class="px-4 py-4">
                                             <span class="max-w-full truncate px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">

@@ -142,6 +142,7 @@
                         <!-- Pay Option -->
                         <div>
                             <span class="block text-sm font-medium text-gray-700">{{ __('Pay Option') }}</span>
+                            <p class="mt-1 text-xs font-medium text-gray-500">{{ __('If available credits are insufficient, the system will automatically save this request as Without Pay.') }}</p>
                             @php($payOption = old('is_paid', $leaf->is_paid === false ? '0' : '1'))
                             <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-indigo-300">

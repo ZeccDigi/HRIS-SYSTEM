@@ -44,9 +44,9 @@
                                     <x-input-error class="mt-2" :messages="$errors->get('contact_number')" />
                                 </div>
                                 <div>
-                                    <x-input-label for="notification_email" :value="__('Notification Email')" />
-                                    <x-text-input id="notification_email" name="notification_email" type="email" class="mt-1 block w-full" :value="old('notification_email')" placeholder="employee@gmail.com" />
-                                    <p class="mt-1 text-xs text-gray-500">{{ __('Use an existing email where the employee can receive account details.') }}</p>
+                                    <x-input-label for="notification_email" :value="__('Recovery / OTP Email')" />
+                                    <x-text-input id="notification_email" name="notification_email" type="email" class="mt-1 block w-full" :value="old('notification_email')" placeholder="juandelacruz@gmail.com" required />
+                                    <p class="mt-1 text-xs text-gray-500">{{ __('Enter an active email address where the employee can receive account details, OTP verification codes, and security notifications.') }}</p>
                                     <x-input-error class="mt-2" :messages="$errors->get('notification_email')" />
                                 </div>
                                 <div>
@@ -109,31 +109,29 @@
                                     </select>
                                     <x-input-error class="mt-2" :messages="$errors->get('employment_status')" />
                                 </div>
+                                <div>
+                                    <x-input-label for="service_start_date" :value="__('Service Start Date')" />
+                                    <x-text-input id="service_start_date" name="service_start_date" type="date" class="mt-1 block w-full" :value="old('service_start_date')" />
+                                    <p class="mt-1 text-xs text-gray-500">{{ __('Used as the starting point for organization leave-credit accrual. If blank, the employee record creation date is used.') }}</p>
+                                    <x-input-error class="mt-2" :messages="$errors->get('service_start_date')" />
+                                </div>
                             </div>
                         </div>
 
                         <div class="pt-4">
                             <div class="mb-5">
                                 <h3 class="text-lg font-medium text-gray-900 mb-1">{{ __('Account Access') }}</h3>
-                                <p class="text-sm text-gray-500">{{ __('Link an existing account, or create a new login account. The system will send the temporary password to the notification email above.') }}</p>
+                                <p class="text-sm text-gray-500">{{ __('Create the employee HRIS username. Account details will be sent only to the Recovery / OTP Email above.') }}</p>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <x-input-label for="user_id" :value="__('Linked User Account')" />
-                                    <select id="user_id" name="user_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
-                                        <option value="">{{ __('None - Keep as standby record') }}</option>
-                                        @foreach($users as $user)
-                                            <option value="{{ $user->id }}" {{ old('user_id') == $user->id ? 'selected' : '' }}>{{ $user->name }} ({{ $user->email }})</option>
-                                        @endforeach
-                                    </select>
-                                    <p class="mt-1 text-xs text-gray-500">{{ __('Use this only if the employee already registered an account.') }}</p>
-                                    <x-input-error class="mt-2" :messages="$errors->get('user_id')" />
-                                </div>
-                                <div>
-                                    <x-input-label for="account_email" :value="__('Official Login Email')" />
-                                    <x-text-input id="account_email" name="account_email" type="email" class="mt-1 block w-full" :value="old('account_email')" placeholder="employee@dmw.gov.ph" />
-                                    <p class="mt-1 text-xs text-gray-500">{{ __('The employee will use this email to log in. Use the notification email above to receive the temporary password.') }}</p>
-                                    <x-input-error class="mt-2" :messages="$errors->get('account_email')" />
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div class="md:col-span-2">
+                                    <x-input-label for="hris_username" :value="__('HRIS Username')" />
+                                    <div class="mt-1 flex rounded-md shadow-sm">
+                                        <input id="hris_username" name="hris_username" type="text" value="{{ old('hris_username') }}" placeholder="juan.delacruz" required class="block w-full min-w-0 flex-1 rounded-none rounded-l-md border-gray-300 lowercase focus:border-indigo-500 focus:ring-indigo-500">
+                                        <span class="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-gray-50 px-4 text-sm font-semibold text-gray-600">@dmw.gov.ph</span>
+                                    </div>
+                                    <p class="mt-1 text-xs text-gray-500">{{ __("This is the employee's username for signing in to the HRIS. The @dmw.gov.ph suffix is part of the login username and is not an email inbox.") }}</p>
+                                    <x-input-error class="mt-2" :messages="$errors->get('hris_username')" />
                                 </div>
                             </div>
                         </div>

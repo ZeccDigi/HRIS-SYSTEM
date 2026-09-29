@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Listeners\AuditLogListener;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\Holiday;
@@ -80,6 +81,8 @@ class MyLeaveController extends Controller
 
         // Calculate duration and reserved credits (pending)
         $duration = LeaveRequest::calculateBusinessDays($validated['start_date'], $validated['end_date']);
+        $leaveYear = Carbon::parse($validated['start_date'])->year;
+        $employee->ensureLeaveCredits($leaveYear);
 
         // Sum of days in pending requests for this type/year
         $pendingDays = $employee->leaveRequests()
@@ -92,21 +95,22 @@ class MyLeaveController extends Controller
 
         // Check credits (Warning only, filing is still allowed as unpaid)
         $credit = $employee->leaveCredits()->where('leave_type_id', $validated['leave_type_id'])
-            ->where('year', Carbon::parse($validated['start_date'])->year)
+            ->where('year', $leaveYear)
             ->first();
 
-        $availableBalance = ($credit?->balance ?? 0) - $pendingDays;
+        $availableBalance = max(0, ($credit?->balance ?? 0) - $pendingDays);
+        $isPaid = (bool) $validated['is_paid'] && $availableBalance >= $duration;
         
         // Deduction only happens on Approval. We allow filing even if credits are insufficient.
         $leaveRequest = $employee->leaveRequests()->create([
             ...$validated,
-            'is_paid' => (bool) $validated['is_paid'],
+            'is_paid' => $isPaid,
             'date_filed' => now(),
         ]);
 
         $msg = 'Leave request submitted successfully.';
-        if (! $credit || $availableBalance < $duration) {
-            $msg .= ' Note: You have insufficient credits, this leave may be approved without pay.';
+        if ((bool) $validated['is_paid'] && ! $isPaid) {
+            $msg .= ' The selected leave was automatically marked as without pay because the available credit is insufficient.';
         }
 
         // Notify HR first for leave review.
@@ -116,7 +120,14 @@ class MyLeaveController extends Controller
 
         Notification::send($hrUsers, new LeaveRequestNotification($leaveRequest));
 
-        return redirect()->route('leaves.index')->with('success', 'Leave request submitted successfully. Credits will be deducted once approved.');
+        AuditLogListener::logActivity(
+            'Submit Leave Application',
+            'Leaves',
+            "Submitted {$leaveType->name} leave application from {$validated['start_date']} to {$validated['end_date']}",
+            auth()->user()
+        );
+
+        return redirect()->route('leaves.index')->with('success', $msg.' Credits will be deducted once approved.');
     }
 
     /**
@@ -195,13 +206,43 @@ class MyLeaveController extends Controller
 
         $leaveType = LeaveType::findOrFail($validated['leave_type_id']);
         $this->validateLeaveEligibilityAndDates($request, $employee, $leaveType);
+        $duration = LeaveRequest::calculateBusinessDays($validated['start_date'], $validated['end_date']);
+        $leaveYear = Carbon::parse($validated['start_date'])->year;
+        $employee->ensureLeaveCredits($leaveYear);
+
+        $pendingDays = $employee->leaveRequests()
+            ->where('leave_type_id', $validated['leave_type_id'])
+            ->where('status', 'pending')
+            ->whereKeyNot($leaf->id)
+            ->get()
+            ->sum(fn ($request) => $request->duration);
+
+        $credit = $employee->leaveCredits()
+            ->where('leave_type_id', $validated['leave_type_id'])
+            ->where('year', $leaveYear)
+            ->first();
+
+        $availableBalance = max(0, ($credit?->balance ?? 0) - $pendingDays);
+        $isPaid = (bool) $validated['is_paid'] && $availableBalance >= $duration;
 
         $leaf->update([
             ...$validated,
-            'is_paid' => (bool) $validated['is_paid'],
+            'is_paid' => $isPaid,
         ]);
 
-        return redirect()->route('leaves.index')->with('success', 'Leave request updated successfully.');
+        AuditLogListener::logActivity(
+            'Update Leave Application',
+            'Leaves',
+            "Updated {$leaveType->name} leave application (#{$leaf->id})",
+            auth()->user()
+        );
+
+        $message = 'Leave request updated successfully.';
+        if ((bool) $validated['is_paid'] && ! $isPaid) {
+            $message .= ' It was automatically marked as without pay because the available credit is insufficient.';
+        }
+
+        return redirect()->route('leaves.index')->with('success', $message);
     }
 
     /**
@@ -220,6 +261,13 @@ class MyLeaveController extends Controller
         }
 
         $leaf->delete();
+
+        AuditLogListener::logActivity(
+            'Cancel Leave Application',
+            'Leaves',
+            "Cancelled leave application (#{$leaf->id})",
+            auth()->user()
+        );
 
         return redirect()->route('leaves.index')->with('success', 'Leave request cancelled successfully.');
     }

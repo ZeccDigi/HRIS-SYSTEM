@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Listeners\AuditLogListener;
 use App\Models\User;
 use App\Notifications\CtoRequestNotification;
 use Carbon\Carbon;
@@ -100,6 +101,13 @@ class MyCtoController extends Controller
             'New CTO Request',
             "{$employeeName} submitted a CTO request for {$ctoRequest->hours} hour(s)."
         ));
+
+        AuditLogListener::logActivity(
+            'Submit CTO Application',
+            'Leaves',
+            "Submitted CTO application ({$ctoRequest->type}) for {$ctoRequest->hours} hour(s) from {$ctoRequest->date_start} to {$ctoRequest->date_end}",
+            auth()->user()
+        );
 
         return redirect()->route('my-cto.index')->with('success', 'CTO request submitted successfully.');
     }

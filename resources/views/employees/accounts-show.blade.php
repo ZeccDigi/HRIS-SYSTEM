@@ -48,10 +48,11 @@
                         @method('PATCH')
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <!-- Email (Readonly) -->
+                            <!-- HRIS Username (Readonly) -->
                             <div class="col-span-1 md:col-span-2">
-                                <label class="block text-sm font-semibold text-gray-700 mb-1">{{ __('Email Address') }}</label>
-                                <input type="email" value="{{ $user->email }}" readonly class="block w-full bg-gray-50 border-gray-300 text-gray-500 rounded-lg shadow-sm focus:ring-0 focus:border-gray-300 cursor-not-allowed sm:text-sm">
+                                <label class="block text-sm font-semibold text-gray-700 mb-1">{{ __('HRIS Username') }}</label>
+                                <input type="text" value="{{ $user->email }}" readonly class="block w-full bg-gray-50 border-gray-300 text-gray-500 rounded-lg shadow-sm focus:ring-0 focus:border-gray-300 cursor-not-allowed sm:text-sm">
+                                <p class="mt-1 text-xs text-gray-500">{{ __('This username is only for HRIS sign-in. It is not an email inbox.') }}</p>
                             </div>
 
                             <!-- Lastname -->

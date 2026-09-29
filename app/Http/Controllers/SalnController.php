@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Listeners\AuditLogListener;
 use App\Http\Requests\StoreSalnRequest;
 use App\Models\Saln;
 use App\Models\UtilityOption;
@@ -93,6 +94,13 @@ class SalnController extends Controller
                 $payload
             );
         }
+
+        AuditLogListener::logActivity(
+            'Save SALN',
+            'Employees',
+            'Saved Statement of Assets, Liabilities, and Net Worth (SALN) as of ' . $saln->as_of_date->format('F d, Y') . ' for ' . trim(($employee->firstname ?? '') . ' ' . ($employee->lastname ?? '')),
+            Auth::user()
+        );
 
         return redirect()
             ->route('salns.index', ['year' => $saln->as_of_date->format('Y')])

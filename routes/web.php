@@ -16,6 +16,7 @@ use App\Http\Controllers\MyLeaveController;
 use App\Http\Controllers\PdsController;
 use App\Http\Controllers\PdsSectionReviewController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SalnController;
 use App\Http\Controllers\TravelOrderController;
 use App\Http\Controllers\UtilityController;
@@ -56,9 +57,7 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     Route::get('employees/filter', [EmployeeController::class, 'filter'])->name('employees.filter')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
     Route::resource('employees', EmployeeController::class)->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
 
-    Route::get('reports', function () {
-        return view('reports.index');
-    })->name('reports.index')->middleware('role:ADMIN,HRSTAFF');
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index')->middleware('role:ADMIN,HRSTAFF');
 
     // Audit Log Routes
     Route::get('audit-logs/login', [AuditLogController::class, 'login'])->name('audit-logs.login')->middleware('role:ADMIN,HRSTAFF');
@@ -88,10 +87,12 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
 
     Route::get('/pds', [PdsController::class, 'edit'])->name('pds.index');
     Route::get('/pds/download', [PdsController::class, 'download'])->name('pds.download');
+    Route::get('/pds/download-excel', [PdsController::class, 'downloadExcel'])->name('pds.download-excel');
     Route::get('/pds/print', [PdsController::class, 'print'])->name('pds.print');
     Route::get('/pds/print-clean', [PdsController::class, 'printClean'])->name('pds.print-clean');
     Route::get('/pds/edit', [PdsController::class, 'edit'])->name('pds.edit');
     Route::put('/pds', [PdsController::class, 'update'])->name('pds.update');
+    Route::get('/employees/{employee}/pds', [PdsController::class, 'showForHr'])->name('employees.pds.show')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
 
     Route::get('/view-announcements', [AnnouncementController::class, 'userIndex'])->name('announcements.view');
     Route::get('/announcements/filter', [AnnouncementController::class, 'filter'])->name('announcements.filter')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
@@ -120,6 +121,7 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     Route::put('/locator-slips/{locatorSlip}', [LocatorSlipController::class, 'update'])->name('locator-slips.update');
 
     Route::post('/employees/{employee}/pds-reviews', [PdsSectionReviewController::class, 'store'])->name('pds-reviews.store');
+    Route::post('/employees/{employee}/pds-reviews/approve-all', [PdsSectionReviewController::class, 'approveAll'])->name('pds-reviews.approve-all')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
 
     // SALN Routes
     Route::get('salns/{saln}/download', [SalnController::class, 'download'])->name('salns.download');

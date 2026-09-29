@@ -32,8 +32,37 @@ class LoginAudit extends Model
         'logout_at' => 'datetime',
     ];
 
+    protected $appends = [
+        'duration',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function getDurationAttribute(): string
+    {
+        if (! $this->login_at) {
+            return 'N/A';
+        }
+
+        $end = $this->logout_at ?? now();
+        $diffSeconds = (int) $this->login_at->diffInSeconds($end);
+
+        if ($diffSeconds < 60) {
+            return $this->logout_at ? '< 1 min' : 'Active (< 1 min)';
+        }
+
+        $hours = (int) floor($diffSeconds / 3600);
+        $minutes = (int) floor(($diffSeconds % 3600) / 60);
+
+        $timeStr = '';
+        if ($hours > 0) {
+            $timeStr .= $hours . ($hours == 1 ? ' hr ' : ' hrs ');
+        }
+        $timeStr .= $minutes . ($minutes == 1 ? ' min' : ' mins');
+
+        return $this->logout_at ? trim($timeStr) : 'Active (' . trim($timeStr) . ')';
     }
 }

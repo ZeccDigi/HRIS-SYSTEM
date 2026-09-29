@@ -294,10 +294,10 @@ table.pds-grid { width: var(--content-w); margin: 0 auto; border-collapse: colla
     .pds-signature { display:block; width:100%; height:100%; object-fit: contain; }
     .pds-old-c4 { display: none !important; }
     .c4-copy { padding: 4mm 4mm 5mm; }
-    .c4-page { width: var(--content-w); height: 303mm; margin: 0 auto; font-family: Arial, Helvetica, sans-serif; font-size: 7.2pt; line-height: 1.18; color: #000; }
+    .c4-page { width: var(--content-w); height: auto; margin: 0 auto; font-family: Arial, Helvetica, sans-serif; font-size: 7.2pt; line-height: 1.18; color: #000; }
     .c4-page table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .c4-page td, .c4-page th { border: 0.22mm solid #000; padding: 1mm 1.4mm; vertical-align: top; font-weight: 400; overflow: hidden; }
-    .c4-page .c4-outer { height: 300mm; border: 0.55mm solid #000; }
+    .c4-page .c4-outer { height: auto; border: 0.55mm solid #000; }
     .c4-page .c4-outer > tbody > tr > td { border-left: 0; border-right: 0; }
     .c4-page .c4-outer > tbody > tr:first-child > td { border-top: 0; }
     .c4-question { background: #e6e6e6; }
@@ -338,9 +338,9 @@ table.pds-grid { width: var(--content-w); margin: 0 auto; border-collapse: colla
     .c4-oath { height: 30mm; border-top: 0.55mm solid #000; border-bottom: 0 !important; text-align: center; padding-top: 5mm !important; }
     .c4-oath-admin { width: 78mm; height: 20mm; margin: 2.5mm auto 0; border: 0.55mm solid #000; display: flex; flex-direction: column; justify-content: flex-end; }
     .c4-oath-admin .c4-sign-main { flex: 1; height: auto; }
-    .c4-footer { display: none; }
-    .c4-footer-row { display: none; }
-    .c4-page-footer { position: absolute; right: 8mm; bottom: 5mm; display: block; width: auto; margin: 0; text-align: right; font-style: italic; font-size: 5.04pt; line-height: 1; white-space: nowrap; }
+    .c4-footer { display: table-cell; border: 0 !important; background: #fff; text-align: right; vertical-align: middle; font-style: italic; font-weight: 700; font-size: 5.04pt; line-height: 1; white-space: nowrap; padding: 0 .45mm; }
+    .c4-footer-row { display: table-row; }
+    .c4-page-footer { display: none; }
     .continuation { height: auto; min-height: var(--page-h); }
     .continuation h2 { margin: 0 0 4mm; text-align: center; font-size: 12pt; }
     .continuation table { width: 100%; border-collapse: collapse; font-size: 8pt; }
@@ -3405,7 +3405,7 @@ PLEASE INDICATE ID Number and Date of Issuance</span></td>
 <td style="border-left:0;border-right:0.55mm solid #000;border-top:0;border-bottom:0.55mm solid #000;text-align:left;vertical-align:middle;font-size:4.80pt"></td>
 </tr>
 <tr style="height:3.074mm; --rh:3.074mm">
-<td colspan="13" style="border-left:0;border-right:0;border-top:0;border-bottom:0;text-align:right;vertical-align:middle;font-style:italic;font-size:5.04pt"><span class="pds-label">CS FORM 212 (Revised 2025),  Page 4 of 4</span></td>
+<td colspan="13" style="border-left:0;border-right:0;border-top:0;border-bottom:0;text-align:right;vertical-align:middle;font-style:italic;font-size:5.04pt"><span class="pds-label" style="white-space:nowrap">CS FORM 212 (Revised 2025), Page 4 of 4</span></td>
 
 
 
@@ -3430,7 +3430,7 @@ PLEASE INDICATE ID Number and Date of Issuance</span></td>
                 <col style="width:76mm">
             </colgroup>
             <tbody>
-                <tr style="height:35mm">
+                <tr style="height:27mm">
                     <td class="c4-question">
                         <div class="c4-qgrid">
                             <span class="c4-no">34.</span>
@@ -3438,13 +3438,13 @@ PLEASE INDICATE ID Number and Date of Issuance</span></td>
                                 Are you related by consanguinity or affinity to the appointing or recommending authority, or to the<br>
                                 chief of bureau or office or to the person who has immediate supervision over you in the Office,<br>
                                 Bureau or Department where you will be appointed,<br>
-                                <div style="margin-top:1.5mm">a. within the third degree?</div>
-                                <div style="margin-top:2mm">b. within the fourth degree (for Local Government Unit - Career Employees)?</div>
+                                <div style="margin-top:.8mm">a. within the third degree?</div>
+                                <div style="margin-top:1mm">b. within the fourth degree (for Local Government Unit - Career Employees)?</div>
                             </div>
                         </div>
                     </td>
                     <td class="c4-answer">
-                        <div class="c4-answer-inner" style="padding-top:11mm">
+                        <div class="c4-answer-inner" style="padding-top:4mm">
                             <div class="c4-options">
                                 <span class="c4-option"><span class="c4-box">{{ $q?->q34_a === null || $q?->q34_a === '' ? '' : ($q?->q34_a ? 'X' : '') }}</span>YES</span>
                                 <span class="c4-option"><span class="c4-box">{{ $q?->q34_a === null || $q?->q34_a === '' ? '' : (!$q?->q34_a ? 'X' : '') }}</span>NO</span>
@@ -3619,12 +3619,12 @@ PLEASE INDICATE ID Number and Date of Issuance</span></td>
                     </td>
                 </tr>
                 <tr class="c4-footer-row" style="height:3mm">
-                    <td colspan="2" class="c4-footer">CS FORM 212 (Revised 2025), &nbsp; Page 4 of 4</td>
+                    <td colspan="2" class="c4-footer">CS FORM 212 (Revised 2025), Page 4 of 4</td>
                 </tr>
             </tbody>
         </table>
     </div>
-    <div class="c4-page-footer">CS FORM 212 (Revised 2025), &nbsp; Page 4 of 4</div>
+    <div class="c4-page-footer">CS FORM 212 (Revised 2025), Page 4 of 4</div>
 </section>
 
 @php

@@ -42,6 +42,11 @@
             text-transform: uppercase;
         }
 
+        .saln-entry-page .text-red-500 {
+            color: #ef4444 !important;
+            font-weight: 700 !important;
+        }
+
         /* Match the PDS field appearance without changing typography */
         .saln-entry-page input[type="text"],
         .saln-entry-page input[type="number"],
@@ -375,12 +380,12 @@
 
                     <section x-show="activeTab === 'declarant'" x-cloak class="space-y-6">
                         <div class="saln-field-grid">
-                            <label class="block"><span class="text-xs text-slate-400">Declarant Family Name</span><input name="declarant_info[family_name]" value="{{ old('declarant_info.family_name', $declarantDefaults['family_name'] ?? $employee->lastname) }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
-                            <label class="block"><span class="text-xs text-slate-400">Declarant First Name</span><input name="declarant_info[first_name]" value="{{ old('declarant_info.first_name', $declarantDefaults['first_name'] ?? $employee->firstname) }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
-                            <label class="block"><span class="text-xs text-slate-400">Declarant Middle Initial</span><input name="declarant_info[middle_initial]" value="{{ old('declarant_info.middle_initial', $declarantDefaults['middle_initial'] ?? strtoupper(substr($employee->middlename ?? '', 0, 1))) }}" maxlength="3" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
-                            <label class="block"><span class="text-xs text-slate-400">Position</span><input name="declarant_info[position]" value="{{ old('declarant_info.position', $declarantDefaults['position'] ?? $employee->position) }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
-                            <label class="block wide-field"><span class="text-xs text-slate-400">Agency / Office</span><textarea name="declarant_info[agency]" rows="2" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0">{{ old('declarant_info.agency', $declarantDefaults['agency'] ?? 'Department of Migrant Workers Region XI') }}</textarea></label>
-                            <label class="block wide-field"><span class="text-xs text-slate-400">Office Address</span><textarea name="declarant_info[office_address]" rows="2" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0">{{ old('declarant_info.office_address', $declarantDefaults['office_address'] ?? '') }}</textarea></label>
+                            <label class="block"><span class="text-xs text-slate-400">Declarant Family Name <span class="text-red-500 font-bold ml-0.5">*</span></span><input name="declarant_info[family_name]" value="{{ old('declarant_info.family_name', $declarantDefaults['family_name'] ?? $employee->lastname) }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
+                            <label class="block"><span class="text-xs text-slate-400">Declarant First Name <span class="text-red-500 font-bold ml-0.5">*</span></span><input name="declarant_info[first_name]" value="{{ old('declarant_info.first_name', $declarantDefaults['first_name'] ?? $employee->firstname) }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
+                            <label class="block"><span class="text-xs text-slate-400">Declarant Middle Initial <span class="text-red-500 font-bold ml-0.5">*</span></span><input name="declarant_info[middle_initial]" value="{{ old('declarant_info.middle_initial', $declarantDefaults['middle_initial'] ?? strtoupper(substr($employee->middlename ?? '', 0, 1))) }}" maxlength="3" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
+                            <label class="block"><span class="text-xs text-slate-400">Position <span class="text-red-500 font-bold ml-0.5">*</span></span><input name="declarant_info[position]" value="{{ old('declarant_info.position', $declarantDefaults['position'] ?? $employee->position) }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
+                            <label class="block wide-field"><span class="text-xs text-slate-400">Agency / Office <span class="text-red-500 font-bold ml-0.5">*</span></span><textarea name="declarant_info[agency]" rows="2" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0">{{ old('declarant_info.agency', $declarantDefaults['agency'] ?? 'Department of Migrant Workers Region XI') }}</textarea></label>
+                            <label class="block wide-field"><span class="text-xs text-slate-400">Office Address <span class="text-red-500 font-bold ml-0.5">*</span></span><textarea name="declarant_info[office_address]" rows="2" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0">{{ old('declarant_info.office_address', $declarantDefaults['office_address'] ?? '') }}</textarea></label>
                             <label class="block"><span class="text-xs text-slate-400">Spouse Family Name</span><input name="spouse_info[family_name]" value="{{ old('spouse_info.family_name', $spouseDefaults['family_name'] ?? '') }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
                             <label class="block"><span class="text-xs text-slate-400">Spouse First Name</span><input name="spouse_info[first_name]" value="{{ old('spouse_info.first_name', $spouseDefaults['first_name'] ?? '') }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
                             <label class="block"><span class="text-xs text-slate-400">Spouse Middle Initial</span><input name="spouse_info[middle_initial]" value="{{ old('spouse_info.middle_initial', $spouseDefaults['middle_initial'] ?? '') }}" maxlength="3" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
@@ -436,8 +441,8 @@
                                 <table class="w-full min-w-[560px] text-left text-sm">
                                     <thead class="bg-white text-[10px] uppercase tracking-widest text-slate-500">
                                         <tr>
-                                            <th class="px-4 py-3 font-semibold">Name of Child</th>
-                                            <th class="px-4 py-3 font-semibold">Age</th>
+                                            <th class="px-4 py-3 font-semibold">Name of Child <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Age <span class="text-red-500 font-bold ml-0.5">*</span></th>
                                             <th class="w-16 px-4 py-3"></th>
                                         </tr>
                                     </thead>
@@ -465,14 +470,14 @@
                                 <table class="saln-real-properties-table w-full min-w-[1380px] text-left text-sm">
                                     <thead class="bg-white text-xs uppercase tracking-wide text-slate-500">
                                         <tr>
-                                            <th class="px-4 py-3 font-semibold">Description</th>
-                                            <th class="px-4 py-3 font-semibold">Kind</th>
-                                            <th class="px-4 py-3 font-semibold">Exact Location</th>
-                                            <th class="px-4 py-3 font-semibold">Assessed Value</th>
-                                            <th class="px-4 py-3 font-semibold">Fair Market Value</th>
-                                            <th class="px-4 py-3 font-semibold">Year</th>
-                                            <th class="px-4 py-3 font-semibold">Mode</th>
-                                            <th class="px-4 py-3 font-semibold">Acquisition Cost</th>
+                                            <th class="px-4 py-3 font-semibold">Description <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Kind <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Exact Location <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Assessed Value <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Fair Market Value <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Year <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Mode <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Acquisition Cost <span class="text-red-500 font-bold ml-0.5">*</span></th>
                                             <th class="w-16 px-4 py-3"></th>
                                         </tr>
                                     </thead>
@@ -505,9 +510,9 @@
                                 <table class="saln-personal-properties-table w-full min-w-[860px] text-left text-sm">
                                     <thead class="bg-white text-xs uppercase tracking-wide text-slate-500">
                                         <tr>
-                                            <th class="px-4 py-3 font-semibold">Description</th>
-                                            <th class="px-4 py-3 font-semibold">Acquisition Year</th>
-                                            <th class="px-4 py-3 font-semibold">Acquisition Cost / Amount</th>
+                                            <th class="px-4 py-3 font-semibold">Description <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Acquisition Year <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Acquisition Cost / Amount <span class="text-red-500 font-bold ml-0.5">*</span></th>
                                             <th class="w-16 px-4 py-3"></th>
                                         </tr>
                                     </thead>
@@ -541,9 +546,9 @@
                                 <table class="saln-liabilities-table w-full min-w-[860px] text-left text-sm">
                                     <thead class="bg-white text-xs uppercase tracking-wide text-slate-500">
                                         <tr>
-                                            <th class="px-4 py-3 font-semibold">Nature</th>
-                                            <th class="px-4 py-3 font-semibold">Name of Creditors</th>
-                                            <th class="px-4 py-3 font-semibold">Outstanding Balance</th>
+                                            <th class="px-4 py-3 font-semibold">Nature <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Name of Creditors <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3 font-semibold">Outstanding Balance <span class="text-red-500 font-bold ml-0.5">*</span></th>
                                             <th class="w-16 px-4 py-3"></th>
                                         </tr>
                                     </thead>
@@ -578,10 +583,10 @@
                                     <table class="w-full min-w-[980px] text-left text-sm">
                                         <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                                             <tr>
-                                                <th class="px-4 py-3 font-semibold">Name of Entity / Business Enterprise</th>
-                                                <th class="px-4 py-3 font-semibold">Business Address</th>
-                                                <th class="px-4 py-3 font-semibold">Nature of Interest / Connection</th>
-                                                <th class="px-4 py-3 font-semibold">Date of Acquisition</th>
+                                                <th class="px-4 py-3 font-semibold">Name of Entity / Business Enterprise <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                                <th class="px-4 py-3 font-semibold">Business Address <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                                <th class="px-4 py-3 font-semibold">Nature of Interest / Connection <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                                <th class="px-4 py-3 font-semibold">Date of Acquisition <span class="text-red-500 font-bold ml-0.5">*</span></th>
                                                 <th class="w-16 px-4 py-3"></th>
                                             </tr>
                                         </thead>
@@ -618,10 +623,10 @@
                                     <table class="w-full min-w-[980px] text-left text-sm">
                                         <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                                             <tr>
-                                                <th class="px-4 py-3 font-semibold">Name of Relative</th>
-                                                <th class="px-4 py-3 font-semibold">Relationship</th>
-                                                <th class="px-4 py-3 font-semibold">Position</th>
-                                                <th class="px-4 py-3 font-semibold">Agency / Office and Address</th>
+                                                <th class="px-4 py-3 font-semibold">Name of Relative <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                                <th class="px-4 py-3 font-semibold">Relationship <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                                <th class="px-4 py-3 font-semibold">Position <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                                <th class="px-4 py-3 font-semibold">Agency / Office and Address <span class="text-red-500 font-bold ml-0.5">*</span></th>
                                                 <th class="w-16 px-4 py-3"></th>
                                             </tr>
                                         </thead>
@@ -651,10 +656,10 @@
                             <div class="space-y-5">
                                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Declarant ID / Signature Details</p>
                                 <div class="grid gap-x-6 gap-y-7 sm:grid-cols-2">
-                                    <label class="block"><span class="text-xs text-slate-400">Date Accomplished</span><input type="date" name="declarant_info[date_accomplished]" value="{{ old('declarant_info.date_accomplished', $declarantDefaults['date_accomplished'] ?? now()->toDateString()) }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
-                                    <label class="block"><span class="text-xs text-slate-400">Government Issued ID</span><select name="declarant_info[government_issued_id]" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"><option value=""></option>@foreach($salnOptionSets['government_id_types'] as $option)<option value="{{ $option->value }}" {{ old('declarant_info.government_issued_id', $declarantDefaults['government_issued_id'] ?? '') == $option->value ? 'selected' : '' }}>{{ $option->label }}</option>@endforeach</select></label>
-                                    <label class="block"><span class="text-xs text-slate-400">ID Number</span><input name="declarant_info[id_no]" value="{{ old('declarant_info.id_no', $declarantDefaults['id_no'] ?? '') }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
-                                    <label class="block"><span class="text-xs text-slate-400">Date / Place Issued</span><input name="declarant_info[date_issued]" value="{{ old('declarant_info.date_issued', $declarantDefaults['date_issued'] ?? '') }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
+                                    <label class="block"><span class="text-xs text-slate-400">Date Accomplished <span class="text-red-500 font-bold ml-0.5">*</span></span><input type="date" name="declarant_info[date_accomplished]" value="{{ old('declarant_info.date_accomplished', $declarantDefaults['date_accomplished'] ?? now()->toDateString()) }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
+                                    <label class="block"><span class="text-xs text-slate-400">Government Issued ID <span class="text-red-500 font-bold ml-0.5">*</span></span><select name="declarant_info[government_issued_id]" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"><option value=""></option>@foreach($salnOptionSets['government_id_types'] as $option)<option value="{{ $option->value }}" {{ old('declarant_info.government_issued_id', $declarantDefaults['government_issued_id'] ?? '') == $option->value ? 'selected' : '' }}>{{ $option->label }}</option>@endforeach</select></label>
+                                    <label class="block"><span class="text-xs text-slate-400">ID Number <span class="text-red-500 font-bold ml-0.5">*</span></span><input name="declarant_info[id_no]" value="{{ old('declarant_info.id_no', $declarantDefaults['id_no'] ?? '') }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
+                                    <label class="block"><span class="text-xs text-slate-400">Date / Place Issued <span class="text-red-500 font-bold ml-0.5">*</span></span><input name="declarant_info[date_issued]" value="{{ old('declarant_info.date_issued', $declarantDefaults['date_issued'] ?? '') }}" class="mt-1 w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm text-slate-600 outline-none focus:border-[#2b428f] focus:ring-0"></label>
                                 </div>
                             </div>
 
