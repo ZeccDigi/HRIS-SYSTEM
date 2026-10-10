@@ -173,10 +173,10 @@
                                         <th scope="col" class="break-words px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
                                             Leave Certification
                                         </th>
-                                        <th scope="col" class="break-words px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
+                                        <th scope="col" class="break-words px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
                                             Recommending Approval
                                         </th>
-                                        <th scope="col" class="break-words px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
+                                        <th scope="col" class="break-words px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
                                             Approval
                                         </th>
                                         <th scope="col" class="break-words px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
@@ -199,7 +199,10 @@
                                             $hasRejected = collect($stages)->contains(fn($stage) => $stage['status'] === 'rejected');
                                             $displayStatus = $leaf->status === 'cancelled' ? 'Cancelled' : ($hasRejected ? 'Rejected' : ($approvedCount === 3 ? 'Approved' : 'Pending'));
                                             $filterStatus = $leaf->status === 'cancelled' ? 'cancelled' : ($hasRejected ? 'rejected' : ($approvedCount === 3 ? 'approved' : 'pending'));
-                                            $leaveTypeName = Str::of($leaf->leaveType?->name ?? '')->replaceMatches('/\s+Leave\b/i', '')->trim();
+                                            $leaveTypeName = Str::of($leaf->leaveType?->name ?? '')
+                                                ->replaceMatches('/\s+Leave\b/i', '')
+                                                ->replaceMatches('/\s*\/\s*/', '/ ')
+                                                ->trim();
                                             $searchText = Str::lower($leaveTypeName . ' ' . $displayStatus . ' ' . \Carbon\Carbon::parse($leaf->date_filed)->format('M d, Y'));
                                             $leaveTrackerPayload = [
                                                 'id' => (string) $leaf->id,
@@ -215,7 +218,7 @@
                                                 'status' => (string) $displayStatus,
                                                 'remarks' => trim(collect([$leaf->rd_remarks, $leaf->hrstaff_remarks, $leaf->chief_remarks, $leaf->remarks])->filter()->implode(' ')) ?: 'No remarks available.',
                                                 'printUrl' => route('leaves.print', ['leaf' => $leaf->id, 'preview' => 1]),
-                                                'directPrintUrl' => route('leaves.print', $leaf->id),
+                                                'directPrintUrl' => route('leaves.print', ['leaf' => $leaf->id, 'auto_print' => 1]),
                                             ];
                                             
                                             $approvalDotClass = fn (string $status) => match ($status) {
@@ -242,8 +245,8 @@
                                                 </div>
                                             </td>
                                             <td class="px-4 py-3 align-middle">
-                                                <div class="w-full min-w-0 text-left text-sm font-bold text-gray-900 break-words whitespace-normal">
-                                                    <span class="block break-words whitespace-normal">{{ $leaveTypeName }}</span>
+                                                <div class="w-full min-w-0 text-left text-sm font-bold text-gray-900 break-normal whitespace-normal">
+                                                    <span class="block break-normal whitespace-normal">{{ $leaveTypeName }}</span>
                                                 </div>
                                             </td>
                                             <td class="px-2 py-3 text-center align-middle">
@@ -278,7 +281,7 @@
                                                         <i class="fa-solid fa-eye"></i>
                                                     </a>
                                                     <a
-                                                        href="{{ route('leaves.print', $leaf) }}"
+                                                        href="{{ route('leaves.print', ['leaf' => $leaf->id, 'auto_print' => 1]) }}"
                                                         target="_blank"
                                                         rel="noopener"
                                                         data-no-transition
@@ -517,7 +520,7 @@
                                 !href.includes('modal=1') &&
                                 !href.includes('/create')
                             ) {
-                                window.location.href = href;
+                                window.location.replace(href);
                             }
                         } catch (error) {}
                     "

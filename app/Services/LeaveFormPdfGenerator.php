@@ -62,10 +62,16 @@ class LeaveFormPdfGenerator
         $leaveType = $leaveRequest->leaveType?->name ?? '';
         $year = Carbon::parse($leaveRequest->start_date)->year;
         $employee?->ensureLeaveCredits($year);
+        $employee?->load('leaveCredits.leaveType');
 
         $vacationCredit = $employee?->leaveCredits->first(fn ($credit) => str_contains(strtolower($credit->leaveType?->name ?? ''), 'vacation'));
         $sickCredit = $employee?->leaveCredits->first(fn ($credit) => str_contains(strtolower($credit->leaveType?->name ?? ''), 'sick'));
-        $currentCredit = $employee?->leaveCredits->firstWhere('leave_type_id', $leaveRequest->leave_type_id);
+        $isSick = str_contains(strtolower($leaveType), 'sick');
+        $duration = (float) $leaveRequest->duration;
+        $vacationCurrent = (float) ($vacationCredit?->balance ?? 0);
+        $sickCurrent = (float) ($sickCredit?->balance ?? 0);
+        $vacationLess = $isSick ? 0.0 : $duration;
+        $sickLess = $isSick ? $duration : 0.0;
 
         $this->coverSampleValues($pdf);
 
@@ -84,11 +90,12 @@ class LeaveFormPdfGenerator
         $this->mark($pdf, 463, 622); // Commutation requested
 
         $this->write($pdf, 198, 730, 135, now()->format('F d, Y'), false, 8, 'C');
-        $this->write($pdf, 230, 758, 70, number_format((float) ($vacationCredit?->leaveType?->days_per_year ?? 0), 1), false, 7, 'C');
-        $this->write($pdf, 330, 758, 70, number_format((float) ($sickCredit?->leaveType?->days_per_year ?? 0), 1), false, 7, 'C');
-        $this->write($pdf, 230, 773, 70, number_format((float) $leaveRequest->duration, 1), false, 7, 'C');
-        $this->write($pdf, 330, 773, 70, str_contains(strtolower($leaveType), 'sick') ? number_format((float) $leaveRequest->duration, 1) : '', false, 7, 'C');
-        $this->write($pdf, 230, 789, 70, number_format((float) ($currentCredit?->balance ?? 0), 1), false, 7, 'C');
+        $this->write($pdf, 230, 758, 70, number_format($vacationCurrent, 1), false, 7, 'C');
+        $this->write($pdf, 330, 758, 70, number_format($sickCurrent, 1), false, 7, 'C');
+        $this->write($pdf, 230, 773, 70, $vacationLess > 0 ? number_format($vacationLess, 1) : '', false, 7, 'C');
+        $this->write($pdf, 330, 773, 70, $sickLess > 0 ? number_format($sickLess, 1) : '', false, 7, 'C');
+        $this->write($pdf, 230, 789, 70, number_format($vacationCurrent - $vacationLess, 1), false, 7, 'C');
+        $this->write($pdf, 330, 789, 70, number_format($sickCurrent - $sickLess, 1), false, 7, 'C');
 
         if ($leaveRequest->chief_status === 'approved') {
             $this->mark($pdf, 464, 728);

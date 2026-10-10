@@ -33,7 +33,7 @@
             </div>  
 
             <div class="mb-4 text-sm text-gray-600 text-center">
-                {{ __('Forgot your password? Enter your HRIS Username and we will send a password reset link to your Recovery / OTP Email on file.') }}
+                {{ __('Forgot your password? Enter your HRIS Username and we will send a reset OTP to your Recovery / OTP Email on file.') }}
             </div>
 
             <!-- Session Status -->
@@ -58,7 +58,7 @@
 
                 <button type="submit" 
                         class="w-full bg-[#1e3a8a] text-white font-bold py-3 rounded-lg hover:bg-blue-900 transition duration-300 shadow-lg">
-                    SEND PASSWORD RESET LINK
+                    SEND RESET OTP
                 </button>
 
                 <div class="mt-8 text-center space-y-2">

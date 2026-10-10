@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Listeners\AuditLogListener;
 use App\Mail\HrisAccountCreatedMail;
 use App\Models\Employee;
+use App\Models\LeaveCreditTransaction;
 use App\Models\UtilityOption;
 use App\Models\User;
 use App\Support\UtilityOptionRegistry;
@@ -185,7 +186,12 @@ class EmployeeController extends Controller
 
                 return redirect()->route('employees.index')
                     ->with('success', 'Employee created successfully.')
-                    ->with('error', 'The login account was created, but the account details could not be sent to the Recovery / OTP Email. Please check the mail settings.');
+                    ->with('error', 'The login account was created, but the account details could not be sent to the Recovery / OTP Email. Please check the mail settings.')
+                    ->with('account_credentials', [
+                        'hris_username' => $createdAccount->email,
+                        'recovery_email' => $notificationEmail,
+                        'temporary_password' => $temporaryPassword,
+                    ]);
             }
         }
 
@@ -196,7 +202,9 @@ class EmployeeController extends Controller
             auth()->user()
         );
 
-        return redirect()->route('employees.index')->with('success', 'Employee created successfully.');
+        return redirect()
+            ->route('employees.index')
+            ->with('success', "Employee created successfully. Account details were sent to {$notificationEmail}.");
     }
 
     /**
@@ -210,12 +218,67 @@ class EmployeeController extends Controller
             'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation', 
             'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks', 
             'pdsTrainings', 'pdsOthers', 'pdsQuestionnaire', 'pdsReferences', 'pdsGovId',
-            'pdsSectionReviews', 'salns', 'leaveCredits.leaveType'
+            'pdsSectionReviews', 'salns', 'leaveCredits.leaveType', 'ctoRequests'
         ]);
 
         $pdsReviewChangedFields = $this->pdsReviewChangedFields($employee);
 
         return view('employees.show', compact('employee', 'pdsReviewChangedFields'));
+    }
+
+    public function storeLeaveCreditAdjustment(Request $request, Employee $employee): RedirectResponse
+    {
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'leave_credit_id' => ['required', 'integer'],
+            'operation' => ['required', 'in:add,deduct'],
+            'amount' => ['required', 'numeric', 'min:0.001', 'max:365'],
+            'remarks' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()
+                ->route('employees.show', $employee)
+                ->withFragment('leave-credits')
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $validated = $validator->validated();
+
+        $leaveCredit = $employee->leaveCredits()
+            ->whereKey($validated['leave_credit_id'])
+            ->firstOrFail();
+
+        $amount = round((float) $validated['amount'], 3);
+        $delta = $validated['operation'] === 'deduct' ? -$amount : $amount;
+        $previousAdjusted = (float) $leaveCredit->adjusted;
+        $adjusted = round($previousAdjusted + $delta, 3);
+
+        $leaveCredit->adjusted = $adjusted;
+        $leaveCredit->balance = round(max(0, (float) $leaveCredit->earned + $adjusted - (float) $leaveCredit->used), 3);
+        $leaveCredit->save();
+
+        LeaveCreditTransaction::create([
+            'employee_id' => $employee->id,
+            'leave_type_id' => $leaveCredit->leave_type_id,
+            'type' => 'adjustment',
+            'amount' => $delta,
+            'balance_after' => $leaveCredit->balance,
+            'effective_date' => now()->toDateString(),
+            'description' => $validated['remarks'] ?: 'HR leave credit adjustment',
+            'metadata' => [
+                'operation' => $validated['operation'],
+                'previous_adjusted' => $previousAdjusted,
+                'new_adjusted' => $adjusted,
+                'year' => $leaveCredit->year,
+                'updated_by' => auth()->id(),
+            ],
+        ]);
+
+        return redirect()
+            ->route('employees.show', $employee)
+            ->withFragment('leave-credits')
+            ->with('success', 'Leave credit adjustment saved successfully.');
     }
 
     private function pdsReviewChangedFields(Employee $employee): array
@@ -502,6 +565,26 @@ class EmployeeController extends Controller
         }
 
         return back()->with('success', 'Reusable e-signature updated successfully.');
+    }
+
+    public function destroyESignature(Employee $employee): RedirectResponse
+    {
+        if (!in_array(auth()->user()->role, ['admin', 'hrstaff', 'chief', 'regionaldirector']) && auth()->user()->employee?->id !== $employee->id) {
+            abort(403);
+        }
+
+        $signaturePath = $employee->e_signature_path;
+
+        if ($signaturePath) {
+            $this->deleteESignature($signaturePath);
+            $employee->update(['e_signature_path' => null]);
+
+            if ($employee->pdsGovId?->signature_path === $signaturePath) {
+                $employee->pdsGovId()->update(['signature_path' => null]);
+            }
+        }
+
+        return back()->with('success', 'Reusable e-signature removed successfully.');
     }
 
     private function deleteProfilePicture(?string $path): void

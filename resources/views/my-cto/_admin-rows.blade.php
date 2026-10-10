@@ -216,9 +216,7 @@
                     <form
                         action="{{ route('cto.update-status', $request->id) }}"
                         method="POST"
-                        onsubmit="return confirm('{{ $isHR
-                            ? __('Verify this CTO request?')
-                            : __('Approve this CTO request?') }}');"
+                        id="ctoApproveRowForm_{{ $request->id }}"
                     >
                         @csrf
                         @method('PUT')
@@ -230,7 +228,12 @@
                         >
 
                         <button
-                            type="submit"
+                            type="button"
+                            onclick="openCtoApproveModal(
+                                {{ $request->id }},
+                                @js('CTO-'.$request->id),
+                                {{ $isHR ? 'true' : 'false' }}
+                            )"
                             class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 transition-colors hover:bg-green-50 hover:text-green-800"
                             title="{{ $isHR ? __('Verify') : __('Approve') }}"
                             aria-label="{{ $isHR ? __('Verify') : __('Approve') }}"
@@ -263,8 +266,9 @@
 
                         <button
                             type="button"
-                            onclick="submitCtoRejectRow(
+                            onclick="openCtoRejectModal(
                                 {{ $request->id }},
+                                @js('CTO-'.$request->id),
                                 {{ $isHR ? 'true' : 'false' }}
                             )"
                             class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 hover:text-red-800"
@@ -293,51 +297,40 @@
 @if(($actionMode ?? 'view') === 'review')
     @once
         <script>
-            window.submitCtoRejectRow = function (id, isHR) {
-                let remarks = '';
+            window.getCtoManagerData = function () {
+                const root = document.querySelector(
+                    '[x-data^="manageCtoRequests"]'
+                );
 
-                if (isHR) {
-                    remarks = prompt(
-                        'Remarks are required when rejecting this request. Please enter remarks:'
-                    );
-
-                    if (remarks === null) {
-                        return;
-                    }
-
-                    remarks = remarks.trim();
-
-                    if (!remarks) {
-                        alert('Remarks are required to reject.');
-                        return;
-                    }
-                } else {
-                    const confirmed = confirm(
-                        'Are you sure you want to decline this request?'
-                    );
-
-                    if (!confirmed) {
-                        return;
-                    }
+                if (!root) {
+                    return null;
                 }
 
-                const form = document.getElementById(
-                    'ctoRejectRowForm_' + id
-                );
+                if (window.Alpine && typeof window.Alpine.$data === 'function') {
+                    return window.Alpine.$data(root);
+                }
 
-                const remarksInput = document.getElementById(
-                    'ctoRejectRowRemarks_' + id
-                );
+                return root.__x?.$data || root._x_dataStack?.[0] || null;
+            };
 
-                if (!form) {
+            window.openCtoApproveModal = function (id, title, isHR) {
+                const manager = window.getCtoManagerData();
+
+                if (!manager) {
                     return;
                 }
 
-                if (remarksInput) {
-                    remarksInput.value = remarks;
+                manager.openApproveModal(id, title, isHR);
+            };
+
+            window.openCtoRejectModal = function (id, title, isHR) {
+                const manager = window.getCtoManagerData();
+
+                if (!manager) {
+                    return;
                 }
 
-                form.submit();
+                manager.openRejectModal(id, title, isHR);
             };
         </script>
     @endonce

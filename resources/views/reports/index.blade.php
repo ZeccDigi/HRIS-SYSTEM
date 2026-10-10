@@ -60,18 +60,15 @@
 
     <div class="min-h-screen bg-slate-50 py-4" x-data="reportsDashboard()" x-init="initCharts()">
         <div class="mx-auto w-full px-0 sm:px-1 lg:px-2">
-            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="mb-4">
                 <h1 class="text-2xl font-black tracking-tight text-slate-900">{{ __('Report Summary') }}</h1>
-                <button type="button" @click="generateReport()" class="inline-flex h-11 w-full items-center justify-center rounded-lg bg-[#0038a8] px-5 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-[#002f8f] sm:w-auto sm:min-w-[10.5rem]">
-                    {{ __('Generate Report') }}
-                </button>
             </div>
 
             <div class="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
                 <div class="reports-main-filters">
                     <label>
                         <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('Report Type') }}</span>
-                        <select x-model="selectedType" @change="generatedType = selectedType; ctoTab = 'overtime'; renderCharts()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
+                        <select x-model="selectedType" @change="changeReportType()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
                             <template x-for="type in reportTypes" :key="type.value">
                                 <option :value="type.value" x-text="type.label"></option>
                             </template>
@@ -80,7 +77,7 @@
 
                     <label x-show="visibleFilters().includes('division')" x-cloak>
                         <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('Division') }}</span>
-                        <select x-model="filters.division" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
+                        <select x-model="filters.division" @change="applyFilters()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
                             <option>All Divisions</option>
                             <template x-for="division in divisions" :key="division">
                                 <option :value="division" x-text="division"></option>
@@ -90,12 +87,12 @@
 
                     <label x-show="visibleFilters().includes('dateRange')" x-cloak>
                         <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('From') }}</span>
-                        <input type="date" x-model="filters.from" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
+                        <input type="date" x-model="filters.from" @change="applyFilters()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
                     </label>
 
                     <label x-show="visibleFilters().includes('dateRange')" x-cloak>
                         <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('To') }}</span>
-                        <input type="date" x-model="filters.to" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
+                        <input type="date" x-model="filters.to" @change="applyFilters()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
                     </label>
                 </div>
             </div>
@@ -265,7 +262,7 @@
                                 <tbody class="divide-y divide-blue-50">
                                     <template x-for="row in filteredRows()" :key="row.key">
                                         <tr class="hover:bg-blue-50/40">
-                                            <template x-for="cell in row.cells" :key="cell">
+                                            <template x-for="(cell, index) in displayCells(row)" :key="`${row.key}-${index}`">
                                                 <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-700">
                                                     <span x-show="['Active', 'Approved', 'Present'].includes(cell)" class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700" x-text="cell"></span>
                                                     <span x-show="['Pending', 'Late'].includes(cell)" class="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700" x-text="cell"></span>
@@ -414,7 +411,7 @@
                     ],
                 },
                 leave_balance: {
-                    title: 'Leave Balance',
+                    title: 'Leave Credits and Entitlements',
                     icon: calendarIcon,
                     gender: { total: 128, male: 54, female: 74, malePercent: 42 },
                     metrics: [
@@ -424,7 +421,7 @@
                         { label: 'Low Credits', value: '7', badge: 'bg-amber-50 text-amber-700', text: 'text-amber-600', icon: clockIcon },
                         { label: 'Updated', value: 'Today', badge: 'bg-blue-50 text-blue-700', text: 'text-[#0038a8]', icon: calendarIcon },
                     ],
-                    chartTwoTitle: 'Leave Credits by Division',
+                    chartTwoTitle: 'Leave Credits and Entitlements by Division',
                     bars: [
                         { label: 'WRSD', value: 210, percent: 78 },
                         { label: 'Admin', value: 185, percent: 68 },
@@ -433,7 +430,7 @@
                         { label: 'Legal', value: 80, percent: 30 },
                     ],
                     recordCount: 128,
-                    columns: ['Employee', 'Vacation Leave Balance', 'Sick Leave Balance', 'Other Leave Balance'],
+                    columns: ['Employee', 'Vacation Leave Balance', 'Sick Leave Balance', 'Other Annual/Statutory Entitlements'],
                     rows: [
                         ['Juan Dela Cruz', '12.5', '15.0', '3.0'],
                         ['Maria Santos', '8.0', '11.5', '2.0'],
@@ -564,7 +561,13 @@
                 visibleFilters() {
                     return this.reportTypes.find((type) => type.value === this.selectedType)?.filters || [];
                 },
-                generateReport() {
+                changeReportType() {
+                    this.generatedType = this.selectedType;
+                    this.ctoTab = 'overtime';
+                    this.search = '';
+                    this.applyFilters();
+                },
+                applyFilters() {
                     const params = new URLSearchParams({
                         type: this.selectedType,
                         from: this.filters.from,
@@ -573,7 +576,9 @@
                         employment_status: this.filters.employmentStatus,
                     });
 
-                    window.location.href = `{{ route('reports.index') }}?${params.toString()}`;
+                    window.history.replaceState({}, '', `{{ route('reports.index') }}?${params.toString()}`);
+                    this.generatedAt = new Date().toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    this.renderCharts();
                 },
                 initCharts() {
                     this.$watch('filters.division', () => this.renderCharts());
@@ -878,8 +883,15 @@
                         return matchesSearch && matchesDivision && matchesEmployment;
                     });
                 },
+                displayCells(row) {
+                    return this.active.columns.map((column, index) => {
+                        const value = row.cells?.[index];
+
+                        return value === undefined || value === null || String(value).trim() === '' ? 'N/A' : value;
+                    });
+                },
                 exportExcel() {
-                    const rows = [this.active.columns, ...this.filteredRows().map((row) => row.cells)];
+                    const rows = [this.active.columns, ...this.filteredRows().map((row) => this.displayCells(row))];
                     const csv = rows
                         .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
                         .join('\n');

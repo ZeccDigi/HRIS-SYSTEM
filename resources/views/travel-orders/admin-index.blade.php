@@ -3,11 +3,12 @@
 
     @php
         $currentYear = now()->year;
+        $approvalRole = strtolower((string) auth()->user()->role);
     @endphp
 
     <div
         class="py-8"
-        x-data='manageTravelAuthorities(@json($tab), @json($currentYear))'
+        x-data='manageTravelAuthorities(@json($tab), @json($currentYear), @json($approvalRole))'
         x-init="init()"
     >
         <div class="mx-auto w-full max-w-[95rem] px-4 sm:px-6 lg:px-8">
@@ -221,11 +222,11 @@
                                     </th>
 
                                     <th class="w-[7%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
-                                        {{ __('TAR Deadline') }}
+                                        {{ __('AR Deadline') }}
                                     </th>
 
                                     <th class="w-[5%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
-                                        {{ __('TAR Status') }}
+                                        {{ __('AR Status') }}
                                     </th>
 
                                     <th class="w-[5%] px-3 py-3 text-right text-[11px] font-black uppercase tracking-widest text-gray-500">
@@ -427,10 +428,109 @@
                 </div>
             </div>
         </template>
+
+        <template x-teleport="body">
+            <div
+                x-cloak
+                x-show="approveModalOpen"
+                class="fixed inset-0 z-[100000] flex items-center justify-center p-4"
+                style="display: none;"
+                @keydown.escape.window="closeApproveModal()"
+            >
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeApproveModal()"></div>
+
+                <div @click.stop class="relative z-10 w-full max-w-xs overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                    <div class="border-b border-slate-100 px-4 py-3">
+                        <div>
+                            <h2 class="text-base font-black text-slate-900">{{ __('Approve this travel authority?') }}</h2>
+                            <p class="mt-0.5 text-xs text-slate-500" x-text="approveModalTitle"></p>
+                        </div>
+                    </div>
+
+                    <div class="px-4 py-3 text-center">
+                        <p class="whitespace-pre-line text-xs leading-5 text-slate-600" x-text="approveModalDescription"></p>
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:justify-end">
+                        <button
+                            type="button"
+                            @click="closeApproveModal()"
+                            class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-widest text-slate-600 transition hover:bg-slate-100"
+                        >
+                            {{ __('Cancel') }}
+                        </button>
+
+                        <button
+                            type="button"
+                            @click="submitApproveForm()"
+                            class="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-blue-800"
+                        >
+                            {{ __('Approve') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <template x-teleport="body">
+            <div
+                x-cloak
+                x-show="rejectModalOpen"
+                class="fixed inset-0 z-[100000] flex items-center justify-center p-4"
+                style="display: none;"
+                @keydown.escape.window="closeRejectModal()"
+            >
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeRejectModal()"></div>
+
+                <div @click.stop class="relative z-10 w-full max-w-xs overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                    <div class="border-b border-slate-100 px-4 py-3">
+                        <div>
+                            <h2 class="text-base font-black text-slate-900">{{ __('Reject this travel authority?') }}</h2>
+                            <p class="mt-0.5 text-xs text-slate-500" x-text="rejectModalTitle"></p>
+                        </div>
+                    </div>
+
+                    <div class="px-4 py-3">
+                        <label
+                            for="travelRejectModalRemarks"
+                            class="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500"
+                        >
+                            {{ __('Remarks / Notes') }}
+                        </label>
+
+                        <textarea
+                            id="travelRejectModalRemarks"
+                            x-model="rejectModalRemarks"
+                            rows="4"
+                            class="block w-full resize-y rounded-lg border-slate-300 bg-slate-50 text-xs text-slate-800 shadow-sm transition focus:border-blue-900 focus:bg-white focus:ring-blue-900"
+                            placeholder="{{ __('Enter remarks or notes here...') }}"
+                        ></textarea>
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:justify-end">
+                        <button
+                            type="button"
+                            @click="closeRejectModal()"
+                            class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-widest text-slate-600 transition hover:bg-slate-100"
+                        >
+                            {{ __('Cancel') }}
+                        </button>
+
+                        <button
+                            type="button"
+                            @click="submitRejectForm()"
+                            class="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-blue-800"
+                        >
+                            {{ __('Reject') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 
     <script>
-        function manageTravelAuthorities(initialTab, currentYear) {
+        function manageTravelAuthorities(initialTab, currentYear, approvalRole) {
             return {
                 tab: initialTab || 'pending',
 
@@ -447,6 +547,14 @@
 
                 previewOpen: false,
                 showRemarks: false,
+                approveModalOpen: false,
+                approveModalFormId: '',
+                approveModalTitle: '',
+                approveModalDescription: '',
+                rejectModalOpen: false,
+                rejectModalFormId: '',
+                rejectModalTitle: '',
+                rejectModalRemarks: '',
 
                 previewData: {
                     title: '',
@@ -667,6 +775,71 @@
                 toggleRemarks() {
                     this.showRemarks = !this.showRemarks;
                 },
+
+                openApproveModal(id, title) {
+                    this.approveModalFormId = `travelApproveForm_${id}`;
+                    this.approveModalTitle = title ? `ID: ${title}` : '';
+                    this.approveModalDescription = approvalRole === 'recordofficer'
+                        ? 'Approving will forward this request\nto Regional Director for final review.'
+                        : (approvalRole === 'regionaldirector'
+                            ? 'Approving will mark this as\nfully approved.'
+                            : 'Approving will move this request to the next step\nor mark it as fully approved.');
+                    this.approveModalOpen = true;
+
+                    document.documentElement.classList.add('overflow-hidden');
+                    document.body.classList.add('overflow-hidden');
+                },
+
+                closeApproveModal() {
+                    this.approveModalOpen = false;
+                    this.approveModalFormId = '';
+                    this.approveModalTitle = '';
+                    this.approveModalDescription = '';
+
+                    document.documentElement.classList.remove('overflow-hidden');
+                    document.body.classList.remove('overflow-hidden');
+                },
+
+                submitApproveForm() {
+                    const form = document.getElementById(this.approveModalFormId);
+
+                    if (form) {
+                        form.submit();
+                    }
+                },
+
+                openRejectModal(id, title) {
+                    this.rejectModalFormId = `travelRejectForm_${id}`;
+                    this.rejectModalTitle = title ? `ID: ${title}` : '';
+                    this.rejectModalRemarks = '';
+                    this.rejectModalOpen = true;
+
+                    document.documentElement.classList.add('overflow-hidden');
+                    document.body.classList.add('overflow-hidden');
+                },
+
+                closeRejectModal() {
+                    this.rejectModalOpen = false;
+                    this.rejectModalFormId = '';
+                    this.rejectModalTitle = '';
+                    this.rejectModalRemarks = '';
+
+                    document.documentElement.classList.remove('overflow-hidden');
+                    document.body.classList.remove('overflow-hidden');
+                },
+
+                submitRejectForm() {
+                    const form = document.getElementById(this.rejectModalFormId);
+                    const input = form?.querySelector('input[name="remarks"]');
+
+                    if (input) {
+                        input.value = this.rejectModalRemarks;
+                    }
+
+                    if (form) {
+                        form.submit();
+                    }
+                },
             };
         }
 
@@ -675,36 +848,54 @@
                 '[x-data^="manageTravelAuthorities"]'
             );
 
-            if (!root || !root.__x) {
+            const component =
+                window.Alpine?.$data?.(root) ||
+                root?.__x?.$data;
+
+            if (!component) {
                 return;
             }
 
-            root.__x.$data.openPreviewModal(
+            component.openPreviewModal(
                 JSON.parse(payloadJson)
             );
         }
 
-        function submitTravelReject(id) {
-            const remarks =
-                window.prompt(
-                    'Enter rejection remarks (optional):',
-                    ''
-                ) ?? '';
-
-            const input = document.getElementById(
-                `travelRejectRemarks_${id}`
+        function openTravelApproveModal(id, title) {
+            const root = document.querySelector(
+                '[x-data^="manageTravelAuthorities"]'
             );
 
-            const form = document.getElementById(
-                `travelRejectForm_${id}`
-            );
+            const component =
+                window.Alpine?.$data?.(root) ||
+                root?.__x?.$data;
 
-            if (!input || !form) {
+            if (!component) {
                 return;
             }
 
-            input.value = remarks;
-            form.submit();
+            component.openApproveModal(id, title);
+        }
+
+        function submitTravelReject(button) {
+            const id = button?.dataset?.travelId;
+            const title = button?.dataset?.travelTitle || '';
+            const root = document.querySelector(
+                '[x-data^="manageTravelAuthorities"]'
+            );
+
+            const component =
+                window.Alpine?.$data?.(root) ||
+                root?.__x?.$data;
+
+            if (!component) {
+                return;
+            }
+
+            component.openRejectModal(
+                id,
+                title
+            );
         }
     </script>
 </x-app-layout>

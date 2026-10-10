@@ -33,6 +33,11 @@ class Saln extends Model
         'total_assets',
         'total_liabilities',
         'net_worth',
+        'review_status',
+        'review_remarks',
+        'reviewed_by_id',
+        'reviewed_at',
+        'submitted_at',
     ];
 
     protected function casts(): array
@@ -52,11 +57,18 @@ class Saln extends Model
             'total_assets' => 'decimal:2',
             'total_liabilities' => 'decimal:2',
             'net_worth' => 'decimal:2',
+            'reviewed_at' => 'datetime',
+            'submitted_at' => 'datetime',
         ];
     }
 
     public function employee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function reviewer(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by_id');
     }
 }

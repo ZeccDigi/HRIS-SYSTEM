@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Notification;
 use App\Models\CtoRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -38,7 +39,7 @@ class MyCtoController extends Controller
         return view('my-cto.create', compact('employee'));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|Response
     {
         $employee = auth()->user()->employee;
         if (! $employee) {
@@ -52,7 +53,6 @@ class MyCtoController extends Controller
             'hours' => 'required|numeric|min:0.5|max:999',
             'purpose' => 'required|string',
             'attachment' => 'nullable|file|mimes:pdf|max:5120',
-            'applicant_signature' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
         $this->validateCtoDates($validated['date_start'], $validated['date_end']);
@@ -68,15 +68,35 @@ class MyCtoController extends Controller
             $attachmentPath = $request->file('attachment')->store('cto-attachments', 'public');
         }
 
-        $signaturePath = null;
-        if ($request->hasFile('applicant_signature')) {
-            $signaturePath = $request->file('applicant_signature')->store('cto-signatures', 'public');
-        }
-
         $ctoBalanceBefore = (float) $employee->cto_balance;
         $ctoBalanceAfter = $validated['type'] === 'use'
             ? max(0, $ctoBalanceBefore - (float) $validated['hours'])
             : $ctoBalanceBefore + (float) $validated['hours'];
+
+        $duplicatePendingCto = $employee->ctoRequests()
+            ->where('type', $validated['type'])
+            ->whereDate('date_start', $validated['date_start'])
+            ->whereDate('date_end', $validated['date_end'])
+            ->where('hours', $validated['hours'])
+            ->where('purpose', $validated['purpose'])
+            ->where('status', 'pending')
+            ->latest()
+            ->first();
+
+        if ($duplicatePendingCto) {
+            $successMessage = 'CTO request submitted successfully.';
+
+            if ($request->boolean('modal')) {
+                session()->flash('success', $successMessage);
+
+                return response()->view('leaves.modal-success-redirect', [
+                    'url' => route('my-cto.index'),
+                    'message' => $successMessage,
+                ]);
+            }
+
+            return redirect()->route('my-cto.index')->with('success', $successMessage);
+        }
 
         $ctoRequest = $employee->ctoRequests()->create([
             'type' => $validated['type'],
@@ -85,7 +105,6 @@ class MyCtoController extends Controller
             'hours' => $validated['hours'],
             'purpose' => $validated['purpose'],
             'attachment_path' => $attachmentPath,
-            'applicant_signature_path' => $signaturePath,
             'cto_balance_before' => $ctoBalanceBefore,
             'cto_balance_after' => $ctoBalanceAfter,
         ]);
@@ -109,7 +128,18 @@ class MyCtoController extends Controller
             auth()->user()
         );
 
-        return redirect()->route('my-cto.index')->with('success', 'CTO request submitted successfully.');
+        $successMessage = 'CTO request submitted successfully.';
+
+        if ($request->boolean('modal')) {
+            session()->flash('success', $successMessage);
+
+            return response()->view('leaves.modal-success-redirect', [
+                'url' => route('my-cto.index'),
+                'message' => $successMessage,
+            ]);
+        }
+
+        return redirect()->route('my-cto.index')->with('success', $successMessage);
     }
 
     public function show(CtoRequest $ctoRequest): View

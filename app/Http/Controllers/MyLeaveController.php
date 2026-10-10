@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Validator;
 use Illuminate\View\View;
@@ -55,7 +56,7 @@ class MyLeaveController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|Response
     {
         $employee = auth()->user()->employee;
         if (! $employee) {
@@ -84,22 +85,50 @@ class MyLeaveController extends Controller
         $leaveYear = Carbon::parse($validated['start_date'])->year;
         $employee->ensureLeaveCredits($leaveYear);
 
-        // Sum of days in pending requests for this type/year
+        $creditType = $this->creditTypeForBalance($leaveType);
+        $creditLeaveTypeIds = $this->leaveTypeIdsUsingCredit($creditType);
+
+        // Sum of days in pending requests that draw from the same credit source.
         $pendingDays = $employee->leaveRequests()
-            ->where('leave_type_id', $validated['leave_type_id'])
+            ->whereIn('leave_type_id', $creditLeaveTypeIds)
             ->where('status', 'pending')
             ->get()
             ->sum(function ($req) {
                 return $req->duration;
             });
 
-        // Check credits (Warning only, filing is still allowed as unpaid)
-        $credit = $employee->leaveCredits()->where('leave_type_id', $validated['leave_type_id'])
+        // Check credits (Warning only, filing is still allowed as unpaid).
+        $credit = $employee->leaveCredits()->where('leave_type_id', $creditType->id)
             ->where('year', $leaveYear)
             ->first();
 
         $availableBalance = max(0, ($credit?->balance ?? 0) - $pendingDays);
-        $isPaid = (bool) $validated['is_paid'] && $availableBalance >= $duration;
+        $typeAvailableBalance = $this->selectedTypeAvailableBalance($employee, $leaveType, $leaveYear, $duration, null);
+        $isPaid = (bool) $validated['is_paid'] && $availableBalance >= $duration && $typeAvailableBalance >= $duration;
+
+        $duplicatePendingLeave = $employee->leaveRequests()
+            ->where('leave_type_id', $leaveType->id)
+            ->whereDate('start_date', $validated['start_date'])
+            ->whereDate('end_date', $validated['end_date'])
+            ->where('reason', $validated['reason'])
+            ->where('status', 'pending')
+            ->latest()
+            ->first();
+
+        if ($duplicatePendingLeave) {
+            $successMessage = 'Leave request submitted successfully. Credits will be deducted once approved.';
+
+            if ($request->boolean('modal')) {
+                session()->flash('success', $successMessage);
+
+                return response()->view('leaves.modal-success-redirect', [
+                    'url' => route('leaves.index'),
+                    'message' => $successMessage,
+                ]);
+            }
+
+            return redirect()->route('leaves.index')->with('success', $successMessage);
+        }
         
         // Deduction only happens on Approval. We allow filing even if credits are insufficient.
         $leaveRequest = $employee->leaveRequests()->create([
@@ -127,7 +156,18 @@ class MyLeaveController extends Controller
             auth()->user()
         );
 
-        return redirect()->route('leaves.index')->with('success', $msg.' Credits will be deducted once approved.');
+        $successMessage = $msg.' Credits will be deducted once approved.';
+
+        if ($request->boolean('modal')) {
+            session()->flash('success', $successMessage);
+
+            return response()->view('leaves.modal-success-redirect', [
+                'url' => route('leaves.index'),
+                'message' => $successMessage,
+            ]);
+        }
+
+        return redirect()->route('leaves.index')->with('success', $successMessage);
     }
 
     /**
@@ -210,20 +250,24 @@ class MyLeaveController extends Controller
         $leaveYear = Carbon::parse($validated['start_date'])->year;
         $employee->ensureLeaveCredits($leaveYear);
 
+        $creditType = $this->creditTypeForBalance($leaveType);
+        $creditLeaveTypeIds = $this->leaveTypeIdsUsingCredit($creditType);
+
         $pendingDays = $employee->leaveRequests()
-            ->where('leave_type_id', $validated['leave_type_id'])
+            ->whereIn('leave_type_id', $creditLeaveTypeIds)
             ->where('status', 'pending')
             ->whereKeyNot($leaf->id)
             ->get()
             ->sum(fn ($request) => $request->duration);
 
         $credit = $employee->leaveCredits()
-            ->where('leave_type_id', $validated['leave_type_id'])
+            ->where('leave_type_id', $creditType->id)
             ->where('year', $leaveYear)
             ->first();
 
         $availableBalance = max(0, ($credit?->balance ?? 0) - $pendingDays);
-        $isPaid = (bool) $validated['is_paid'] && $availableBalance >= $duration;
+        $typeAvailableBalance = $this->selectedTypeAvailableBalance($employee, $leaveType, $leaveYear, $duration, $leaf->id);
+        $isPaid = (bool) $validated['is_paid'] && $availableBalance >= $duration && $typeAvailableBalance >= $duration;
 
         $leaf->update([
             ...$validated,
@@ -371,10 +415,68 @@ class MyLeaveController extends Controller
                 'description' => $type->description,
                 'legal_basis' => $type->legal_basis,
                 'balance' => (float) ($credits[$type->id]->balance ?? 0),
+                'credit_note' => $this->creditNoteForLeaveType($type),
                 'date_policy' => $this->datePolicyForLeaveType($type),
                 'date_help' => '',
             ];
         });
+    }
+
+    private function selectedTypeAvailableBalance($employee, LeaveType $leaveType, int $year, float $duration, ?int $exceptRequestId): float
+    {
+        $creditType = $this->creditTypeForBalance($leaveType);
+
+        if ($creditType->id === $leaveType->id) {
+            return $duration;
+        }
+
+        $pendingQuery = $employee->leaveRequests()
+            ->where('leave_type_id', $leaveType->id)
+            ->where('status', 'pending');
+
+        if ($exceptRequestId) {
+            $pendingQuery->whereKeyNot($exceptRequestId);
+        }
+
+        $pendingDays = $pendingQuery->get()->sum(fn ($request) => $request->duration);
+        $credit = $employee->leaveCredits()
+            ->where('leave_type_id', $leaveType->id)
+            ->where('year', $year)
+            ->first();
+
+        return max(0, ($credit?->balance ?? 0) - $pendingDays);
+    }
+
+    private function creditTypeForBalance(LeaveType $type): LeaveType
+    {
+        if (! $this->isMandatoryForceLeave($type)) {
+            return $type;
+        }
+
+        return LeaveType::where('name', 'Vacation Leave')->first() ?? $type;
+    }
+
+    private function leaveTypeIdsUsingCredit(LeaveType $creditType): array
+    {
+        if (strtolower(trim($creditType->name)) !== 'vacation leave') {
+            return [$creditType->id];
+        }
+
+        return LeaveType::whereIn('name', ['Vacation Leave', 'Mandatory/Force Leave'])
+            ->pluck('id')
+            ->all();
+    }
+
+    private function creditNoteForLeaveType(LeaveType $type): string
+    {
+        return $this->isMandatoryForceLeave($type)
+            ? 'Mandatory/Force Leave is charged against Vacation Leave credits.'
+            : '';
+    }
+
+    private function isMandatoryForceLeave(LeaveType $type): bool
+    {
+        return strtolower(trim($type->name)) === 'mandatory/force leave';
     }
 
     private function datePolicyForLeaveType(LeaveType $type): string

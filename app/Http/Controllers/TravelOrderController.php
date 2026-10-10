@@ -165,6 +165,38 @@ class TravelOrderController extends Controller
         return $exporter->stream($travelOrder);
     }
 
+    public function acknowledgementReport(TravelOrder $travelOrder): View
+    {
+        $this->authorizeTravelOrderAccess($travelOrder);
+        $travelOrder->loadMissing(['employee.user', 'companions', 'recordsOfficer', 'regionalDirector']);
+
+        return view('travel-orders.acknowledgement-report', compact('travelOrder'));
+    }
+
+    public function printAcknowledgementReport(TravelOrder $travelOrder): View
+    {
+        $this->authorizeTravelOrderAccess($travelOrder);
+        $travelOrder->loadMissing(['employee.user', 'companions', 'recordsOfficer', 'regionalDirector']);
+
+        return view('travel-orders.acknowledgement-report-print', compact('travelOrder'));
+    }
+
+    public function viewAcknowledgementReportFile(TravelOrder $travelOrder)
+    {
+        $this->authorizeTravelOrderAccess($travelOrder);
+
+        if (! $travelOrder->tar_attachment_path || ! Storage::disk('public')->exists($travelOrder->tar_attachment_path)) {
+            abort(404);
+        }
+
+        $fileName = ($travelOrder->ta_number ?: 'acknowledgement-report') . '.pdf';
+
+        return Storage::disk('public')->response($travelOrder->tar_attachment_path, $fileName, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $fileName . '"',
+        ]);
+    }
+
     public function adminIndex(Request $request): View
     {
         $search = trim((string) $request->query('search', ''));
@@ -205,15 +237,16 @@ class TravelOrderController extends Controller
 
         $role = strtolower((string) auth()->user()->role);
         $employeeId = auth()->user()->employee?->id;
+        $remarks = $validated['remarks'] ?? null;
 
-        DB::transaction(function () use ($validated, $travelOrder, $role, $employeeId) {
+        DB::transaction(function () use ($validated, $travelOrder, $role, $employeeId, $remarks) {
             if ($role === 'recordofficer') {
                 if (($travelOrder->recordofficer_status ?? 'pending') !== 'pending') {
                     return;
                 }
 
                 $travelOrder->approved_by_recordofficer = $employeeId;
-                $travelOrder->recordofficer_remarks = $validated['remarks'];
+                $travelOrder->recordofficer_remarks = $remarks;
                 $travelOrder->recordofficer_status = $validated['status'];
 
                 if ($validated['status'] === 'rejected') {
@@ -244,7 +277,7 @@ class TravelOrderController extends Controller
                 }
 
                 $travelOrder->approved_by_regionaldirector = $employeeId;
-                $travelOrder->rd_remarks = $validated['remarks'];
+                $travelOrder->rd_remarks = $remarks;
                 $travelOrder->rd_status = $validated['status'];
                 $travelOrder->status = $validated['status'] === 'approved' ? 'approved' : 'rejected';
 
@@ -302,14 +335,26 @@ class TravelOrderController extends Controller
             'tar_remarks' => $validated['tar_remarks'] ?? null,
         ]);
 
+        $travelOrder->loadMissing('employee');
+        $submitterName = trim(($employee->firstname ?? '') . ' ' . ($employee->lastname ?? '')) ?: 'An employee';
+        $viewers = User::whereHas('employee', function ($query) {
+            $query->whereIn('account_role', ['admin', 'hrstaff', 'recordofficer', 'regionaldirector']);
+        })->get();
+
+        Notification::send($viewers, new TravelOrderNotification(
+            $travelOrder,
+            'Acknowledgement Report Submitted',
+            "{$submitterName} submitted an acknowledgement report for travel authority {$travelOrder->ta_number}."
+        ));
+
         AuditLogListener::logActivity(
-            'Submit Travel Report',
+            'Submit Acknowledgement Report',
             'Attendance',
-            "Submitted travel accomplishment report for travel order ({$travelOrder->ta_number})",
+            "Submitted acknowledgement report for travel order ({$travelOrder->ta_number})",
             auth()->user()
         );
 
-        return redirect()->route('travel-orders.index')->with('success', 'Travel accomplishment report submitted successfully.');
+        return redirect()->route('travel-orders.index')->with('success', 'Acknowledgement report submitted successfully.');
     }
 
     private function authorizeTravelOrderAccess(TravelOrder $travelOrder): void

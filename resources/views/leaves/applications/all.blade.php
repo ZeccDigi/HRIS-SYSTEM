@@ -136,41 +136,51 @@
 
             {{-- Leave Records Table --}}
             <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                <div class="overflow-x-auto">
+                <div class="w-full min-w-0">
                     <table class="w-full table-fixed divide-y divide-gray-100">
+                        <colgroup>
+                            <col class="w-[9%]">
+                            <col class="w-[15%]">
+                            <col class="w-[14%]">
+                            <col class="w-[13%]">
+                            <col class="w-[14%]">
+                            <col class="w-[13%]">
+                            <col class="w-[10%]">
+                            <col class="w-[12%]">
+                        </colgroup>
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="w-[10%] px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                <th class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
                                     {{ __('Date Filed') }}
                                 </th>
 
-                                <th class="w-[16%] px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                <th class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
                                     {{ __('Name') }}
                                 </th>
 
-                                <th class="w-[13%] px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                <th class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
                                     {{ __('Leave Type') }}
                                 </th>
 
-                                <th class="w-[16%] px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                <th class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
                                     {{ __('Leave Certification') }}
                                 </th>
 
-                                <th class="w-[16%] px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                <th class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
                                     {{ __('Recommending Approval') }}
                                 </th>
 
-                                <th class="w-[15%] px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                <th class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
                                     {{ __('Approval') }}
                                 </th>
 
                                 {{-- Status is immediately before Actions --}}
-                                <th class="w-[10%] px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                <th class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
     {{ __('Status') }}
 </th>
 
 
-                                <th class="w-[7%] px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                <th class="break-words whitespace-normal px-1 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
     {{ __('Actions') }}
 </th>
                             </tr>

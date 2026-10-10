@@ -142,9 +142,11 @@
         }
 
         .header-logo {
-            width: 11mm;
-            height: 11mm;
+            width: auto;
+            height: 13mm;
+            max-width: 13mm;
             object-fit: contain;
+            aspect-ratio: 1 / 1;
         }
 
         .letterhead {
@@ -672,12 +674,16 @@
     $vacationCredit = $credits->first(fn ($credit) => str_contains(strtolower($credit->leaveType?->name ?? ''), 'vacation'));
     $sickCredit = $credits->first(fn ($credit) => str_contains(strtolower($credit->leaveType?->name ?? ''), 'sick'));
     $isSick = str_contains($leaveTypeLower, 'sick');
-    $vacationLess = $isSick ? '' : $durationText;
-    $sickLess = $isSick ? $durationText : '';
-    $vacationBalance = number_format((float) ($vacationCredit?->balance ?? 0), 1);
-    $sickBalance = number_format((float) ($sickCredit?->balance ?? 0), 1);
-    $vacationEarned = number_format((float) ($vacationCredit?->leaveType?->days_per_year ?? 0), 1);
-    $sickEarned = number_format((float) ($sickCredit?->leaveType?->days_per_year ?? 0), 1);
+    $vacationCurrent = (float) ($vacationCredit?->balance ?? 0);
+    $sickCurrent = (float) ($sickCredit?->balance ?? 0);
+    $vacationLessValue = $isSick ? 0.0 : $duration;
+    $sickLessValue = $isSick ? $duration : 0.0;
+    $vacationLess = $vacationLessValue > 0 ? $durationText : '';
+    $sickLess = $sickLessValue > 0 ? $durationText : '';
+    $vacationEarned = number_format($vacationCurrent, 1);
+    $sickEarned = number_format($sickCurrent, 1);
+    $vacationBalance = number_format($vacationCurrent - $vacationLessValue, 1);
+    $sickBalance = number_format($sickCurrent - $sickLessValue, 1);
     $formatName = fn ($person) => trim(($person?->firstname ?? '') . ' ' . ($person?->middlename ? Str::substr($person->middlename, 0, 1) . '. ' : '') . ($person?->lastname ?? ''));
     $chiefName = $formatName($leaveRequest->chief) ?: 'LOUIE JAY C. LOSARIA';
     $hrName = $formatName($leaveRequest->hrstaff) ?: 'MANILYN JOY P. VELITA';
@@ -964,5 +970,14 @@
         </tbody>
     </table>
 </main>
+
+@if(request()->boolean('auto_print'))
+    <script>
+        window.addEventListener('load', () => {
+            window.focus();
+            window.print();
+        });
+    </script>
+@endif
 </body>
 </html>

@@ -18,6 +18,16 @@
                 $recordStatus = $travelOrder->recordofficer_status ?: 'pending';
                 $rdStatus = $travelOrder->rd_status ?: 'pending';
                 $mainStatus = $travelOrder->status ?: 'pending';
+                $travelOrderIdLabel = $travelOrder->ta_number
+                    ?: 'TA-' .
+                        optional($travelOrder->created_at)->format('Y-m-d') .
+                        '-' .
+                        str_pad((string) $travelOrder->id, 3, '0', STR_PAD_LEFT);
+                $approveDescription = $isRecordsOfficer
+                    ? "Approving will forward this request\nto Regional Director for final review."
+                    : ($isDirector
+                        ? "Approving will mark this as\nfully approved."
+                        : "Approving will move this request to the next step\nor mark it as fully approved.");
 
                 $trackedEmployee = trim(
                     ($travelOrder->employee?->firstname ?? '') . ' ' .
@@ -114,26 +124,25 @@
                 empty="No travel authority to track yet."
             />
 
-            {{-- Review Action Above the Form --}}
-            <section class="mt-8 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-7">
-                @if($isMyTurn)
-                    <div class="mb-6 flex flex-col gap-3 border-b border-gray-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <p class="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">
-                                {{ __('Current Review Stage') }}
-                            </p>
+            {{-- Full Travel Authority Form --}}
+            <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+                <div class="bg-slate-100 px-3 pb-3 pt-6 sm:px-5 sm:pb-5 sm:pt-8">
+                    <div class="mx-auto w-full max-w-[1100px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                        <iframe
+                            id="travelAuthorityPreview"
+                            src="{{ route('travel-orders.preview', $travelOrder) }}"
+                            class="block w-full border-0 bg-white"
+                            style="height: 1300px;"
+                            scrolling="no"
+                            title="{{ __('Travel authority print preview') }}"
+                        ></iframe>
+                    </div>
+                </div>
+            </section>
 
-                            <h3 class="mt-1 text-xl font-black text-gray-900">
-                                {{ $isRecordsOfficer
-                                    ? __('Review Travel Authority')
-                                    : __('Approve Travel Authority') }}
-                            </h3>
-
-                            <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
-                                {{ __('Enter your remarks, then recommend, approve, or reject the travel authority. Review the complete form below before submitting your decision.') }}
-                            </p>
-                        </div>
-
+            @if($isMyTurn)
+                <section class="mt-6 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-7">
+                    <div class="mb-5 flex justify-end">
                         <div class="inline-flex shrink-0 items-center gap-2 rounded-full bg-orange-50 px-3 py-2">
                             <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-orange-400"></span>
 
@@ -151,7 +160,6 @@
                         @csrf
                         @method('PUT')
 
-                        {{-- Remarks --}}
                         <div>
                             <label
                                 for="travel_order_remarks"
@@ -180,10 +188,10 @@
                             </div>
                         </div>
 
-                        {{-- Action Buttons --}}
                         <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                             <button
                                 type="submit"
+                                id="travelOrderRejectButton"
                                 name="status"
                                 value="rejected"
                                 class="inline-flex min-w-48 items-center justify-center rounded-xl border border-red-300 bg-white px-6 py-3 text-xs font-black uppercase tracking-widest text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2"
@@ -194,6 +202,7 @@
 
                             <button
                                 type="submit"
+                                id="travelOrderApproveButton"
                                 name="status"
                                 value="approved"
                                 class="inline-flex min-w-48 items-center justify-center rounded-xl bg-indigo-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
@@ -206,63 +215,56 @@
                             </button>
                         </div>
                     </form>
-                @else
-                    <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                        <div class="flex items-start gap-4">
-                            <div class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-                                <i class="fa-solid fa-lock"></i>
-                            </div>
+                </section>
 
-                            <div>
-                                <h3 class="text-sm font-black uppercase tracking-widest text-gray-700">
-                                    {{ __('Review Action Unavailable') }}
-                                </h3>
+                <div
+                    id="travelApproveConfirmModal"
+                    class="fixed inset-0 z-[100000] hidden items-center justify-center p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="travelApproveConfirmTitle"
+                >
+                    <div
+                        id="travelApproveConfirmBackdrop"
+                        class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                    ></div>
 
-                                <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
-                                    @if($waitingMessage)
-                                        {{ $waitingMessage }}
-                                    @else
-                                        {{ __('This travel authority has already been processed or is currently assigned to another approval stage.') }}
-                                    @endif
-                                </p>
-                            </div>
+                    <div class="relative z-10 w-full max-w-xs overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                        <div class="border-b border-slate-100 px-4 py-3">
+                            <h2
+                                id="travelApproveConfirmTitle"
+                                class="text-base font-black text-slate-900"
+                            ></h2>
+
+                            <p class="mt-0.5 text-xs text-slate-500">
+                                {{ __('ID: :id', ['id' => $travelOrderIdLabel]) }}
+                            </p>
                         </div>
 
-                        <div class="inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2
-                            {{ $waitingMessage ? 'bg-yellow-50' : 'bg-green-50' }}">
-                            @if($waitingMessage)
-                                <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-yellow-400"></span>
-
-                                <span class="text-[10px] font-black uppercase tracking-widest text-yellow-600">
-                                    {{ __('In Progress') }}
-                                </span>
-                            @else
-                                <span class="h-2.5 w-2.5 rounded-full bg-green-500"></span>
-
-                                <span class="text-[10px] font-black uppercase tracking-widest text-green-600">
-                                    {{ __('Travel Authority Processed') }}
-                                </span>
-                            @endif
+                        <div class="px-4 py-3 text-center">
+                            <p class="whitespace-pre-line text-xs leading-5 text-slate-600">
+                                <span id="travelApproveConfirmDescription"></span>
+                            </p>
                         </div>
-                    </div>
-                @endif
-            </section>
 
-            {{-- Full Travel Authority Form --}}
-            <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-                <div class="bg-slate-100 p-3 sm:p-5">
-                    <div class="mx-auto w-full max-w-[1100px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                        <iframe
-                            id="travelAuthorityPreview"
-                            src="{{ route('travel-orders.preview', $travelOrder) }}"
-                            class="block w-full border-0 bg-white"
-                            style="height: 1300px;"
-                            scrolling="no"
-                            title="{{ __('Travel authority print preview') }}"
-                        ></iframe>
+                        <div class="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                id="travelApproveCancelButton"
+                                class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-widest text-slate-600 transition hover:bg-slate-100"
+                            >
+                                {{ __('Cancel') }}
+                            </button>
+
+                            <button
+                                type="button"
+                                id="travelApproveConfirmButton"
+                                class="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-blue-800"
+                            ></button>
+                        </div>
                     </div>
                 </div>
-            </section>
+            @endif
 
             @if($travelOrder->recordofficer_remarks || $travelOrder->chief_remarks || $travelOrder->hrstaff_remarks || $travelOrder->rd_remarks)
                 <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
@@ -304,6 +306,16 @@
             const form = document.getElementById('travelOrderStatusForm');
             const remarksField = document.getElementById('travel_order_remarks');
             const errorSpan = document.getElementById('travelOrderRemarksError');
+            const approveButton = document.getElementById('travelOrderApproveButton');
+            const rejectButton = document.getElementById('travelOrderRejectButton');
+            const approveModal = document.getElementById('travelApproveConfirmModal');
+            const approveTitle = document.getElementById('travelApproveConfirmTitle');
+            const approveDescription = document.getElementById('travelApproveConfirmDescription');
+            const approveConfirmButton = document.getElementById('travelApproveConfirmButton');
+            const approveCancelButton = document.getElementById('travelApproveCancelButton');
+            const approveBackdrop = document.getElementById('travelApproveConfirmBackdrop');
+            let confirmedAction = null;
+            let pendingButton = null;
 
             function resizeTravelAuthorityPreview() {
                 if (!iframe) {
@@ -379,6 +391,82 @@
                     }
 
                     remarksField?.focus();
+                    return;
+                }
+
+                if ((action === 'approved' || action === 'rejected') && confirmedAction !== action) {
+                    event.preventDefault();
+                    pendingButton = action === 'approved' ? approveButton : rejectButton;
+                    openTravelApproveConfirmModal(action);
+                    return;
+                }
+            });
+
+            function openTravelApproveConfirmModal(action) {
+                if (!approveModal) {
+                    confirmedAction = action;
+                    form?.requestSubmit(pendingButton);
+                    return;
+                }
+
+                if (approveTitle) {
+                    approveTitle.textContent = action === 'approved'
+                        ? 'Approve this travel authority?'
+                        : 'Reject this travel authority?';
+                }
+
+                if (approveDescription) {
+                    approveDescription.textContent = action === 'approved'
+                        ? @js($approveDescription)
+                        : 'Rejecting will mark this request as rejected.';
+                }
+
+                if (approveConfirmButton) {
+                    approveConfirmButton.textContent = action === 'approved'
+                        ? 'Approve'
+                        : 'Reject';
+                }
+
+                approveModal.classList.remove('hidden');
+                approveModal.classList.add('flex');
+                document.documentElement.classList.add('overflow-hidden');
+                document.body.classList.add('overflow-hidden');
+            }
+
+            function closeTravelApproveConfirmModal() {
+                approveModal?.classList.add('hidden');
+                approveModal?.classList.remove('flex');
+                pendingButton = null;
+                document.documentElement.classList.remove('overflow-hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+
+            approveConfirmButton?.addEventListener('click', function () {
+                const action = pendingButton?.value;
+
+                if (!action) {
+                    closeTravelApproveConfirmModal();
+                    return;
+                }
+
+                confirmedAction = action;
+                closeTravelApproveConfirmModal();
+                form?.requestSubmit(action === 'approved' ? approveButton : rejectButton);
+            });
+
+            approveCancelButton?.addEventListener(
+                'click',
+                closeTravelApproveConfirmModal
+            );
+
+            approveBackdrop?.addEventListener(
+                'click',
+                closeTravelApproveConfirmModal
+            );
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    closeTravelApproveConfirmModal();
                 }
             });
         });

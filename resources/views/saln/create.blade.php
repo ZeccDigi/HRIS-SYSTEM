@@ -1,4 +1,6 @@
 <x-app-layout>
+    <x-slot name="title">{{ __('SALN Update') }}</x-slot>
+
     @php
         $selectedYear = $selectedYear ?? now()->year;
         $selectedSaln = $selectedSaln ?? null;
@@ -129,10 +131,10 @@
 
         /* Consistent soft rounded panels */
         .saln-entry-page .pds-paper {
-            border: 1px solid #e2e8f0;
-            border-radius: .5rem;
-            background: #fff;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
         }
 
         .saln-entry-page .saln-soft-panel {
@@ -245,16 +247,21 @@
         ]))"
     >
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            @unless($isSalnIndex)
-                <div class="mb-5 flex items-center justify-between gap-3">
-                    <a href="{{ route('salns.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        Back
-                    </a>
-                </div>
-            @endunless
+            <div class="mb-5 flex items-center justify-between gap-3">
+                <a href="{{ route('salns.index', ['year' => $selectedYear]) }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Back
+                </a>
+                <button
+                    type="submit"
+                    form="salnForm"
+                    class="inline-flex items-center rounded-lg bg-indigo-700 px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-800"
+                >
+                    Save SALN
+                </button>
+            </div>
 
             @if ($errors->any())
                 <div class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
@@ -267,45 +274,8 @@
                 </div>
             @endif
 
-            <div class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900">Statement of Assets, Liabilities, and Net Worth</h2>
-                    <p class="mt-1 text-sm font-medium text-slate-600">Please put N/A for fields if not applicable.</p>
-                </div>
-                <form method="GET" action="{{ route('salns.index') }}" class="flex w-fit items-center gap-2">
-                    <label for="saln_year" class="text-[10px] font-black uppercase tracking-widest text-slate-400">Year</label>
-                    <select id="saln_year" name="year" onchange="this.form.submit()" class="w-32 rounded-lg border-gray-100 bg-gray-50/30 px-3 py-2 text-sm font-bold text-slate-700 shadow-sm outline-none focus:border-indigo-500 focus:ring-indigo-500">
-                        @foreach(range(now()->year + 1, now()->year - 5) as $year)
-                            <option value="{{ $year }}" @selected((int) $selectedYear === (int) $year)>{{ $year }}</option>
-                        @endforeach
-                    </select>
-                </form>
-            </div>
-
-            <div class="pds-paper overflow-hidden rounded border border-slate-200 bg-white shadow-sm">
-                <div class="flex flex-col gap-4 border-b border-slate-200 px-6 py-5 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 class="text-xl font-black tracking-tight text-slate-900">{{ $selectedYear }} SALN Form</h1>
-                        <p class="mt-1 text-xs font-medium text-slate-500">Per CSC Resolution No. 2500632 | As required by R.A. No. 6713</p>
-                    </div>
-
-                    <div class="flex flex-col items-stretch gap-3 sm:items-end">
-                        <div class="flex flex-wrap items-center justify-end gap-2">
-                            @if($selectedSaln)
-                                <a href="{{ route('salns.show', $selectedSaln) }}" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-xs font-black uppercase tracking-widest text-indigo-700 ring-1 ring-indigo-100 hover:bg-indigo-50">View {{ $selectedYear }} Copy</a>
-                            @endif
-                            <button
-                                type="submit"
-                                form="salnForm"
-                                class="inline-flex items-center rounded-lg bg-indigo-700 px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-800"
-                            >
-                                Save SALN
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="border-b border-gray-200 bg-white">
+            <div class="pds-paper w-full">
+                <div class="border-b border-gray-200">
                 <div class="flex items-center gap-5 overflow-x-auto px-6 pt-5">
                     <button type="button" @click="$refs.salnTabs.scrollBy({ left: -240, behavior: 'smooth' })" class="shrink-0 p-2 text-slate-400 hover:text-[#2b428f]">
                         <i class="fa-solid fa-chevron-left"></i>

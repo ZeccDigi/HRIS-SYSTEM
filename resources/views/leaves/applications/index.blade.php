@@ -178,12 +178,12 @@
 
             {{-- Leave applications table --}}
             <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                <div class="w-full overflow-x-auto">
+                <div class="w-full min-w-0">
                     <table class="w-full table-fixed divide-y divide-gray-100">
                         <colgroup>
-                            <col class="w-[10%]"> {{-- Date Filed --}}
+                            <col class="w-[9%]"> {{-- Date Filed --}}
     <col class="w-[15%]"> {{-- Name --}}
-    <col class="w-[13%]"> {{-- Leave Type --}}
+    <col class="w-[14%]"> {{-- Leave Type --}}
     <col class="w-[13%]"> {{-- Leave Certification --}}
     <col class="w-[14%]"> {{-- Recommending Approval --}}
     <col class="w-[13%]"> {{-- Approval --}}
@@ -266,6 +266,102 @@
                 </div>
             </div>
         </div>
+
+        {{-- Approval confirmation modal --}}
+        <template x-teleport="body">
+            <div
+                x-show="approveModalOpen"
+                x-cloak
+                class="fixed inset-0 z-[100000] flex items-center justify-center p-4"
+                style="display: none;"
+                @keydown.escape.window="closeApproveModal()"
+            >
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeApproveModal()"></div>
+
+                <div @click.stop class="relative z-10 w-full max-w-xs overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                    <div class="border-b border-slate-100 px-4 py-3">
+                        <h2 class="text-base font-black text-slate-900" x-text="approveModalHeading"></h2>
+                        <p class="mt-0.5 text-xs text-slate-500" x-text="approveModalTitle"></p>
+                    </div>
+
+                    <div class="px-4 py-3 text-center">
+                        <p class="whitespace-pre-line text-xs leading-5 text-slate-600" x-text="approveModalDescription"></p>
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:justify-end">
+                        <button
+                            type="button"
+                            @click="closeApproveModal()"
+                            class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-widest text-slate-600 transition hover:bg-slate-100"
+                        >
+                            {{ __('Cancel') }}
+                        </button>
+
+                        <button
+                            type="button"
+                            @click="submitApproveForm()"
+                            class="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-blue-800"
+                            x-text="approveModalAction"
+                        ></button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        {{-- Rejection confirmation modal --}}
+        <template x-teleport="body">
+            <div
+                x-show="rejectModalOpen"
+                x-cloak
+                class="fixed inset-0 z-[100000] flex items-center justify-center p-4"
+                style="display: none;"
+                @keydown.escape.window="closeRejectModal()"
+            >
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeRejectModal()"></div>
+
+                <div @click.stop class="relative z-10 w-full max-w-xs overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                    <div class="border-b border-slate-100 px-4 py-3">
+                        <h2 class="text-base font-black text-slate-900">{{ __('Reject this leave application?') }}</h2>
+                        <p class="mt-0.5 text-xs text-slate-500" x-text="rejectModalTitle"></p>
+                    </div>
+
+                    <div class="px-4 py-3">
+                        <label
+                            for="leaveRejectModalRemarks"
+                            class="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500"
+                        >
+                            {{ __('Remarks / Notes') }}
+                        </label>
+
+                        <textarea
+                            id="leaveRejectModalRemarks"
+                            x-model="rejectModalRemarks"
+                            rows="4"
+                            class="block w-full resize-y rounded-lg border-slate-300 bg-slate-50 text-xs text-slate-800 shadow-sm transition focus:border-blue-900 focus:bg-white focus:ring-blue-900"
+                            placeholder="{{ __('Enter remarks or notes here...') }}"
+                        ></textarea>
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:justify-end">
+                        <button
+                            type="button"
+                            @click="closeRejectModal()"
+                            class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-widest text-slate-600 transition hover:bg-slate-100"
+                        >
+                            {{ __('Cancel') }}
+                        </button>
+
+                        <button
+                            type="button"
+                            @click="submitRejectForm()"
+                            class="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-blue-800"
+                        >
+                            {{ __('Reject') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
 
         {{-- Leave preview modal --}}
         <template x-teleport="body">
@@ -418,6 +514,16 @@
             return {
                 previewModalOpen: false,
                 showRemarks: false,
+                approveModalOpen: false,
+                approveModalFormId: '',
+                approveModalHeading: '',
+                approveModalTitle: '',
+                approveModalDescription: '',
+                approveModalAction: '',
+                rejectModalOpen: false,
+                rejectModalFormId: '',
+                rejectModalTitle: '',
+                rejectModalRemarks: '',
 
                 previewData: {
                     title: '',
@@ -465,21 +571,91 @@
                 toggleRemarks() {
                     this.showRemarks = !this.showRemarks;
                 },
+
+                openApproveModal(id, title, isHR) {
+                    this.approveModalFormId = `leaveApproveRowForm_${id}`;
+                    this.approveModalHeading = isHR
+                        ? 'Verify this leave application?'
+                        : 'Approve this leave application?';
+                    this.approveModalTitle = title ? `ID: ${title}` : '';
+                    this.approveModalAction = isHR ? 'Verify' : 'Approve';
+                    this.approveModalDescription = isHR
+                        ? 'Verifying will forward this request\nto the next approval stage.'
+                        : 'Approving will move this request to the next step\nor mark it as fully approved.';
+                    this.approveModalOpen = true;
+
+                    document.documentElement.classList.add('overflow-hidden');
+                    document.body.classList.add('overflow-hidden');
+                },
+
+                closeApproveModal() {
+                    this.approveModalOpen = false;
+                    this.approveModalFormId = '';
+                    this.approveModalHeading = '';
+                    this.approveModalTitle = '';
+                    this.approveModalDescription = '';
+                    this.approveModalAction = '';
+
+                    document.documentElement.classList.remove('overflow-hidden');
+                    document.body.classList.remove('overflow-hidden');
+                },
+
+                submitApproveForm() {
+                    const form = document.getElementById(this.approveModalFormId);
+
+                    if (form) {
+                        form.submit();
+                    }
+                },
+
+                openRejectModal(id, title, isHR) {
+                    this.rejectModalFormId = `leaveRejectRowForm_${id}`;
+                    this.rejectModalTitle = title ? `ID: ${title}` : '';
+                    this.rejectModalRemarks = '';
+                    this.rejectModalOpen = true;
+
+                    document.documentElement.classList.add('overflow-hidden');
+                    document.body.classList.add('overflow-hidden');
+                },
+
+                closeRejectModal() {
+                    this.rejectModalOpen = false;
+                    this.rejectModalFormId = '';
+                    this.rejectModalTitle = '';
+                    this.rejectModalRemarks = '';
+
+                    document.documentElement.classList.remove('overflow-hidden');
+                    document.body.classList.remove('overflow-hidden');
+                },
+
+                submitRejectForm() {
+                    const form = document.getElementById(this.rejectModalFormId);
+
+                    if (!form) {
+                        return;
+                    }
+
+                    const remarksInput = form.querySelector('input[name="remarks"]');
+
+                    if (remarksInput) {
+                        remarksInput.value = this.rejectModalRemarks.trim();
+                    }
+
+                    form.submit();
+                },
             };
         }
 
         function openLeavePreviewModal(payloadJson) {
-            const root = document.querySelector(
-                '[x-data="leaveApplicationPreviewPage()"]'
-            );
+            const page = window.getLeaveApplicationPageData
+                ? window.getLeaveApplicationPageData()
+                : null;
 
-            if (!root || !root.__x) {
+            if (!page) {
                 return;
             }
 
-            root.__x.$data.openPreviewModal(
-                JSON.parse(payloadJson)
-            );
+            page.openPreviewModal(JSON.parse(payloadJson));
         }
     </script>
 </x-app-layout>

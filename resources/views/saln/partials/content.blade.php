@@ -116,8 +116,13 @@
                 </table>
 
                 @php
-                    $multipleSpouses = $saln->declarant_info['multiple_spouses'] ?? [];
-                    $multipleMarriagesNA = ($saln->declarant_info['multiple_marriages_not_applicable'] ?? null) !== false && empty(array_filter($multipleSpouses));
+                    $hasSavedSaln = $hasSavedSaln ?? $saln->exists;
+                    $multipleSpouses = collect($saln->declarant_info['multiple_spouses'] ?? [])
+                        ->filter(fn ($spouseName) => trim((string) $spouseName) !== '')
+                        ->values();
+                    $multipleMarriagesNA = $hasSavedSaln
+                        && ($saln->declarant_info['multiple_marriages_not_applicable'] ?? null) !== false
+                        && $multipleSpouses->isEmpty();
                 @endphp
                 <p class="saln-instruction-label">Spouses, who are both public officials or employees, may file the SALN jointly or separately.</p>
                 <p class="saln-instruction-label">The declarant shall check the appropriate box</p>
@@ -129,20 +134,16 @@
 
                 <p class="saln-instruction-label">If with multiple marriages, indicate name(s) of spouses, otherwise check the "Not Applicable" box.</p>
                 <div class="mb-4 saln-multiple-marriage-section">
-                    @if($multipleMarriagesNA)
-                        <div class="saln-multiple-marriage-row">
-                            <span class="saln-line flex-1">&nbsp;</span>
-                            <span class="saln-check-label mt-1">@include('saln.partials.box', ['checked' => true]) Not Applicable</span>
-                        </div>
+                    <div class="saln-multiple-marriage-row">
+                        <span class="saln-line flex-1">{{ $multipleMarriagesNA ? '' : ($multipleSpouses[0] ?? '') }}</span>
+                        <span class="saln-check-label mt-1">@include('saln.partials.box', ['checked' => $multipleMarriagesNA]) Not Applicable</span>
+                    </div>
+                    @foreach($multipleSpouses->slice(1) as $spouseName)
+                        <div class="saln-line">{{ $spouseName }}</div>
+                    @endforeach
+                    @for($i = max($multipleSpouses->count(), 1); $i < 2; $i++)
                         <div class="saln-line">&nbsp;</div>
-                    @else
-                        @foreach($multipleSpouses as $spouseName)
-                            <div class="saln-line">{{ $spouseName }}</div>
-                        @endforeach
-                        @for($i = count($multipleSpouses); $i < 2; $i++)
-                            <div class="saln-line">&nbsp;</div>
-                        @endfor
-                    @endif
+                    @endfor
                 </div>
                 </div>
 
@@ -317,7 +318,7 @@
                 <p class="saln-note text-center mb-2">(of Declarant / Declarant's spouse / Unmarried Children Below Eighteen (18) years of Age Living in Declarant's Household)</p>
                 <p class="mb-2">
                     <span class="saln-check-label">
-                        @include('saln.partials.box', ['checked' => !$saln->has_business_interests])
+                        @include('saln.partials.box', ['checked' => $hasSavedSaln && ! $saln->has_business_interests])
                         I/We do not have any business interest or financial connection.
                     </span>
                 </p>
@@ -351,7 +352,7 @@
                 <p class="saln-note text-center mb-2">(Within the Fourth Degree of Consanguinity or Affinity. Include also Bilas, Balae and Inso)</p>
                 <p class="mb-2">
                     <span class="saln-check-label">
-                        @include('saln.partials.box', ['checked' => !$saln->has_relatives_in_gov])
+                        @include('saln.partials.box', ['checked' => $hasSavedSaln && ! $saln->has_relatives_in_gov])
                         I/We do not know of any relative/s in the government service
                     </span>
                 </p>

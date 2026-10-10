@@ -57,8 +57,8 @@
                 empty="No locator slip approval process to track yet."
             />
 
-            <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-                <section class="rounded-[2rem] border border-gray-100 bg-white p-3 shadow-sm sm:p-5">
+            <div class="mt-8 space-y-6">
+                <section class="rounded-[2rem] border border-gray-100 bg-white px-3 pb-3 pt-6 shadow-sm sm:px-5 sm:pb-5 sm:pt-8">
                     <div class="mx-auto w-full max-w-[900px] overflow-hidden rounded-2xl border border-gray-200 bg-slate-200">
                         <iframe
                             id="locator-form-preview"
@@ -74,18 +74,13 @@
                     </div>
                 </section>
 
-                <aside class="space-y-5">
-                    @if($canReview)
+                @if($canReview)
     <section class="rounded-3xl bg-indigo-700 p-6 text-white shadow-2xl shadow-indigo-200">
         <h3 class="text-lg font-black uppercase tracking-widest">
             {{ __('Review Action') }}
         </h3>
 
-        <p class="mt-3 text-sm font-medium leading-relaxed text-indigo-100">
-            {{ __('Verify the official preview before sending your decision.') }}
-        </p>
-
-        <div class="mt-8">
+        <div class="mt-6">
             <label
                 for="locator_review_remarks"
                 class="mb-3 block text-[10px] font-black uppercase tracking-widest text-indigo-200"
@@ -111,16 +106,17 @@
 
         {{-- Approve button --}}
         <form
+            id="locator-approve-form"
             action="{{ route('locator-slips.approve', $locatorSlip) }}"
             method="POST"
             class="mt-8"
-            onsubmit="return confirm('{{ __('Approve this locator slip?') }}');"
         >
             @csrf
             @method('PATCH')
 
             <button
-                type="submit"
+                type="button"
+                onclick="openLocatorDecisionModal('approved')"
                 class="w-full rounded-2xl bg-white px-5 py-4 text-xs font-black uppercase tracking-widest text-indigo-700 shadow-lg transition hover:bg-indigo-50"
             >
                 {{ __('Approve Request') }}
@@ -133,26 +129,76 @@
             action="{{ route('locator-slips.reject', $locatorSlip) }}"
             method="POST"
             class="mt-4"
-            onsubmit="return confirm('{{ __('Reject this locator slip?') }}');"
         >
             @csrf
             @method('PATCH')
 
             <button
-                type="submit"
+                type="button"
+                onclick="openLocatorDecisionModal('rejected')"
                 class="w-full rounded-2xl border-2 border-indigo-300 bg-indigo-500/60 px-5 py-4 text-xs font-black uppercase tracking-widest text-white transition hover:border-white hover:bg-indigo-500"
             >
                 {{ __('Reject Request') }}
             </button>
         </form>
+
+        <div
+            id="locatorDecisionModal"
+            class="fixed inset-0 z-[100000] hidden items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="locatorDecisionModalTitle"
+        >
+            <div
+                id="locatorDecisionModalBackdrop"
+                class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            ></div>
+
+            <div class="relative z-10 w-full max-w-xs overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                <div class="border-b border-slate-100 px-4 py-3">
+                    <h2
+                        id="locatorDecisionModalTitle"
+                        class="text-base font-black text-slate-900"
+                    ></h2>
+
+                    <p class="mt-0.5 text-xs text-slate-500">
+                        {{ __('ID: :id', ['id' => $locatorSlip->id]) }}
+                    </p>
+                </div>
+
+                <div class="px-4 py-3 text-center">
+                    <p
+                        id="locatorDecisionModalDescription"
+                        class="whitespace-pre-line text-xs leading-5 text-slate-600"
+                    ></p>
+                </div>
+
+                <div class="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:justify-end">
+                    <button
+                        type="button"
+                        onclick="closeLocatorDecisionModal()"
+                        class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-widest text-slate-600 transition hover:bg-slate-100"
+                    >
+                        {{ __('Cancel') }}
+                    </button>
+
+                    <button
+                        type="button"
+                        id="locatorDecisionConfirmButton"
+                        class="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-blue-800"
+                    ></button>
+                </div>
+            </div>
+        </div>
     </section>
 @endif
-                </aside>
             </div>
         </div>
     </div>
 
     <script>
+        let locatorDecisionAction = null;
+
         function printLocatorForm() {
             const previewIframe = document.getElementById('locator-form-preview');
 
@@ -164,5 +210,66 @@
             previewIframe.contentWindow.focus();
             previewIframe.contentWindow.print();
         }
+
+        function openLocatorDecisionModal(action) {
+            locatorDecisionAction = action;
+
+            const modal = document.getElementById('locatorDecisionModal');
+            const title = document.getElementById('locatorDecisionModalTitle');
+            const description = document.getElementById('locatorDecisionModalDescription');
+            const confirmButton = document.getElementById('locatorDecisionConfirmButton');
+
+            if (title) {
+                title.textContent = action === 'approved'
+                    ? 'Approve this locator slip?'
+                    : 'Reject this locator slip?';
+            }
+
+            if (description) {
+                description.textContent = action === 'approved'
+                    ? 'Approving will mark this request as approved.'
+                    : 'Rejecting will mark this request as rejected.';
+            }
+
+            if (confirmButton) {
+                confirmButton.textContent = action === 'approved'
+                    ? 'Approve'
+                    : 'Reject';
+            }
+
+            modal?.classList.remove('hidden');
+            modal?.classList.add('flex');
+            document.documentElement.classList.add('overflow-hidden');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeLocatorDecisionModal() {
+            const modal = document.getElementById('locatorDecisionModal');
+
+            modal?.classList.add('hidden');
+            modal?.classList.remove('flex');
+            locatorDecisionAction = null;
+            document.documentElement.classList.remove('overflow-hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        document.getElementById('locatorDecisionConfirmButton')?.addEventListener('click', function () {
+            const form = locatorDecisionAction === 'approved'
+                ? document.getElementById('locator-approve-form')
+                : document.getElementById('locator-reject-form');
+
+            form?.submit();
+        });
+
+        document.getElementById('locatorDecisionModalBackdrop')?.addEventListener(
+            'click',
+            closeLocatorDecisionModal
+        );
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                closeLocatorDecisionModal();
+            }
+        });
     </script>
 </x-app-layout>

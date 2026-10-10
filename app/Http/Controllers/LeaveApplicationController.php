@@ -166,13 +166,21 @@ class LeaveApplicationController extends Controller
     public function show(LeaveRequest $leaveApplication): View
     {
         $leaveApplication->load(['employee', 'leaveType', 'chief', 'hrstaff', 'regionalDirector']);
-        $leaveApplication->employee?->ensureLeaveCredits(Carbon::parse($leaveApplication->start_date)->year);
+        $leaveYear = Carbon::parse($leaveApplication->start_date)->year;
+        $leaveApplication->employee?->ensureLeaveCredits($leaveYear);
+
+        $creditLeaveType = $leaveApplication->leaveType;
+
+        if (strtolower(trim((string) $leaveApplication->leaveType?->name)) === 'mandatory/force leave') {
+            $creditLeaveType = LeaveType::where('name', 'Vacation Leave')->first() ?? $leaveApplication->leaveType;
+        }
+
         $leaveCredit = $leaveApplication->employee?->leaveCredits()
-            ->where('leave_type_id', $leaveApplication->leave_type_id)
-            ->where('year', Carbon::parse($leaveApplication->start_date)->year)
+            ->where('leave_type_id', $creditLeaveType?->id)
+            ->where('year', $leaveYear)
             ->first();
 
-        return view('leaves.applications.show', compact('leaveApplication', 'leaveCredit'));
+        return view('leaves.applications.show', compact('leaveApplication', 'leaveCredit', 'creditLeaveType'));
     }
 
     public function print(LeaveRequest $leaveApplication): View

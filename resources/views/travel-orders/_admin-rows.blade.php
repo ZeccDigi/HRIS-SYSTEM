@@ -40,6 +40,10 @@
             $computedTarStatus = 'not_applicable';
         }
 
+        $acknowledgementReportUrl = $order->tar_attachment_path
+            ? route('travel-orders.ar.file', $order)
+            : route('travel-orders.ar.print', $order);
+
         $recordsOfficerName = $order->recordsOfficer
             ? trim(
                 ($order->recordsOfficer->firstname ?? '') . ' ' .
@@ -75,6 +79,7 @@
                     $recordsOfficerName,
                     $regionalDirectorName,
                     $mainStatus,
+                    $computedTarStatus,
                 ])
             )
         );
@@ -222,18 +227,26 @@
             {{ $tarDeadline?->format('M d, Y') ?? __('N/A') }}
         </td>
 
-        {{-- TAR status --}}
-        <td
-            class="px-3 py-3 align-top text-xs font-semibold
-                {{ $computedTarStatus === 'submitted'
-                    ? 'text-green-700'
-                    : ($computedTarStatus === 'overdue'
-                        ? 'text-red-700'
-                        : 'text-gray-600') }}"
-        >
-            {{ $computedTarStatus === 'not_applicable'
-                ? '—'
-                : strtoupper($computedTarStatus) }}
+        {{-- AR status --}}
+        <td class="px-3 py-3 align-top text-xs font-semibold">
+            @if($computedTarStatus === 'submitted')
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                    <i class="fa-solid fa-file-lines"></i>
+                    <span>{{ __('Submitted') }}</span>
+                </span>
+            @elseif($computedTarStatus === 'overdue')
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-red-100 bg-red-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-red-700">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>{{ __('Overdue') }}</span>
+                </span>
+            @elseif($computedTarStatus === 'not_applicable')
+                <span class="text-gray-400">—</span>
+            @else
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-slate-600">
+                    <i class="fa-regular fa-clock"></i>
+                    <span>{{ __('Pending') }}</span>
+                </span>
+            @endif
         </td>
 
         {{-- Actions --}}
@@ -262,6 +275,20 @@
                     <i class="fa-solid fa-print text-sm"></i>
                 </a>
 
+                @if($computedTarStatus === 'submitted')
+                    <a
+                        href="{{ $acknowledgementReportUrl }}"
+                        target="_blank"
+                        rel="noopener"
+                        data-no-transition
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-700 transition hover:bg-blue-50 hover:text-blue-900"
+                        title="{{ __('View Acknowledgement Report') }}"
+                        aria-label="{{ __('View Acknowledgement Report') }}"
+                    >
+                        <i class="fa-solid fa-file-circle-check text-sm"></i>
+                    </a>
+                @endif
+
                 @if(
                     ($actionMode ?? 'view') === 'review' &&
                     ($canRecordsReview || $canDirectorReview)
@@ -269,8 +296,8 @@
                     <form
                         action="{{ route('travel-orders.update-status', $order->id) }}"
                         method="POST"
+                        id="travelApproveForm_{{ $order->id }}"
                         class="m-0 flex h-8 w-8 items-center justify-center"
-                        onsubmit="return confirm('{{ __('Approve this travel authority?') }}');"
                     >
                         @csrf
                         @method('PUT')
@@ -282,7 +309,8 @@
                         >
 
                         <button
-                            type="submit"
+                            type="button"
+                            onclick="openTravelApproveModal({{ $order->id }}, @js($taNumber))"
                             class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 transition hover:bg-green-50 hover:text-green-800"
                             title="{{ __('Approve') }}"
                             aria-label="{{ __('Approve travel authority') }}"
@@ -315,7 +343,9 @@
 
                         <button
                             type="button"
-                            onclick="submitTravelReject({{ $order->id }})"
+                            onclick="submitTravelReject(this)"
+                            data-travel-id="{{ $order->id }}"
+                            data-travel-title="{{ $taNumber }}"
                             class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-800"
                             title="{{ __('Reject') }}"
                             aria-label="{{ __('Reject travel authority') }}"

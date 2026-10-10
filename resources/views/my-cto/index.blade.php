@@ -8,39 +8,10 @@
                     {{ session('success') }}
                 </div>
             @endif
-            <div class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-indigo-600 rounded-2xl p-6 text-white shadow-xl shadow-indigo-200 md:col-span-1">
-                    <span class="text-[10px] font-black uppercase tracking-widest text-indigo-200">Available Balance</span>
-                    <div class="mt-2 flex items-baseline gap-2">
-                        <span class="text-4xl font-black">{{ number_format($employee->cto_balance, 1) }}</span>
-                        <span class="text-sm font-bold text-indigo-200 uppercase">Hours</span>
-                    </div>
-                    <p class="mt-2 text-xs text-indigo-200">Compensatory time-off credits available to use</p>
-                </div>
-                <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm md:col-span-2">
-                    <span class="text-[10px] font-black uppercase tracking-widest text-gray-400">Quick Guide</span>
-                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                        <div class="flex items-start gap-3">
-                            <span class="shrink-0 w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-black">+</span>
-                            <div>
-                                <p class="font-bold text-gray-900">Earn CTO</p>
-                                <p class="text-xs text-gray-500 mt-0.5">File overtime or extra work rendered to earn credits.</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <span class="shrink-0 w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-black">-</span>
-                            <div>
-                                <p class="font-bold text-gray-900">Use CTO</p>
-                                <p class="text-xs text-gray-500 mt-0.5">Apply to use earned credits as time off.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
             <div x-data="myCtoRequestsTable()" x-init="init()">
-                <div class="mb-6 flex flex-wrap items-center justify-end gap-3">
-                    <div class="relative">
-                        <label for="my_cto_year" class="sr-only">
+                <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-end">
+                    <div class="flex items-center gap-2">
+                        <label for="my_cto_year" class="text-sm font-semibold text-gray-700">
                             {{ __('Year') }}
                         </label>
 
@@ -48,7 +19,7 @@
                             id="my_cto_year"
                             x-model="year"
                             @change="applyFilters()"
-                            class="h-10 w-28 appearance-none rounded-xl border-gray-300 bg-white py-0 pl-4 pr-9 text-sm font-semibold text-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            class="h-10 w-28 appearance-none rounded-lg border-gray-300 bg-white pl-4 pr-10 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                             @php
                                 $currentYear = now()->year;
@@ -58,31 +29,90 @@
                             @endfor
                         </select>
 
-                        <svg
-                            class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                        <button
+                            type="button"
+                            @click="$dispatch('open-cto-request-modal', {
+                                url: @js(route('my-cto.create', ['modal' => 1])),
+                                title: @js(__('File CTO Request'))
+                            })"
+                            class="inline-flex items-center justify-center rounded-xl bg-blue-900 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white transition hover:bg-blue-800"
                         >
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"></path>
-                        </svg>
+                            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            {{ __('File CTO Request') }}
+                        </button>
                     </div>
-
-                    <button
-                        type="button"
-                        @click="$dispatch('open-cto-request-modal', {
-                            url: @js(route('my-cto.create', ['modal' => 1])),
-                            title: @js(__('File CTO Request'))
-                        })"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl bg-indigo-600 px-5 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-200 transition-all hover:-translate-y-0.5 hover:bg-indigo-700"
-                    >
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
-                        {{ __('File CTO Request') }}
-                    </button>
                 </div>
 
+                <div class="mb-6 border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8 overflow-x-auto" aria-label="{{ __('CTO tabs') }}">
+                        <button
+                            type="button"
+                            @click="tab = 'applications'"
+                            :class="tab === 'applications' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+                            class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-bold uppercase tracking-widest transition-colors duration-200"
+                        >
+                            {{ __('My CTO Applications') }}
+                        </button>
+
+                        <button
+                            type="button"
+                            @click="tab = 'credits'"
+                            :class="tab === 'credits' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+                            class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-bold uppercase tracking-widest transition-colors duration-200"
+                        >
+                            {{ __('My CTO Credits') }}
+                        </button>
+                    </nav>
+                </div>
+
+                <div
+                    x-show="tab === 'credits'"
+                    x-transition:enter="transition ease-out duration-300"
+                    x-transition:enter-start="opacity-0 transform scale-95"
+                    x-transition:enter-end="opacity-100 transform scale-100"
+                    style="display: none;"
+                >
+                    <div class="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div class="rounded-2xl bg-blue-900 p-6 text-white shadow-xl shadow-blue-200 md:col-span-1">
+                            <span class="text-[10px] font-black uppercase tracking-widest text-blue-100">{{ __('Available Balance') }}</span>
+                            <div class="mt-2 flex items-baseline gap-2">
+                                <span class="text-4xl font-black">{{ number_format($employee->cto_balance, 1) }}</span>
+                                <span class="text-sm font-bold uppercase text-blue-100">{{ __('Hours') }}</span>
+                            </div>
+                            <p class="mt-2 text-xs text-blue-100">{{ __('Compensatory time-off credits available to use') }}</p>
+                        </div>
+
+                        <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:col-span-2">
+                            <span class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ __('Quick Guide') }}</span>
+                            <div class="mt-3 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                                <div class="flex items-start gap-3">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-xs font-black text-emerald-600">+</span>
+                                    <div>
+                                        <p class="font-bold text-gray-900">{{ __('Earn CTO') }}</p>
+                                        <p class="mt-0.5 text-xs text-gray-500">{{ __('File overtime or extra work rendered to earn credits.') }}</p>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-start gap-3">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xs font-black text-blue-600">-</span>
+                                    <div>
+                                        <p class="font-bold text-gray-900">{{ __('Use CTO') }}</p>
+                                        <p class="mt-0.5 text-xs text-gray-500">{{ __('Apply to use earned credits as time off.') }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    x-show="tab === 'applications'"
+                    x-transition:enter="transition ease-out duration-300"
+                    x-transition:enter-start="opacity-0 transform scale-95"
+                    x-transition:enter-end="opacity-100 transform scale-100"
+                >
                 <div class="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                 <div class="border-b border-gray-100 bg-gray-50/70 p-2">
                     <div class="flex min-w-max items-center gap-2 overflow-x-auto">
@@ -207,6 +237,7 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
             </div>
             </div>
         </div>
@@ -341,6 +372,7 @@
     <script>
         function myCtoRequestsTable() {
             return {
+                tab: 'applications',
                 search: '',
                 type: '',
                 status: '',

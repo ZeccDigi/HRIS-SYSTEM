@@ -13,7 +13,7 @@
                             <p class="text-sm text-gray-500 font-medium italic">Civil Service Records Management Dashboard.</p>
                         </div>
                         <div class="flex gap-4">
-                            <a href="{{ route('pds.print-clean') }}" target="_blank" data-no-transition
+                            <a href="{{ route('pds.print-clean') }}" target="_blank" rel="noopener noreferrer" data-no-transition
                                 class="inline-flex items-center px-6 py-2.5 bg-white border-2 border-indigo-100 rounded-xl font-bold text-sm text-indigo-700 shadow-sm hover:bg-indigo-50 active:scale-95 transition-all duration-300">
                                 Clean
                             </a>

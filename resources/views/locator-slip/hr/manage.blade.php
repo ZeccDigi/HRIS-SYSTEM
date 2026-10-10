@@ -3,25 +3,6 @@
 
     @php
         $currentYear = now()->year;
-
-        $availableYears = collect()
-            ->merge($pendingLocatorSlips)
-            ->merge($allLocatorSlips)
-            ->map(function ($slip) {
-                $date = $slip->date_covered ?? $slip->created_at;
-
-                return $date
-                    ? \Carbon\Carbon::parse($date)->year
-                    : null;
-            })
-            ->filter()
-            ->unique()
-            ->sortDesc()
-            ->values();
-
-        if (!$availableYears->contains($currentYear)) {
-            $availableYears->prepend($currentYear);
-        }
     @endphp
 
     <div
@@ -55,7 +36,7 @@
             <select
                 id="locatorSlipYear"
                 x-model="year"
-                @change="applyFilters()"
+                @change="submitFilters()"
                 class="h-10 w-28 rounded-lg border-gray-300 bg-white pl-4 pr-10 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
                 @foreach($availableYears as $yearOption)
@@ -128,8 +109,8 @@
                     id="locatorSlipSearch"
                     type="search"
                     x-model="search"
-                    @input.debounce.200ms="applyFilters()"
-                    placeholder="{{ __('Search employee, destination, purpose, or status...') }}"
+                    @input.debounce.400ms="submitFilters()"
+                    placeholder="{{ __('Search employee, destination, type, or status...') }}"
                     class="block h-9 w-full rounded-lg border-gray-300 pl-10 pr-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 >
             </div>
@@ -146,7 +127,7 @@
                 <select
                     id="locatorSlipType"
                     x-model="type"
-                    @change="applyFilters()"
+                    @change="submitFilters()"
                     class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 >
                     <option value="">
@@ -179,7 +160,7 @@
                 <select
                     id="locatorSlipStatus"
                     x-model="status"
-                    @change="applyFilters()"
+                    @change="submitFilters()"
                     class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 >
                     <option value="">
@@ -221,12 +202,13 @@
                 <div class="w-full overflow-x-auto">
                     <table class="w-full table-fixed divide-y divide-gray-100">
                         <colgroup>
+                            <col class="w-[17%]">
+                            <col class="w-[14%]">
+                            <col class="w-[11%]">
                             <col class="w-[19%]">
-                            <col class="w-[15%]">
-                            <col class="w-[27%]">
-                            <col class="w-[16%]">
-                            <col class="w-[13%]">
-                            <col class="w-[10%]">
+                            <col class="w-[18%]">
+                            <col class="w-[12%]">
+                            <col class="w-[9%]">
                         </colgroup>
 
                         <thead class="bg-gray-50">
@@ -247,9 +229,16 @@
 
                                 <th
                                     scope="col"
+                                    class="break-words whitespace-normal px-3 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                >
+                                    {{ __('Type') }}
+                                </th>
+
+                                <th
+                                    scope="col"
                                     class="break-words whitespace-normal px-3 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
-                                    {{ __('Purpose') }}
+                                    {{ __('Destination') }}
                                 </th>
 
                                 <th
@@ -328,7 +317,6 @@
                                             $slip->employee?->division,
                                             $approverName,
                                             $slip->destination,
-                                            $slip->purpose,
                                             $displayType,
                                             $displayStatus,
                                         ]))
@@ -407,13 +395,23 @@
                                         </div>
                                     </td>
 
-                                    {{-- Purpose --}}
+                                    {{-- Type --}}
+                                    <td class="px-3 py-3 text-center align-middle">
+                                        <div
+                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm leading-5 text-gray-700"
+                                            title="{{ $displayType }}"
+                                        >
+                                            {{ $displayType ?: __('N/A') }}
+                                        </div>
+                                    </td>
+
+                                    {{-- Destination --}}
                                     <td class="px-3 py-3 align-middle">
                                         <div
-                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm uppercase leading-5 text-gray-700"
-                                            title="{{ $slip->purpose }}"
+                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm leading-5 text-gray-700"
+                                            title="{{ $slip->destination }}"
                                         >
-                                            {{ $slip->purpose ?: __('N/A') }}
+                                            {{ $slip->destination ?: __('N/A') }}
                                         </div>
                                     </td>
 
@@ -521,7 +519,7 @@
                             @empty
                                 <tr>
                                     <td
-                                        colspan="6"
+                                        colspan="7"
                                         class="px-4 py-8 text-center text-sm font-medium italic text-gray-500"
                                     >
                                         {{ __('No pending locator slips found.') }}
@@ -535,7 +533,7 @@
                                     x-cloak
                                 >
                                     <td
-                                        colspan="6"
+                                        colspan="7"
                                         class="px-4 py-8 text-center text-sm font-medium italic text-gray-500"
                                     >
                                         {{ __('No pending locator slips match your current filters.') }}
@@ -545,6 +543,8 @@
                         </tbody>
                     </table>
                 </div>
+
+                {{-- Pagination temporarily disabled until the locator slip pagination flow is revisited. --}}
             </div>
         </div>
 
@@ -557,12 +557,13 @@
                 <div class="w-full overflow-x-auto">
                     <table class="w-full table-fixed divide-y divide-gray-100">
                         <colgroup>
+                            <col class="w-[17%]">
+                            <col class="w-[14%]">
+                            <col class="w-[11%]">
                             <col class="w-[19%]">
-                            <col class="w-[15%]">
-                            <col class="w-[27%]">
-                            <col class="w-[16%]">
-                            <col class="w-[13%]">
-                            <col class="w-[10%]">
+                            <col class="w-[18%]">
+                            <col class="w-[12%]">
+                            <col class="w-[9%]">
                         </colgroup>
 
                         <thead class="bg-gray-50">
@@ -583,9 +584,16 @@
 
                                 <th
                                     scope="col"
+                                    class="break-words whitespace-normal px-3 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                >
+                                    {{ __('Type') }}
+                                </th>
+
+                                <th
+                                    scope="col"
                                     class="break-words whitespace-normal px-3 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
-                                    {{ __('Purpose') }}
+                                    {{ __('Destination') }}
                                 </th>
 
                                 <th
@@ -664,7 +672,6 @@
                                             $slip->employee?->division,
                                             $approverName,
                                             $slip->destination,
-                                            $slip->purpose,
                                             $displayType,
                                             $displayStatus,
                                         ]))
@@ -743,13 +750,23 @@
                                         </div>
                                     </td>
 
-                                    {{-- Purpose --}}
+                                    {{-- Type --}}
+                                    <td class="px-3 py-3 text-center align-middle">
+                                        <div
+                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm leading-5 text-gray-700"
+                                            title="{{ $displayType }}"
+                                        >
+                                            {{ $displayType ?: __('N/A') }}
+                                        </div>
+                                    </td>
+
+                                    {{-- Destination --}}
                                     <td class="px-3 py-3 align-middle">
                                         <div
-                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm uppercase leading-5 text-gray-700"
-                                            title="{{ $slip->purpose }}"
+                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm leading-5 text-gray-700"
+                                            title="{{ $slip->destination }}"
                                         >
-                                            {{ $slip->purpose ?: __('N/A') }}
+                                            {{ $slip->destination ?: __('N/A') }}
                                         </div>
                                     </td>
 
@@ -805,7 +822,7 @@
                             @empty
                                 <tr>
                                     <td
-                                        colspan="6"
+                                        colspan="7"
                                         class="px-4 py-8 text-center text-sm font-medium italic text-gray-500"
                                     >
                                         {{ __('No locator slips found.') }}
@@ -819,7 +836,7 @@
                                     x-cloak
                                 >
                                     <td
-                                        colspan="6"
+                                        colspan="7"
                                         class="px-4 py-8 text-center text-sm font-medium italic text-gray-500"
                                     >
                                         {{ __('No locator slips match your current filters.') }}
@@ -829,6 +846,8 @@
                         </tbody>
                     </table>
                 </div>
+
+                {{-- Pagination temporarily disabled until the locator slip pagination flow is revisited. --}}
             </div>
         </div>
 
@@ -964,10 +983,10 @@
             return {
                 tab: initialTab || 'pending',
 
-                search: '',
-                type: '',
-                status: '',
-                year: String(currentYear),
+                search: @js($search),
+                type: @js($type),
+                status: @js($status),
+                year: @js((string) $year),
 
                 pendingRows: [],
                 allRows: [],
@@ -1000,141 +1019,36 @@
                         )
                     );
 
-                    this.applyFilters();
                 },
 
                 changeTab(selectedTab) {
                     this.tab = selectedTab;
-                    this.applyFilters();
-
-                    const url = new URL(window.location.href);
-
-                    url.searchParams.set(
-                        'tab',
-                        selectedTab
-                    );
-
-                    window.history.replaceState(
-                        {},
-                        '',
-                        url.toString()
-                    );
+                    this.submitFilters(selectedTab);
                 },
 
-                applyFilters() {
-                    const pendingVisible = this.filterRows(
-                        this.pendingRows,
-                        document.getElementById('pendingLocatorSlipRows')
-                    );
+                submitFilters(selectedTab = null) {
+                    const url = new URL(@js(route('hr.locator-slips.index')));
+                    const activeTab = selectedTab || this.tab || 'pending';
 
-                    const allVisible = this.filterRows(
-                        this.allRows,
-                        document.getElementById('allLocatorSlipRows')
-                    );
+                    url.searchParams.set('tab', activeTab);
 
-                    this.pendingNoResults =
-                        this.pendingRows.length > 0 &&
-                        pendingVisible === 0;
-
-                    this.allNoResults =
-                        this.allRows.length > 0 &&
-                        allVisible === 0;
-                },
-
-                filterRows(rows, tbody) {
-                    if (!tbody) {
-                        return 0;
+                    if (this.search.trim()) {
+                        url.searchParams.set('search', this.search.trim());
                     }
 
-                    const searchValue = this.search
-                        .trim()
-                        .toLowerCase();
+                    if (this.type) {
+                        url.searchParams.set('type', this.type);
+                    }
 
-                    const selectedType = String(
-                        this.type || ''
-                    ).toLowerCase();
+                    if (this.status) {
+                        url.searchParams.set('status', this.status);
+                    }
 
-                    const selectedStatus = String(
-                        this.status || ''
-                    ).toLowerCase();
+                    if (this.year) {
+                        url.searchParams.set('year', this.year);
+                    }
 
-                    const selectedYear = String(
-                        this.year || ''
-                    );
-
-                    let visibleCount = 0;
-
-                    /*
-                     * Keep newest records first automatically.
-                     */
-                    rows.sort((firstRow, secondRow) => {
-                        const firstFiled = Number(
-                            firstRow.dataset.filed || 0
-                        );
-
-                        const secondFiled = Number(
-                            secondRow.dataset.filed || 0
-                        );
-
-                        return secondFiled - firstFiled;
-                    });
-
-                    rows.forEach((row) => {
-                        const rowSearch = String(
-                            row.dataset.search || ''
-                        ).toLowerCase();
-
-                        const rowType = String(
-                            row.dataset.type || ''
-                        ).toLowerCase();
-
-                        const rowStatus = String(
-                            row.dataset.status || ''
-                        ).toLowerCase();
-
-                        const rowYear = String(
-                            row.dataset.year || ''
-                        );
-
-                        const matchesSearch =
-                            !searchValue ||
-                            rowSearch.includes(searchValue);
-
-                        const matchesType =
-                            !selectedType ||
-                            rowType === selectedType;
-
-                        const matchesStatus =
-                            !selectedStatus ||
-                            (
-                                selectedStatus === 'pending'
-                                    ? rowStatus.includes('pending')
-                                    : rowStatus === selectedStatus
-                            );
-
-                        const matchesYear =
-                            !selectedYear ||
-                            rowYear === selectedYear;
-
-                        const visible =
-                            matchesSearch &&
-                            matchesType &&
-                            matchesStatus &&
-                            matchesYear;
-
-                        row.classList.toggle(
-                            'hidden',
-                            !visible
-                        );
-
-                        if (visible) {
-                            visibleCount++;
-                        }
-
-                        tbody.appendChild(row);
-                    });
-
-                    return visibleCount;
+                    window.location.href = url.toString();
                 },
 
                 reset() {
@@ -1143,7 +1057,7 @@
                     this.status = '';
                     this.year = String(currentYear);
 
-                    this.applyFilters();
+                    window.location.href = @js(route('hr.locator-slips.index'));
                 },
 
                 openPreviewModal(payload) {

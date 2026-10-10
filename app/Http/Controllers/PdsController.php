@@ -9,6 +9,7 @@ use App\Models\UtilityOption;
 use App\Notifications\PdsUpdatedNotification;
 use App\Services\PdsExcelExporter;
 use App\Services\PdsPdfExporter;
+use App\Support\PdsFormatter;
 use App\Support\UtilityOptionRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,8 +52,8 @@ class PdsController extends Controller
             return $exporter->download($employee, $request->boolean('print') ? 'inline' : 'attachment');
         } catch (\Throwable $e) {
             return redirect()
-                ->route('pds.index')
-                ->with('error', 'Could not generate PDF. Run: composer require barryvdh/laravel-dompdf - '.$e->getMessage());
+                ->route('pds.print')
+                ->with('error', 'Could not generate the downloadable PDS PDF. You can still use Print / Save PDF from this preview. '.$e->getMessage());
         }
     }
 
@@ -208,6 +209,11 @@ class PdsController extends Controller
         }
 
         $personal = $request->input('personal', []);
+        if (array_key_exists('height_m', $personal)) {
+            $personal['height_m'] = PdsFormatter::heightCm($personal['height_m'], '');
+            $request->merge(['personal' => $personal]);
+        }
+
         if (! empty($personal['mobile_no'])) {
             $digits = substr(preg_replace('/\D/', '', (string) $personal['mobile_no']), 0, 11);
             $personal['mobile_no'] = strlen($digits) === 11

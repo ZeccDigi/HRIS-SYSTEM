@@ -1,11 +1,11 @@
 <section>
     <header>
         <h2 class="text-lg font-medium text-gray-900">
-            {{ __('Profile Information') }}
+            {{ __('Account Information') }}
         </h2>
 
         <p class="mt-1 text-sm text-gray-600">
-            {{ __("Update your account profile information. Your HRIS Username is managed by HR.") }}
+            {{ __("Review your account identity and recovery email. HR manages account records and your HRIS Username.") }}
         </p>
     </header>
 
@@ -18,12 +18,19 @@
         @method('patch')
 
         <div>
-            <x-input-label for="name" :value="__('Username')" />
+            <x-input-label for="name" :value="__('Display Name')" />
             <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />
+            <p class="mt-1 text-xs text-gray-500">{{ __("This name is shown inside HRIS. Your official employee details are maintained by HR.") }}</p>
             <x-input-error class="mt-2" :messages="$errors->get('name')" />
         </div>
 
         @if($user->employee)
+            <div>
+                <x-input-label :value="__('Recovery / OTP Email')" />
+                <x-text-input type="text" class="mt-1 block w-full bg-gray-50 border-gray-100 text-gray-500" :value="$user->employee->notification_email ?: __('No recovery email registered')" disabled />
+                <p class="mt-1 text-xs text-gray-500">{{ __("Password reset OTPs and account notices are sent here. Contact HR if this email needs to be changed.") }}</p>
+            </div>
+
             <div>
                 <x-input-label :value="__('Employment Status')" />
                 <x-text-input type="text" class="mt-1 block w-full bg-gray-50 border-gray-100 text-gray-500 font-bold" :value="$user->employee->employment_status ?: __('N/A')" disabled />

@@ -51,7 +51,7 @@ class LoginAudit extends Model
         $diffSeconds = (int) $this->login_at->diffInSeconds($end);
 
         if ($diffSeconds < 60) {
-            return $this->logout_at ? '< 1 min' : 'Active (< 1 min)';
+            return '< 1 min';
         }
 
         $hours = (int) floor($diffSeconds / 3600);
@@ -63,6 +63,6 @@ class LoginAudit extends Model
         }
         $timeStr .= $minutes . ($minutes == 1 ? ' min' : ' mins');
 
-        return $this->logout_at ? trim($timeStr) : 'Active (' . trim($timeStr) . ')';
+        return trim($timeStr);
     }
 }

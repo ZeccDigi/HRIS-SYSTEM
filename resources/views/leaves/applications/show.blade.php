@@ -54,16 +54,39 @@
                     </svg>
                     {{ __('Back') }}
                 </a>
-                <a href="{{ route('leave-applications.print', $leaveApplication) }}" target="_blank" data-no-transition class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700">
+                <button type="button" onclick="printLeaveForm()" class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700">
                     {{ __('Print Leave Form') }}
-                </a>
+                </button>
             </div>
 
             <x-approval-tracker :payload="$trackedLeavePayload" event="leave-selected" empty="No leave approval process to track yet." />
 
-            {{-- Review Action Above Form --}}
-            <section class="mt-8 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-7">
+            {{-- Full Leave Form Preview --}}
+            <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+                <div class="bg-slate-100 px-3 pb-3 pt-6 sm:px-5 sm:pb-5 sm:pt-8">
+                    <div class="mx-auto w-full max-w-[1100px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                        <iframe
+                            id="leaveFormPreview"
+                            src="{{ route('leave-applications.print', [
+                                'leaveApplication' => $leaveApplication->id,
+                                'preview' => 1
+                            ]) }}"
+                            class="block w-full border-0 bg-white"
+                            style="height: 1300px;"
+                            scrolling="no"
+                            title="{{ __('Leave form print preview') }}"
+                        ></iframe>
+                    </div>
+                </div>
+            </section>
+
+            {{-- Review Action Below Form --}}
+            <section class="mt-6 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-7">
                 @if($isMyTurn)
+                    @php
+                        $currentLeaveBalance = (float) ($leaveCredit?->balance ?? 0);
+                        $creditLeaveTypeName = $creditLeaveType?->name ?? $leaveApplication->leaveType?->name ?? __('Leave');
+                    @endphp
                     <div class="mb-6 flex flex-col gap-3 border-b border-gray-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                             <p class="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">
@@ -75,17 +98,15 @@
                                     ? __('Verify Leave Application')
                                     : __('Review Leave Application') }}
                             </h3>
-
-                            <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
-                                {{ __('Enter your remarks, then approve or reject the application. Review the complete form below before submitting your decision.') }}
-                            </p>
                         </div>
 
-                        <div class="inline-flex shrink-0 items-center gap-2 rounded-full bg-orange-50 px-3 py-2">
-                            <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-orange-400"></span>
-
-                            <span class="text-[10px] font-black uppercase tracking-widest text-orange-600">
-                                {{ __('Your Review Needed') }}
+                        <div class="inline-flex shrink-0 items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-emerald-700">
+                            <span class="text-[10px] font-black uppercase tracking-widest">
+                                {{ __('Current credits:') }}
+                            </span>
+                            <span class="text-xs font-black">
+                                {{ number_format($currentLeaveBalance, 3) }}
+                                {{ \Illuminate\Support\Str::plural('day', $currentLeaveBalance) }}
                             </span>
                         </div>
                     </div>
@@ -131,6 +152,7 @@
                         <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                             <button
                                 type="submit"
+                                id="leaveRejectButton"
                                 name="status"
                                 value="rejected"
                                 class="inline-flex min-w-44 items-center justify-center rounded-xl border border-red-300 bg-white px-6 py-3 text-xs font-black uppercase tracking-widest text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2"
@@ -141,6 +163,7 @@
 
                             <button
                                 type="submit"
+                                id="leaveApproveButton"
                                 name="status"
                                 value="approved"
                                 class="inline-flex min-w-44 items-center justify-center rounded-xl bg-indigo-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
@@ -153,6 +176,55 @@
                             </button>
                         </div>
                     </form>
+
+                    <div
+                        id="leaveDecisionModal"
+                        class="fixed inset-0 z-[100000] hidden items-center justify-center p-4"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="leaveDecisionModalTitle"
+                    >
+                        <div
+                            id="leaveDecisionModalBackdrop"
+                            class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        ></div>
+
+                        <div class="relative z-10 w-full max-w-xs overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                            <div class="border-b border-slate-100 px-4 py-3">
+                                <h2
+                                    id="leaveDecisionModalTitle"
+                                    class="text-base font-black text-slate-900"
+                                ></h2>
+
+                                <p class="mt-0.5 text-xs text-slate-500">
+                                    {{ __('ID: :id', ['id' => $leaveApplication->id]) }}
+                                </p>
+                            </div>
+
+                            <div class="px-4 py-3 text-center">
+                                <p
+                                    id="leaveDecisionModalDescription"
+                                    class="whitespace-pre-line text-xs leading-5 text-slate-600"
+                                ></p>
+                            </div>
+
+                            <div class="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:justify-end">
+                                <button
+                                    type="button"
+                                    id="leaveDecisionCancelButton"
+                                    class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-widest text-slate-600 transition hover:bg-slate-100"
+                                >
+                                    {{ __('Cancel') }}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    id="leaveDecisionConfirmButton"
+                                    class="inline-flex items-center justify-center rounded-lg bg-blue-900 px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-blue-800"
+                                ></button>
+                            </div>
+                        </div>
+                    </div>
                 @else
                     <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                         <div class="flex items-start gap-4">
@@ -195,27 +267,6 @@
                 @endif
             </section>
 
-            {{-- Full Leave Form Preview at Bottom --}}
-            <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-               
-
-                <div class="bg-slate-100 p-3 sm:p-5">
-    <div class="mx-auto w-full max-w-[1100px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <iframe
-            id="leaveFormPreview"
-            src="{{ route('leave-applications.print', [
-                'leaveApplication' => $leaveApplication->id,
-                'preview' => 1
-            ]) }}"
-            class="block w-full border-0 bg-white"
-            style="height: 1300px;"
-            scrolling="no"
-            title="{{ __('Leave form print preview') }}"
-        ></iframe>
-    </div>
-</div>
-            </section>
-
             @if($leaveApplication->hrstaff_remarks || $leaveApplication->chief_remarks || $leaveApplication->rd_remarks)
                 <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
                     <div class="text-xs font-black text-indigo-500 uppercase tracking-widest mb-6 inline-block border-b-2 border-indigo-100 pb-1">Approver Remarks</div>
@@ -246,10 +297,44 @@
     </div>
 
     <script>
+        function printLeaveForm() {
+            const previewIframe = document.getElementById('leaveFormPreview');
+
+            if (!previewIframe) {
+                alert('Leave form preview was not found.');
+                return;
+            }
+
+            try {
+                const previewWindow = previewIframe.contentWindow;
+
+                if (!previewWindow) {
+                    alert('Leave form preview is not ready yet.');
+                    return;
+                }
+
+                previewWindow.focus();
+                previewWindow.print();
+            } catch (error) {
+                console.error('Unable to print the leave form:', error);
+                alert('Unable to open the print dialog. Please refresh the page and try again.');
+            }
+        }
+
         (function() {
             const form = document.getElementById('leaveStatusForm');
             const remarksField = form?.querySelector('textarea[name="remarks"]');
             const errorSpan = document.getElementById('leaveRemarksError');
+            const approveButton = document.getElementById('leaveApproveButton');
+            const rejectButton = document.getElementById('leaveRejectButton');
+            const decisionModal = document.getElementById('leaveDecisionModal');
+            const decisionBackdrop = document.getElementById('leaveDecisionModalBackdrop');
+            const decisionTitle = document.getElementById('leaveDecisionModalTitle');
+            const decisionDescription = document.getElementById('leaveDecisionModalDescription');
+            const decisionConfirmButton = document.getElementById('leaveDecisionConfirmButton');
+            const decisionCancelButton = document.getElementById('leaveDecisionCancelButton');
+            let confirmedAction = null;
+            let pendingButton = null;
 
             remarksField?.addEventListener('input', function() {
                 remarksField.classList.remove('ring-2', 'ring-red-500', 'border-red-500');
@@ -260,8 +345,9 @@
             });
 
             form?.addEventListener('submit', function(e) {
-                const action = document.activeElement ? document.activeElement.getAttribute('value') : null;
-                const remarks = remarksField.value.trim();
+                const submitter = e.submitter || document.activeElement;
+                const action = submitter ? submitter.getAttribute('value') : null;
+                const remarks = remarksField?.value.trim() || '';
                 if (action === 'rejected' && !remarks) {
                     e.preventDefault();
                     remarksField.classList.add('ring-2', 'ring-red-500', 'border-red-500');
@@ -270,6 +356,74 @@
                         errorSpan.classList.remove('hidden');
                     }
                     remarksField.focus();
+                    return;
+                }
+
+                if ((action === 'approved' || action === 'rejected') && confirmedAction !== action) {
+                    e.preventDefault();
+                    pendingButton = action === 'approved' ? approveButton : rejectButton;
+                    openDecisionModal(action);
+                }
+            });
+
+            function openDecisionModal(action) {
+                if (!decisionModal) {
+                    confirmedAction = action;
+                    form?.requestSubmit(pendingButton);
+                    return;
+                }
+
+                if (decisionTitle) {
+                    decisionTitle.textContent = action === 'approved'
+                        ? 'Approve this leave application?'
+                        : 'Reject this leave application?';
+                }
+
+                if (decisionDescription) {
+                    decisionDescription.textContent = action === 'approved'
+                        ? 'Approving will move this request to the next step\nor mark it as fully approved.'
+                        : 'Rejecting will mark this request as rejected.';
+                }
+
+                if (decisionConfirmButton) {
+                    decisionConfirmButton.textContent = action === 'approved'
+                        ? 'Approve'
+                        : 'Reject';
+                }
+
+                decisionModal.classList.remove('hidden');
+                decisionModal.classList.add('flex');
+                document.documentElement.classList.add('overflow-hidden');
+                document.body.classList.add('overflow-hidden');
+            }
+
+            function closeDecisionModal() {
+                decisionModal?.classList.add('hidden');
+                decisionModal?.classList.remove('flex');
+                pendingButton = null;
+                document.documentElement.classList.remove('overflow-hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+
+            decisionConfirmButton?.addEventListener('click', function() {
+                const action = pendingButton?.value;
+
+                if (!action) {
+                    closeDecisionModal();
+                    return;
+                }
+
+                confirmedAction = action;
+                closeDecisionModal();
+                form?.requestSubmit(action === 'approved' ? approveButton : rejectButton);
+            });
+
+            decisionCancelButton?.addEventListener('click', closeDecisionModal);
+            decisionBackdrop?.addEventListener('click', closeDecisionModal);
+
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    closeDecisionModal();
                 }
             });
         })();
@@ -311,7 +465,7 @@
         iframe.addEventListener('load', function () {
             resizeLeaveFormPreview();
 
-            setTimeout(resizeLeaveFaormPreview, 300);
+            setTimeout(resizeLeaveFormPreview, 300);
             setTimeout(resizeLeaveFormPreview, 800);
         });
 

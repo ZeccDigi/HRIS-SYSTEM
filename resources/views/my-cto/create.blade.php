@@ -56,14 +56,18 @@
                 <p class="text-sm text-gray-500 mb-8">Available balance: <span class="font-bold text-indigo-600">{{ number_format($employee->cto_balance, 1) }} hour(s)</span></p>
 
                 <form
-                    action="{{ route('my-cto.store') }}"
+                    action="{{ route('my-cto.store', request()->boolean('modal') ? ['modal' => 1] : []) }}"
                     method="POST"
                     enctype="multipart/form-data"
                     class="space-y-6"
                     x-data="ctoRequestForm('{{ old('type', 'earn') }}', '{{ old('date_start') }}', '{{ old('date_end') }}', '{{ now()->toDateString() }}')"
                     x-init="init()"
+                    @submit="submitting = true"
                 >
                     @csrf
+                    @if(request()->boolean('modal'))
+                        <input type="hidden" name="modal" value="1">
+                    @endif
 
                     {{-- Request Type --}}
                     <div>
@@ -144,48 +148,6 @@
                         @error('attachment') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                     </div>
 
-                    {{-- Applicant Signature --}}
-                    <div x-data="{ signatureName: '' }">
-                        <label for="applicant_signature" class="block text-sm font-bold text-gray-700 mb-1">
-                            {{ __('Applicant Signature Override') }}
-                            <span class="text-gray-400 font-normal text-xs">- Optional</span>
-                        </label>
-                        <div class="relative group">
-                            <input type="file"
-                                name="applicant_signature"
-                                id="applicant_signature"
-                                x-ref="applicantSignature"
-                                class="hidden"
-                                @change="signatureName = $event.target.files[0]?.name || ''"
-                                accept=".jpg,.jpeg,.png,image/jpeg,image/png">
-
-                            <label for="applicant_signature"
-                                class="flex items-center justify-between w-full border-2 border-dashed border-gray-200 group-hover:border-indigo-400 rounded-xl p-4 bg-gray-50/50 cursor-pointer transition-all duration-300">
-                                <div class="flex items-center gap-3 min-w-0">
-                                    <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shrink-0">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 3.487a2.1 2.1 0 012.97 2.97L8.75 17.54 4.8 18.6l1.06-3.95L16.862 3.487z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.5 6.85l2.97 2.97" />
-                                        </svg>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <span x-show="!signatureName" class="text-sm font-bold text-gray-500">{{ __('Use profile signature unless replaced here') }}</span>
-                                        <span x-show="signatureName" x-text="signatureName" class="text-sm font-bold text-indigo-700 truncate max-w-xs"></span>
-                                        <p class="text-xs text-gray-400">{{ __('JPG or PNG only (Max 2MB)') }}</p>
-                                    </div>
-                                </div>
-
-                                <span x-show="!signatureName" class="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                    BROWSE
-                                </span>
-                                <button type="button" x-show="signatureName" @click.prevent="signatureName = ''; $refs.applicantSignature.value = ''" class="text-red-500 hover:text-red-700">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                </button>
-                            </label>
-                        </div>
-                        @error('applicant_signature') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
-                    </div>
-
                     <div class="flex items-center justify-end gap-4 border-t border-gray-100 pt-4">
     @if(request()->boolean('modal'))
         <button
@@ -206,9 +168,11 @@
 
     <button
         type="submit"
-        class="rounded-xl bg-indigo-600 px-8 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-200 transition-all hover:-translate-y-0.5 hover:bg-indigo-700"
+        x-bind:disabled="submitting"
+        class="rounded-xl bg-indigo-600 px-8 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-200 transition-all hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
     >
-        {{ __('Submit Request') }}
+        <span x-show="!submitting">{{ __('Submit Request') }}</span>
+        <span x-show="submitting" x-cloak>{{ __('Submitting...') }}</span>
     </button>
 </div>
                 </form>
@@ -223,6 +187,7 @@
                 dateStart: oldStart || '',
                 dateEnd: oldEnd || '',
                 minDate,
+                submitting: false,
                 activePicker: null,
                 currentMonth: null,
                 init() {

@@ -362,19 +362,7 @@
                     </div>
 
                     {{-- Fixed footer --}}
-                    <div class="flex shrink-0 flex-col gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-                        <div class="min-w-0 flex-1">
-                            @if ($latestLocatorRemark)
-                                <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                                    Latest Rejection Remark
-                                </p>
-
-                                <p class="mt-1 text-xs leading-5 text-slate-600">
-                                    {{ $latestLocatorRemark }}
-                                </p>
-                            @endif
-                        </div>
-
+                    <div class="flex shrink-0 justify-end border-t border-slate-200 bg-slate-50 px-6 py-4 sm:px-8">
                         <div class="flex shrink-0 gap-3">
                             <button
                                 type="button"

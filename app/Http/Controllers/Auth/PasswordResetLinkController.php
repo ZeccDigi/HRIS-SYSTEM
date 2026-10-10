@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -30,16 +31,43 @@ class PasswordResetLinkController extends Controller
             'email' => ['required', 'email'],
         ]);
 
-        // We will send the password reset link to this user. Once we have attempted
-        // to send the link, we will examine the response then see the message we
-        // need to show to the user. Finally, we'll send out a proper response.
-        $status = Password::sendResetLink(
-            $request->only('email')
+        $user = User::query()
+            ->with('employee')
+            ->where('email', strtolower($request->email))
+            ->first();
+
+        if (! $user) {
+            throw ValidationException::withMessages([
+                'email' => 'We could not find an account with that HRIS Username.',
+            ]);
+        }
+
+        $recoveryEmail = $user->employee?->notification_email;
+
+        if (! $recoveryEmail) {
+            throw ValidationException::withMessages([
+                'email' => 'No Recovery / OTP Email is registered for this account. Please contact HR.',
+            ]);
+        }
+
+        $otp = (string) random_int(100000, 999999);
+
+        $user->forceFill([
+            'otp' => $otp,
+            'otp_expires_at' => now()->addMinutes(10),
+        ])->save();
+
+        Mail::raw(
+            "Your DMW-HRIS password reset OTP is {$otp}.\n\nThis code expires in 10 minutes. If you did not request a password reset, please ignore this message or contact HR.",
+            function ($message) use ($recoveryEmail) {
+                $message
+                    ->to($recoveryEmail)
+                    ->subject('DMW-HRIS Password Reset OTP');
+            }
         );
 
-        return $status == Password::RESET_LINK_SENT
-                    ? back()->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+        return redirect()
+            ->route('password.otp.reset', ['email' => $user->email])
+            ->with('status', 'A password reset OTP has been sent to your Recovery / OTP Email.');
     }
 }

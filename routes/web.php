@@ -47,6 +47,7 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/employees/{employee}/profile-picture', [EmployeeController::class, 'uploadProfilePicture'])->name('employees.profile-picture');
     Route::post('/employees/{employee}/e-signature', [EmployeeController::class, 'uploadESignature'])->name('employees.e-signature');
+    Route::delete('/employees/{employee}/e-signature', [EmployeeController::class, 'destroyESignature'])->name('employees.e-signature.destroy');
 
     Route::get('/locator-slips', [LocatorSlipController::class, 'index'])->name('locator-slips.index');
     Route::get('/locator-slips/create', [LocatorSlipController::class, 'create'])->name('locator-slips.create');
@@ -55,6 +56,7 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     Route::patch('employees/{employee}/restore', [EmployeeController::class, 'restore'])->name('employees.restore')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
     Route::delete('employees/{employee}/force-delete', [EmployeeController::class, 'forceDelete'])->name('employees.force-delete')->middleware('role:ADMIN');
     Route::get('employees/filter', [EmployeeController::class, 'filter'])->name('employees.filter')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
+    Route::post('employees/{employee}/leave-credit-adjustments', [EmployeeController::class, 'storeLeaveCreditAdjustment'])->name('employees.leave-credit-adjustments.store')->middleware('role:ADMIN,HRSTAFF');
     Route::resource('employees', EmployeeController::class)->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
 
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index')->middleware('role:ADMIN,HRSTAFF');
@@ -125,11 +127,15 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
 
     // SALN Routes
     Route::get('salns/{saln}/download', [SalnController::class, 'download'])->name('salns.download');
+    Route::patch('salns/{saln}/review', [SalnController::class, 'review'])->name('salns.review')->middleware('role:ADMIN,HRSTAFF');
     Route::resource('salns', SalnController::class);
 
     // Travel Authority Routes
     Route::get('travel-orders/{travelOrder}/preview', [TravelOrderController::class, 'preview'])->name('travel-orders.preview');
     Route::get('travel-orders/{travelOrder}/print', [TravelOrderController::class, 'print'])->name('travel-orders.print');
+    Route::get('travel-orders/{travelOrder}/acknowledgement-report', [TravelOrderController::class, 'acknowledgementReport'])->name('travel-orders.ar.show');
+    Route::get('travel-orders/{travelOrder}/acknowledgement-report/file', [TravelOrderController::class, 'viewAcknowledgementReportFile'])->name('travel-orders.ar.file');
+    Route::get('travel-orders/{travelOrder}/acknowledgement-report/print', [TravelOrderController::class, 'printAcknowledgementReport'])->name('travel-orders.ar.print');
     Route::resource('travel-orders', TravelOrderController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('/travel-orders/{travelOrder}/tar', [TravelOrderController::class, 'submitTar'])->name('travel-orders.submit-tar');
     Route::get('/hr/travel-orders', [TravelOrderController::class, 'adminIndex'])->name('hr.travel-orders.index')->middleware('role:ADMIN,HRSTAFF,RECORDOFFICER,REGIONALDIRECTOR');

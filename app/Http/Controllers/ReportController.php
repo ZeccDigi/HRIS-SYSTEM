@@ -290,7 +290,7 @@ class ReportController extends Controller
         })->values();
 
         return $this->reportPayload(
-            'Leave Balance',
+            'Leave Credits and Entitlements',
             [
                 $this->metric('Employees', $employees->count(), 'blue', 'users'),
                 $this->metric('Avg Vacation', number_format((float) $rows->avg(fn ($row) => (float) $row['cells'][1]), 2), 'blue', 'chart'),
@@ -298,17 +298,17 @@ class ReportController extends Controller
                 $this->metric('Low Credits', $rows->filter(fn ($row) => ((float) $row['cells'][1] + (float) $row['cells'][2]) < 5)->count(), 'amber', 'clock'),
                 $this->metric('Year', (string) $currentYear, 'blue', 'calendar'),
             ],
-            'Leave Credits by Division',
+            'Leave Credits and Entitlements by Division',
             $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned')),
-            ['Employee', 'Vacation Leave Balance', 'Sick Leave Balance', 'Other Leave Balance'],
+            ['Employee', 'Vacation Leave Balance', 'Sick Leave Balance', 'Other Annual/Statutory Entitlements'],
             $rows->all(),
             $employees,
             [
-                $this->chart('Leave Balance by Division', 'bar', $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned'))),
-                $this->chart('Leave Credit Type Totals', 'doughnut', [
+                $this->chart('Leave Credits and Entitlements by Division', 'bar', $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned'))),
+                $this->chart('Leave Credit and Entitlement Totals', 'doughnut', [
                     ['label' => 'Vacation', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][1]), 'color' => '#0038a8'],
                     ['label' => 'Sick', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][2]), 'color' => '#10b981'],
-                    ['label' => 'Other', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][3]), 'color' => '#f59e0b'],
+                    ['label' => 'Other Entitlements', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][3]), 'color' => '#f59e0b'],
                 ]),
                 $this->chart('Employees with Leave Credits', 'bar', $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned'))),
             ]

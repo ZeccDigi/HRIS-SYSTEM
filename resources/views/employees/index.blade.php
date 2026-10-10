@@ -25,6 +25,27 @@
                     {{ session('error') }}
                 </div>
             @endif
+            @if(session('account_credentials'))
+                @php($credentials = session('account_credentials'))
+                <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <div class="font-black uppercase tracking-wider text-amber-800">{{ __('Temporary Account Details') }}</div>
+                    <p class="mt-1 text-amber-700">{{ __('Give these details to the employee only if the email was not received. This message appears once after account creation.') }}</p>
+                    <div class="mt-3 grid gap-2 sm:grid-cols-3">
+                        <div>
+                            <span class="block text-[10px] font-black uppercase tracking-widest text-amber-700">{{ __('HRIS Username') }}</span>
+                            <span class="font-bold">{{ $credentials['hris_username'] ?? '' }}</span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] font-black uppercase tracking-widest text-amber-700">{{ __('Recovery / OTP Email') }}</span>
+                            <span class="font-bold">{{ $credentials['recovery_email'] ?? '' }}</span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] font-black uppercase tracking-widest text-amber-700">{{ __('Temporary Password') }}</span>
+                            <span class="font-mono font-black">{{ $credentials['temporary_password'] ?? '' }}</span>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             <!-- Header Actions -->
             <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">

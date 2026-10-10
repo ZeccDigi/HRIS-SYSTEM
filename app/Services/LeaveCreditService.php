@@ -32,15 +32,17 @@ class LeaveCreditService
                 continue;
             }
 
-            if ((float) $credit->earned === 0.0 && (float) $credit->used === 0.0) {
-                $earned = (float) ($type->days_per_year ?? $credit->balance ?? 0);
-                $used = $this->approvedPaidUsageDays($employee, $type, $year);
-                $credit->earned = $earned;
-                $credit->used = $used;
-                $credit->balance = round(max(0, $earned + (float) $credit->adjusted - $used), 3);
-                $credit->accrued_as_of = $asOf->toDateString();
-                $credit->save();
+            $previousEarned = (float) $credit->earned;
+            $earned = (float) ($type->days_per_year ?? $credit->balance ?? 0);
+            $used = $this->approvedPaidUsageDays($employee, $type, $year);
 
+            $credit->earned = $earned;
+            $credit->used = $used;
+            $credit->balance = round(max(0, $earned + (float) $credit->adjusted - $used), 3);
+            $credit->accrued_as_of = $asOf->toDateString();
+            $credit->save();
+
+            if ((float) $previousEarned === 0.0 && $earned > 0) {
                 $this->recordTransaction($employee, $type, null, 'entitlement', (float) $credit->earned, (float) $credit->balance, $asOf, 'Annual fixed leave entitlement');
             }
         }
@@ -62,8 +64,10 @@ class LeaveCreditService
             return;
         }
 
+        $creditType = $this->creditTypeForUsage($leaveRequest->leaveType);
+
         $credit = $leaveRequest->employee->leaveCredits()
-            ->where('leave_type_id', $leaveRequest->leave_type_id)
+            ->where('leave_type_id', $creditType->id)
             ->where('year', $year)
             ->first();
 
@@ -76,9 +80,22 @@ class LeaveCreditService
         $credit->balance = round(max(0, (float) $credit->earned + (float) $credit->adjusted - (float) $credit->used), 3);
         $credit->save();
 
+        if ($creditType->id !== $leaveRequest->leave_type_id) {
+            $displayCredit = $leaveRequest->employee->leaveCredits()
+                ->where('leave_type_id', $leaveRequest->leave_type_id)
+                ->where('year', $year)
+                ->first();
+
+            if ($displayCredit) {
+                $displayCredit->used = round((float) $displayCredit->used + $days, 3);
+                $displayCredit->balance = round(max(0, (float) $displayCredit->earned + (float) $displayCredit->adjusted - (float) $displayCredit->used), 3);
+                $displayCredit->save();
+            }
+        }
+
         LeaveCreditTransaction::create([
             'employee_id' => $leaveRequest->employee_id,
-            'leave_type_id' => $leaveRequest->leave_type_id,
+            'leave_type_id' => $creditType->id,
             'leave_request_id' => $leaveRequest->id,
             'type' => 'usage',
             'amount' => -$days,
@@ -86,6 +103,8 @@ class LeaveCreditService
             'effective_date' => Carbon::parse($leaveRequest->end_date)->toDateString(),
             'description' => 'Approved paid leave deduction',
             'metadata' => [
+                'request_leave_type_id' => $leaveRequest->leave_type_id,
+                'request_leave_type' => $leaveRequest->leaveType?->name,
                 'start_date' => Carbon::parse($leaveRequest->start_date)->toDateString(),
                 'end_date' => Carbon::parse($leaveRequest->end_date)->toDateString(),
             ],
@@ -199,8 +218,12 @@ class LeaveCreditService
 
     private function approvedPaidUsageDays(Employee $employee, LeaveType $type, int $year): float
     {
+        $leaveTypeIds = $this->isVacationLeave($type)
+            ? LeaveType::whereIn('name', ['Vacation Leave', 'Mandatory/Force Leave'])->pluck('id')->all()
+            : [$type->id];
+
         return round((float) $employee->leaveRequests()
-            ->where('leave_type_id', $type->id)
+            ->whereIn('leave_type_id', $leaveTypeIds)
             ->where('status', 'approved')
             ->where('is_paid', true)
             ->whereYear('start_date', $year)
@@ -218,6 +241,25 @@ class LeaveCreditService
         $name = strtolower($type->name);
 
         return str_contains($name, 'vacation') || str_contains($name, 'sick');
+    }
+
+    private function creditTypeForUsage(LeaveType $type): LeaveType
+    {
+        if (! $this->isMandatoryForceLeave($type)) {
+            return $type;
+        }
+
+        return LeaveType::where('name', 'Vacation Leave')->first() ?? $type;
+    }
+
+    private function isVacationLeave(LeaveType $type): bool
+    {
+        return strtolower(trim($type->name)) === 'vacation leave';
+    }
+
+    private function isMandatoryForceLeave(LeaveType $type): bool
+    {
+        return strtolower(trim($type->name)) === 'mandatory/force leave';
     }
 
     private function recordTransaction(Employee $employee, LeaveType $type, ?LeaveRequest $leaveRequest, string $transactionType, float $amount, float $balanceAfter, Carbon $effectiveDate, string $description): void

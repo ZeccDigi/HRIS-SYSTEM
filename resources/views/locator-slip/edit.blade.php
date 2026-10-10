@@ -1,4 +1,6 @@
 ﻿<x-app-layout>
+    <x-slot name="title">{{ __('Edit Locator Slip') }}</x-slot>
+
     <div class="p-4 sm:p-6 lg:p-8">
         <div class="rounded-2xl border border-gray-100 bg-white/80 p-6 shadow-lg backdrop-blur-xl">
             <h2 class="mb-6 text-2xl font-bold text-gray-800">Edit Locator Slip</h2>

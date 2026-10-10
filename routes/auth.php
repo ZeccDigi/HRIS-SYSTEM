@@ -30,6 +30,12 @@ Route::middleware('guest')->group(function () {
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
+
+    Route::get('reset-password-otp', [NewPasswordController::class, 'createOtp'])
+        ->name('password.otp.reset');
+
+    Route::post('reset-password-otp', [NewPasswordController::class, 'storeOtp'])
+        ->name('password.otp.store');
 });
 
 Route::middleware('auth')->group(function () {
@@ -48,6 +54,8 @@ Route::middleware('auth')->group(function () {
         ->name('password.confirm');
 
     Route::post('confirm-password', [ConfirmablePasswordController::class, 'store']);
+
+    Route::post('password/otp', [PasswordController::class, 'sendOtp'])->name('password.otp.send');
 
     Route::put('password', [PasswordController::class, 'update'])->name('password.update');
 

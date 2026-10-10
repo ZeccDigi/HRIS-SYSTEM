@@ -174,15 +174,15 @@
             <div class="mb-6 flex flex-col gap-5 print:hidden">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     @if(! $isReadOnly)
-                        <a href="{{ route('dashboard') }}" class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-xs font-black uppercase tracking-widest text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-indigo-600">
-                            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-indigo-600">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
                             </svg>
                             {{ __('Back') }}
                         </a>
                     @else
-                        <a href="{{ route('employees.show', $employee) }}" class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-xs font-black uppercase tracking-widest text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-indigo-600">
-                            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <a href="{{ route('employees.show', $employee) }}" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-indigo-600">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
                             </svg>
                             {{ __('Back') }}
@@ -193,7 +193,7 @@
                         {{--
                         <a href="{{ route('pds.download-excel') }}" data-no-transition class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-white px-4 text-xs font-black uppercase tracking-widest text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-50">Download Excel</a>
                         --}}
-                        <a href="{{ route('pds.print') }}" data-no-transition target="_blank" class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-indigo-700 px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-800">Preview PDS</a>
+                        <a href="{{ route('pds.print') }}" data-no-transition target="_blank" rel="noopener noreferrer" class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-indigo-700 px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-800">Preview PDS</a>
                     </div>
                 </div>
                 <div>
@@ -368,8 +368,8 @@
                                     <!-- 7. Height, 8. Weight, 9. Blood -->
                                     <div class="contents">
                                         <div class="space-y-1">
-                                            <x-input-label value="Height (m)" :required="true" class="text-[10px] font-black uppercase text-gray-500 tracking-wider" />
-                                            <x-text-input class="block w-full text-sm font-bold border-gray-100" name="personal[height_m]" :value="old('personal.height_m', $employee->pdsPersonal?->height_m)" />
+                                            <x-input-label value="Height (cm)" :required="true" class="text-[10px] font-black uppercase text-gray-500 tracking-wider" />
+                                            <x-text-input class="block w-full text-sm font-bold border-gray-100" name="personal[height_m]" :value="old('personal.height_m', \App\Support\PdsFormatter::heightCm($employee->pdsPersonal?->height_m, ''))" />
                                         </div>
                                         <div class="space-y-1">
                                             <x-input-label value="Weight (kg)" :required="true" class="text-[10px] font-black uppercase text-gray-500 tracking-wider" />

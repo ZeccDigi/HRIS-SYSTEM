@@ -41,14 +41,30 @@
 
             <div class="space-y-8 p-6">
                 @if($tab === 'leave-types')
-                    <div class="flex items-center justify-between gap-3 mb-6">
+                    <div
+                        x-data="{ leaveTypeSearch: '' }"
+                        class="space-y-5"
+                    >
+                    <div class="flex flex-col gap-4 mb-6 lg:flex-row lg:items-end lg:justify-between">
                         <div>
                             <h3 class="text-lg font-bold text-slate-800">Leave Types</h3>
-                            <p class="mt-1 text-sm text-slate-500">These values are managed in the existing leave types module.</p>
                         </div>
-                        <button type="button" @click="createLeaveTypeModalOpen = true" class="inline-flex items-center rounded-lg bg-[#0038a8] px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-[#002f8f]">
-                            Add Leave Type
-                        </button>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                            <div class="relative w-full sm:w-80">
+                                <svg class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" />
+                                </svg>
+                                <input
+                                    type="search"
+                                    x-model.debounce.150ms="leaveTypeSearch"
+                                    placeholder="Search leave types..."
+                                    class="h-11 w-full rounded-xl border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-700 shadow-sm transition placeholder:text-slate-400 focus:border-[#0038a8] focus:ring-[#0038a8]"
+                                >
+                            </div>
+                            <button type="button" @click="createLeaveTypeModalOpen = true" class="inline-flex h-11 items-center justify-center rounded-lg bg-[#0038a8] px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-[#002f8f]">
+                                Add Leave Type
+                            </button>
+                        </div>
                     </div>
 
                     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -63,7 +79,18 @@
                             </thead>
                             <tbody class="divide-y divide-slate-100 bg-white">
                                 @forelse($leaveTypes as $leaveType)
-                                    <tr>
+                                    @php
+                                        $leaveTypeSearchText = strtolower(implode(' ', array_filter([
+                                            $leaveType->name,
+                                            ($leaveType->is_active ?? true) ? 'active' : 'inactive',
+                                            optional($leaveType->created_at)->format('M d, Y'),
+                                        ])));
+                                    @endphp
+                                    <tr
+                                        data-leave-type-row
+                                        data-search="{{ $leaveTypeSearchText }}"
+                                        x-show="$el.dataset.search.includes(leaveTypeSearch.toLowerCase())"
+                                    >
                                         <td class="px-4 py-3 font-semibold text-slate-700">{{ $leaveType->name }}</td>
                                         <td class="px-4 py-3 text-slate-600">{{ ($leaveType->is_active ?? true) ? 'Active' : 'Inactive' }}</td>
                                         <td class="px-4 py-3 text-slate-600">{{ optional($leaveType->created_at)->format('M d, Y') }}</td>
@@ -72,8 +99,17 @@
                                 @empty
                                     <tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-500">No leave types found.</td></tr>
                                 @endforelse
+                                @if($leaveTypes->isNotEmpty())
+                                    <tr
+                                        x-show="leaveTypeSearch && !Array.from($root.querySelectorAll('[data-leave-type-row]')).some(row => row.dataset.search.includes(leaveTypeSearch.toLowerCase()))"
+                                        style="display: none;"
+                                    >
+                                        <td colspan="4" class="px-4 py-8 text-center text-sm text-slate-500">No leave types match your search.</td>
+                                    </tr>
+                                @endif
                             </tbody>
                         </table>
+                    </div>
                     </div>
                 @else
                     <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -123,14 +159,14 @@
                             <div class="space-y-3">
                                 @forelse($groupOptions->take(200) as $option)
                                     <div class="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between">
-                                        <form method="POST" action="{{ route('utilities.options.update', $option) }}" class="grid flex-1 gap-3 md:grid-cols-{{ $parentGroup ? '3' : '2' }}">
+                                        <form method="POST" action="{{ route('utilities.options.update', $option) }}" class="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
                                             @csrf
                                             @method('PUT')
-                                            <input type="text" name="label" value="{{ $option->label }}" class="rounded-lg border-slate-200 text-sm font-semibold">
+                                            <input type="text" name="label" value="{{ $option->label }}" class="w-full rounded-lg border-slate-200 text-sm font-semibold md:w-[30rem]">
                                             <input type="hidden" name="value" value="{{ $option->label }}">
                                             @if($parentGroup)
                                                 @if($parentOptions->count() > 100)
-                                                    <div class="flex items-center rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm font-semibold text-slate-500">
+                                                    <div class="flex items-center rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm font-semibold text-slate-500 md:w-64">
                                                         @php
                                                             $parentOpt = $parentOptions->firstWhere('value', $option->parent_value);
                                                         @endphp
@@ -138,7 +174,7 @@
                                                         <input type="hidden" name="parent_value" value="{{ $option->parent_value }}">
                                                     </div>
                                                 @else
-                                                    <select name="parent_value" class="rounded-lg border-slate-200 text-sm font-semibold">
+                                                    <select name="parent_value" class="rounded-lg border-slate-200 text-sm font-semibold md:w-64">
                                                         <option value="">No parent</option>
                                                         @foreach($parentOptions as $parentOption)
                                                             <option value="{{ $parentOption->value }}" @selected($option->parent_value === $parentOption->value)>{{ $parentOption->label }}</option>
@@ -146,7 +182,7 @@
                                                     </select>
                                                 @endif
                                             @endif
-                                            <div class="flex items-center gap-2">
+                                            <div class="flex items-center gap-2 lg:ml-auto">
                                                 <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600">
                                                     <input type="checkbox" name="is_active" value="1" class="rounded border-slate-300 text-[#0038a8]" {{ $option->is_active ? 'checked' : '' }}>
                                                     Active
@@ -155,7 +191,7 @@
                                             </div>
                                         </form>
 
-                                        <form method="POST" action="{{ route('utilities.options.destroy', $option) }}" onsubmit="return confirm('Remove this option?')">
+                                        <form method="POST" action="{{ route('utilities.options.destroy', $option) }}" onsubmit="return confirm('Remove this option?')" class="lg:ml-1">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="rounded-lg bg-red-50 px-4 py-2 text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-100">Delete</button>
@@ -212,17 +248,6 @@
                             class="w-full rounded-xl border-slate-200 text-sm font-semibold text-slate-800 shadow-sm focus:border-[#0038a8] focus:ring-[#0038a8]"
                         >
                         <p class="mt-1 text-[11px] font-medium text-slate-400 italic">Leave blank or enter 0 if this type of leave has no specific annual limit.</p>
-                    </div>
-
-                    <!-- DESCRIPTION / REMARKS -->
-                    <div>
-                        <label for="modal_description" class="mb-1.5 block text-[11px] font-black uppercase tracking-wider text-slate-500">Description / Remarks</label>
-                        <textarea
-                            id="modal_description"
-                            name="description"
-                            rows="3"
-                            class="w-full rounded-xl border-slate-200 text-sm font-semibold text-slate-800 shadow-sm focus:border-[#0038a8] focus:ring-[#0038a8]"
-                        ></textarea>
                     </div>
 
                     <!-- LEGAL BASIS -->

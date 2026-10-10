@@ -1,4 +1,6 @@
 <x-app-layout>
+    <x-slot name="title">{{ __('Pending Locator Slips') }}</x-slot>
+
     <div class="p-4 sm:p-6 lg:p-8">
         <div class="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
             <div class="p-6 border-b border-gray-100">

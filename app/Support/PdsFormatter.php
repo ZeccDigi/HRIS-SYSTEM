@@ -24,6 +24,29 @@ class PdsFormatter
         return filled($value) ? (string) $value : $fallback;
     }
 
+    public static function heightCm(mixed $value, string $fallback = 'N/A'): string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            return $fallback;
+        }
+
+        $numeric = preg_replace('/[^0-9.]/', '', $value);
+
+        if ($numeric === '' || ! is_numeric($numeric)) {
+            return $value;
+        }
+
+        $height = (float) $numeric;
+
+        if ($height > 0 && $height < 3) {
+            $height *= 100;
+        }
+
+        return rtrim(rtrim(number_format($height, 2, '.', ''), '0'), '.');
+    }
+
     public static function check(?string $value, string $expected): string
     {
         return strcasecmp((string) $value, $expected) === 0 ? '☑' : '☐';

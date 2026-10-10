@@ -172,24 +172,32 @@
     $photoMarkup = $photoUrl ? '<img src="'.e($photoUrl).'" alt="ID photo" class="pds-photo">' : '<span class="photo-placeholder">PHOTO</span>';
 @endphp
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PDS CS Form 212 Revised 2025</title>
+<x-app-layout>
+<x-slot name="title">{{ __('Personal Data Sheet Preview') }}</x-slot>
 <style>
 :root { --page-w: 215.9mm; --page-h: 330.2mm; --content-w: 202mm; --ink: #000; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #eef2f7; color: #000; font-family: Arial, Helvetica, sans-serif; }
-    .pds-toolbar { position: sticky; top: 0; z-index: 20; display: flex; gap: 16px; justify-content: space-between; align-items: center; padding: 18px 28px; background: #fff; border-bottom: 1px solid #e5e7eb; }
-    .pds-toolbar button, .pds-toolbar a { display: inline-flex; align-items: center; justify-content: center; width: 150px; height: 40px; border-radius: 10px; padding: 0 14px; font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: 800; line-height: 1; letter-spacing: .16em; text-transform: uppercase; text-decoration: none; cursor: pointer; transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
-    .pds-toolbar a { border: 1px solid #e0e7ff; background: #fff; color: #4338ca; }
-    .pds-toolbar a:hover { background: #eef2ff; }
-    .pds-toolbar button { border: 1px solid #4338ca; background: #4338ca; color: #fff; }
-    .pds-toolbar button:hover { background: #3730a3; }
-    .pds-document { padding: 10mm 0; }
-.page { position: relative; width: var(--page-w); height: var(--page-h); margin: 0 auto 10mm; padding: 5mm 4mm; background: #fff; box-shadow: 0 8px 30px rgba(15, 23, 42, .18); overflow: hidden; page-break-after: always; }
+    .pds-preview-page { margin: 0; background: #f8fafc; color: #000; font-family: Arial, Helvetica, sans-serif; }
+    .pds-toolbar { display: flex; gap: 12px; justify-content: space-between; align-items: center; max-width: 900px; margin: 0 auto 1rem; padding: 0; font-family: Manrope, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .pds-toolbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+    .pds-toolbar button, .pds-toolbar a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 12px; padding: 0 20px; font-family: inherit; font-size: 13px; font-weight: 800; line-height: 1; text-decoration: none; cursor: pointer; transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+    .pds-toolbar svg { width: 16px; height: 16px; flex: 0 0 auto; }
+    .pds-back { border: 1px solid #e5e7eb; background: #fff; color: #4b5563; box-shadow: 0 1px 4px rgba(15, 23, 42, .08); }
+    .pds-back:hover { background: #f9fafb; color: #4f46e5; }
+    .pds-primary { border: 1px solid #002f8f; background: #0038a8; color: #fff; box-shadow: 0 8px 18px rgba(0, 56, 168, .18); letter-spacing: 0; text-transform: uppercase; }
+    .pds-primary:hover { background: #002f8f; }
+    .pds-secondary { border: 1px solid #1f2937; background: #1f2937; color: #fff; letter-spacing: 0; text-transform: uppercase; }
+    .pds-secondary:hover { background: #111827; }
+    .pds-document { max-width: calc(var(--page-w) + 12mm); margin: 0 auto 10mm; padding: 3mm; background: #fff; border: 1px solid #e5edf7; border-radius: 14px; box-shadow: 0 10px 30px rgba(15, 23, 42, .06); }
+    .pds-page-controls { display: flex; align-items: center; justify-content: center; gap: 14px; max-width: 900px; margin: 0 auto 1rem; font-family: Manrope, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .pds-page-arrow { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border: 1px solid #dbeafe; border-radius: 999px; background: #fff; color: #0038a8; box-shadow: 0 1px 4px rgba(15, 23, 42, .08); transition: background-color .15s ease, color .15s ease, opacity .15s ease; }
+    .pds-page-arrow:hover:not(:disabled) { background: #eff6ff; }
+    .pds-page-arrow:disabled { opacity: .35; cursor: not-allowed; }
+    .pds-page-arrow svg { width: 18px; height: 18px; }
+    .pds-page-indicator { min-width: 112px; text-align: center; color: #475569; font-size: 13px; font-weight: 800; }
+    .pds-document.is-paged .page { display: none; margin-bottom: 0; }
+    .pds-document.is-paged .page.is-active { display: block; }
+.page { position: relative; width: var(--page-w); height: var(--page-h); margin: 0 auto 8mm; padding: 5mm 4mm; background: #fff; box-shadow: none; overflow: hidden; page-break-after: always; }
     .page:last-of-type { page-break-after: auto; }
 table.pds-grid { width: var(--content-w); margin: 0 auto; border-collapse: collapse; table-layout: fixed; font-size: 5.85pt; line-height: .96; color: #000; transform-origin: top left; border-right: 0.55mm solid #000; }
 .page-1 table.pds-grid { margin: 6mm auto 0; }
@@ -197,6 +205,7 @@ table.pds-grid { width: var(--content-w); margin: 0 auto; border-collapse: colla
     .pds-grid td { position: relative; padding: .18mm .45mm; vertical-align: middle; overflow: hidden; height: var(--rh); max-height: var(--rh); white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.06; }
     .pds-label { display: block; max-width: 100%; max-height: 100%; padding: 0 .15mm; font-weight: 700; white-space: normal; overflow-wrap: anywhere; word-break: break-word; overflow: hidden; line-height: 1.05; }
     .pds-value { display: block; width: 100%; max-width: 100%; min-height: 0; max-height: calc(var(--rh) - .36mm); padding: 0 .35mm; font-weight: 500; white-space: normal; overflow-wrap: anywhere; word-break: break-word; overflow: hidden; line-height: 1.08; text-align: inherit; }
+    .pds-address-value { white-space: nowrap !important; overflow-wrap: normal !important; word-break: normal !important; overflow: hidden !important; line-height: 1 !important; font-size: 5.2pt !important; }
     .page-4 .pds-grid tr,
     .page-4 .pds-grid td,
     .page-4 .pds-label,
@@ -338,9 +347,24 @@ table.pds-grid { width: var(--content-w); margin: 0 auto; border-collapse: colla
     .c4-oath { height: 30mm; border-top: 0.55mm solid #000; border-bottom: 0 !important; text-align: center; padding-top: 5mm !important; }
     .c4-oath-admin { width: 78mm; height: 20mm; margin: 2.5mm auto 0; border: 0.55mm solid #000; display: flex; flex-direction: column; justify-content: flex-end; }
     .c4-oath-admin .c4-sign-main { flex: 1; height: auto; }
-    .c4-footer { display: table-cell; border: 0 !important; background: #fff; text-align: right; vertical-align: middle; font-style: italic; font-weight: 700; font-size: 5.04pt; line-height: 1; white-space: nowrap; padding: 0 .45mm; }
-    .c4-footer-row { display: table-row; }
-    .c4-page-footer { display: none; }
+    .c4-footer { display: none; }
+    .c4-footer-row { display: none; }
+    .c4-page-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        width: calc(var(--content-w) + 0.55mm);
+        min-height: 3.09mm;
+        margin: 0 auto;
+        padding-right: 1.25mm;
+        border-right: 0.55mm solid #000;
+        text-align: right;
+        font-style: italic;
+        font-weight: 700;
+        font-size: 5.76pt;
+        line-height: 1;
+        white-space: nowrap;
+    }
     .continuation { height: auto; min-height: var(--page-h); }
     .continuation h2 { margin: 0 0 4mm; text-align: center; font-size: 12pt; }
     .continuation table { width: 100%; border-collapse: collapse; font-size: 8pt; }
@@ -349,20 +373,54 @@ table.pds-grid { width: var(--content-w); margin: 0 auto; border-collapse: colla
 @media print {
 @page { size: 215.9mm 330.2mm; margin: 0; }
 html, body { width: 215.9mm; margin: 0; background: #fff; }
-        .pds-toolbar { display: none !important; }
-        .pds-document { padding: 0; }
+        body > .flex,
+        body > .flex > .flex-1,
+        body main,
+        body main > div,
+        body main > div > div { display: block !important; width: auto !important; max-width: none !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+        body aside,
+        body header { display: none !important; }
+        .pds-toolbar,
+        .pds-page-controls { display: none !important; }
+        .pds-document { max-width: none; margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+        .pds-document.is-paged .page { display: block !important; }
+        .pds-document.is-paged .pds-old-c4 { display: none !important; }
         .page { margin: 0; box-shadow: none; page-break-after: always; break-after: page; }
         .page:last-of-type { page-break-after: auto; break-after: auto; }
         .pds-grid tr, .pds-grid td, .continuation tr { break-inside: avoid; page-break-inside: avoid; }
     }
 </style>
-</head>
-<body>
-<div class="pds-toolbar">
-    <a href="{{ route('pds.index') }}">Back to PDS</a>
-    <button type="button" onclick="window.print()">Print PDS</button>
-</div>
-<div class="pds-document">
+
+<div class="pds-preview-page min-h-screen py-8">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="pds-toolbar">
+            <a href="{{ route('pds.index') }}" class="pds-back">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
+                </svg>
+                Back
+            </a>
+            <div class="pds-toolbar-actions">
+                <button type="button" onclick="window.print()" class="pds-primary">
+                    Print PDF
+                </button>
+                <a href="{{ route('pds.download') }}" data-no-transition class="pds-secondary">Download PDF</a>
+            </div>
+        </div>
+        <div class="pds-page-controls" data-pds-page-controls>
+            <button type="button" class="pds-page-arrow" data-pds-prev-page aria-label="Previous page">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
+            <span class="pds-page-indicator" data-pds-page-indicator>Page 1 of 1</span>
+            <button type="button" class="pds-page-arrow" data-pds-next-page aria-label="Next page">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M9 5l7 7-7 7" />
+                </svg>
+            </button>
+        </div>
+        <div class="pds-document">
 
 <section class="page page-1" aria-label="PDS C1 A4 page">
 <table class="pds-grid">
@@ -624,10 +682,10 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 
 <td style="border-left:0.55mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"><span class="pds-label">17. RESIDENTIAL ADDRESS</span></td>
 <td style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
-<td colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value">{{ pdsText($p?->res_house_no) }}</span></td>
+<td colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value pds-address-value">{{ pdsText($p?->res_house_no) }}</span></td>
 
 
-<td colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value">{{ pdsText($p?->res_street) }}</span></td>
+<td colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value pds-address-value">{{ pdsText($p?->res_street) }}</span></td>
 
 
 </tr>
@@ -651,10 +709,10 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 
 <td style="border-left:0.55mm solid #000;border-right:0;border-top:0;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
 <td style="border-left:0;border-right:0;border-top:0;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
-<td rowspan="2" colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value" style="max-height:none;line-height:1.05">{{ pdsText($p?->res_subdivision) }}</span></td>
+<td rowspan="2" colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value pds-address-value" style="max-height:none">{{ pdsText($p?->res_subdivision) }}</span></td>
 
 
-<td rowspan="2" colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value" style="max-height:none;line-height:1.05">{{ pdsText($p?->res_barangay) }}</span></td>
+<td rowspan="2" colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value pds-address-value" style="max-height:none">{{ pdsText($p?->res_barangay) }}</span></td>
 
 
 </tr>
@@ -686,17 +744,17 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 </tr>
 <tr style="height:4.056mm; --rh:4.056mm">
 <td rowspan="2" style="border-left:0.55mm solid #000;border-right:0;border-top:0;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:right;vertical-align:middle;font-size:5.76pt"><span class="pds-label">7.</span></td>
-<td rowspan="2" colspan="2" style="border-left:0;border-right:0.22mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"><span class="pds-label">HEIGHT (m)</span></td>
+<td rowspan="2" colspan="2" style="border-left:0;border-right:0.22mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"><span class="pds-label">HEIGHT (cm)</span></td>
 
-<td rowspan="2" colspan="3" style="border-left:0;border-right:0;border-top:0;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-weight:700;font-size:7.20pt"><span class="pds-value">{{ pdsText($p?->height_m) }}</span></td>
+<td rowspan="2" colspan="3" style="border-left:0;border-right:0;border-top:0;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-weight:700;font-size:7.20pt"><span class="pds-value">{{ \App\Support\PdsFormatter::heightCm($p?->height_m, '') }}</span></td>
 
 
 <td style="border-left:0.55mm solid #000;border-right:0;border-top:0;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
 <td style="border-left:0;border-right:0;border-top:0;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
-<td colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#fff;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value" style="max-height:none">{{ pdsText($p?->res_city) }}</span></td>
+<td colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#fff;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value pds-address-value" style="max-height:none">{{ pdsText($p?->res_city) }}</span></td>
 
 
-<td colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#fff;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value" style="max-height:none">{{ pdsText($p?->res_province) }}</span></td>
+<td colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#fff;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value pds-address-value" style="max-height:none">{{ pdsText($p?->res_province) }}</span></td>
 
 
 </tr>
@@ -725,7 +783,7 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 
 <td colspan="2" style="border-left:0.55mm solid #000;border-right:0.22mm solid #000;border-top:0;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:center;vertical-align:middle;white-space:pre-wrap;font-size:5.76pt"><span class="pds-label">ZIP CODE    </span></td>
 
-<td colspan="6" style="border-left:0.22mm solid #000;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#fff;text-align:center;vertical-align:middle;white-space:pre-wrap;font-size:5.76pt"><span class="pds-value" style="max-height:none">{{ pdsText($p?->res_zip_code) }}</span></td>
+<td colspan="6" style="border-left:0.22mm solid #000;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#fff;text-align:center;vertical-align:middle;white-space:pre-wrap;font-size:5.76pt"><span class="pds-value pds-address-value" style="max-height:none">{{ pdsText($p?->res_zip_code) }}</span></td>
 
 
 
@@ -741,10 +799,10 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 
 <td style="border-left:0.55mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"><span class="pds-label">18. PERMANENT ADDRESS</span></td>
 <td style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
-<td colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-style:italic;font-size:5.76pt"><span class="pds-value">{{ pdsText($p?->perm_house_no) }}</span></td>
+<td colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-style:italic;font-size:5.76pt"><span class="pds-value pds-address-value">{{ pdsText($p?->perm_house_no) }}</span></td>
 
 
-<td colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-style:italic;font-size:5.76pt"><span class="pds-value">{{ pdsText($p?->perm_street) }}</span></td>
+<td colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-style:italic;font-size:5.76pt"><span class="pds-value pds-address-value">{{ pdsText($p?->perm_street) }}</span></td>
 
 
 </tr>
@@ -773,10 +831,10 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 
 <td style="border-left:0.55mm solid #000;border-right:0;border-top:0;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
 <td style="border-left:0;border-right:0;border-top:0;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
-<td colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-style:italic;font-size:5.76pt"><span class="pds-value">{{ pdsText($p?->perm_subdivision) }}</span></td>
+<td colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-style:italic;font-size:5.76pt"><span class="pds-value pds-address-value">{{ pdsText($p?->perm_subdivision) }}</span></td>
 
 
-<td colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-style:italic;font-size:5.76pt"><span class="pds-value">{{ pdsText($p?->perm_barangay) }}</span></td>
+<td colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-style:italic;font-size:5.76pt"><span class="pds-value pds-address-value">{{ pdsText($p?->perm_barangay) }}</span></td>
 
 
 </tr>
@@ -805,12 +863,8 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 
 <td style="border-left:0.55mm solid #000;border-right:0;border-top:0;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
 <td style="border-left:0;border-right:0.22mm solid #000;border-top:0;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
-<td style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:left;vertical-align:middle;font-style:italic;font-size:7.20pt"><span class="pds-value">{{ pdsText($p?->perm_city) }}</span></td>
-<td style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:left;vertical-align:middle;font-style:italic;font-size:7.20pt"></td>
-<td style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:left;vertical-align:middle;font-style:italic;font-size:7.20pt"></td>
-<td style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:left;vertical-align:middle;font-style:italic;font-size:7.20pt"><span class="pds-value">{{ pdsText($p?->perm_province) }}</span></td>
-<td style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:left;vertical-align:middle;font-style:italic;font-size:7.20pt"></td>
-<td style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:left;vertical-align:middle;font-style:italic;font-size:7.20pt"></td>
+<td colspan="3" style="border-left:0.22mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value pds-address-value" style="max-height:none">{{ pdsText($p?->perm_city) }}</span></td>
+<td colspan="3" style="border-left:0;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value pds-address-value" style="max-height:none">{{ pdsText($p?->perm_province) }}</span></td>
 </tr>
 <tr style="height:2.511mm; --rh:2.511mm">
 
@@ -836,7 +890,7 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 
 <td colspan="2" style="border-left:0.55mm solid #000;border-right:0.22mm solid #000;border-top:0;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:center;vertical-align:middle;white-space:pre-wrap;font-size:5.76pt"><span class="pds-label">ZIP CODE    </span></td>
 
-<td colspan="6" style="border-left:0.22mm solid #000;border-right:0.55mm solid #000;border-top:0;border-bottom:0.22mm solid #000;background:#fff;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value" style="max-height:none">{{ pdsText($p?->perm_zip_code) }}</span></td>
+<td colspan="6" style="border-left:0.22mm solid #000;border-right:0.55mm solid #000;border-top:0;border-bottom:0.22mm solid #000;background:#fff;text-align:center;vertical-align:middle;font-size:5.76pt"><span class="pds-value pds-address-value" style="max-height:none">{{ pdsText($p?->perm_zip_code) }}</span></td>
 
 
 </tr>
@@ -3683,6 +3737,8 @@ const waitForPdsImages = () => Promise.all(Array.from(document.images).map((img)
 }));
 
 document.addEventListener('DOMContentLoaded', async () => {
+    let restorePagedModeAfterPrint = false;
+
     const cleanMergedLabels = () => {
         const sectionLabels = [
             'I. PERSONAL INFORMATION',
@@ -3759,17 +3815,81 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         };
 
+        const setupPdsPager = () => {
+            const documentEl = document.querySelector('.pds-document');
+            const controls = document.querySelector('[data-pds-page-controls]');
+            const prevButton = document.querySelector('[data-pds-prev-page]');
+            const nextButton = document.querySelector('[data-pds-next-page]');
+            const indicator = document.querySelector('[data-pds-page-indicator]');
+
+            if (!documentEl || !controls || !prevButton || !nextButton || !indicator) {
+                return;
+            }
+
+            const pages = Array.from(documentEl.querySelectorAll('.page'))
+                .filter((page) => !page.classList.contains('pds-old-c4'));
+
+            if (pages.length <= 1) {
+                controls.style.display = 'none';
+                return;
+            }
+
+            let currentPage = Math.max(0, pages.findIndex((page) => page.classList.contains('is-active')));
+
+            if (currentPage < 0) {
+                currentPage = 0;
+            }
+
+            const renderPage = (index) => {
+                currentPage = Math.min(Math.max(index, 0), pages.length - 1);
+
+                documentEl.classList.add('is-paged');
+                pages.forEach((page, pageIndex) => {
+                    page.classList.toggle('is-active', pageIndex === currentPage);
+                });
+
+                prevButton.disabled = currentPage === 0;
+                nextButton.disabled = currentPage === pages.length - 1;
+                indicator.textContent = `Page ${currentPage + 1} of ${pages.length}`;
+            };
+
+            prevButton.addEventListener('click', () => renderPage(currentPage - 1));
+            nextButton.addEventListener('click', () => renderPage(currentPage + 1));
+            renderPage(currentPage);
+        };
+
+        const disablePagedModeForPrint = () => {
+            const documentEl = document.querySelector('.pds-document');
+            if (!documentEl) {
+                return;
+            }
+
+            restorePagedModeAfterPrint = documentEl.classList.contains('is-paged');
+            documentEl.classList.remove('is-paged');
+        };
+
+        const restorePagedMode = () => {
+            if (restorePagedModeAfterPrint) {
+                document.querySelector('.pds-document')?.classList.add('is-paged');
+            }
+        };
+
     cleanMergedLabels();
     shrinkValues();
     fitExcelSheets();
+    setupPdsPager();
     await waitForPdsImages();
     window.addEventListener('beforeprint', () => {
+        disablePagedModeForPrint();
         cleanMergedLabels();
         shrinkValues();
         fitExcelSheets();
     });
+    window.addEventListener('afterprint', restorePagedMode);
 });
 </script>
-</body>
-</html>
+        </div>
+    </div>
+</div>
+</x-app-layout>
 

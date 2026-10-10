@@ -50,16 +50,28 @@
                                     </div>
                                 </div>
 
-                                <form id="account_e_signature_form" action="{{ route('employees.e-signature', $user->employee) }}" method="POST" enctype="multipart/form-data" class="mt-4">
-                                    @csrf
-                                    <label for="account_e_signature_upload" class="inline-flex cursor-pointer items-center justify-center rounded-md bg-blue-900 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                                        {{ __('Upload Signature') }}
-                                    </label>
-                                    <input type="file" id="account_e_signature_upload" name="e_signature" accept="image/png,.png" class="hidden" onchange="document.getElementById('account_e_signature_form').submit()">
-                                    @error('e_signature')
-                                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                                    @enderror
-                                </form>
+                                <div class="mt-4 flex flex-wrap items-center gap-3">
+                                    <form id="account_e_signature_form" action="{{ route('employees.e-signature', $user->employee) }}" method="POST" enctype="multipart/form-data">
+                                        @csrf
+                                        <label for="account_e_signature_upload" class="inline-flex cursor-pointer items-center justify-center rounded-md bg-blue-900 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                            {{ $user->employee->effective_signature_url ? __('Change Signature') : __('Upload Signature') }}
+                                        </label>
+                                        <input type="file" id="account_e_signature_upload" name="e_signature" accept="image/png,.png" class="hidden" onchange="document.getElementById('account_e_signature_form').submit()">
+                                    </form>
+
+                                    @if($user->employee->effective_signature_url)
+                                        <form action="{{ route('employees.e-signature.destroy', $user->employee) }}" method="POST" onsubmit="return confirm('{{ __('Remove your reusable e-signature?') }}')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="inline-flex items-center justify-center rounded-md border border-red-100 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                                                {{ __('Remove Signature') }}
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                                @error('e_signature')
+                                    <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
                         </section>
                     </div>

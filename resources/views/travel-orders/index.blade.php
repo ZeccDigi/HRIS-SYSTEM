@@ -121,9 +121,9 @@
                                 <th class="w-[20%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Destination') }}</th>
                                 <th class="w-[22%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Records Officer') }}</th>
                                 <th class="w-[22%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Regional Director') }}</th>
-                                <th class="w-[10%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('TAR Deadline') }}</th>
-                                <th class="w-[8%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('TAR Status') }}</th>
-                                <th class="w-[5%] px-3 py-3 text-right text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Actions') }}</th>
+                                <th class="w-[10%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('AR Deadline') }}</th>
+                                <th class="w-[8%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('AR Status') }}</th>
+                                <th class="w-[7%] px-3 py-3 text-center text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 bg-white">
@@ -165,6 +165,9 @@
                                         ])));
 
                                         $taNumber = $order->ta_number ?: 'TA-' . optional($order->created_at)->format('Y-m-d') . '-' . str_pad((string) $order->id, 3, '0', STR_PAD_LEFT);
+                                        $acknowledgementReportUrl = $order->tar_attachment_path
+                                            ? route('travel-orders.ar.file', $order)
+                                            : route('travel-orders.ar.print', $order);
                                         $previewPayload = [
                                             'title' => $taNumber,
                                             'date' => $order->created_at?->format('M d, Y') ?? 'N/A',
@@ -208,19 +211,41 @@
                                             </div>
                                         </td>
                                         <td class="px-3 py-3 align-top text-xs text-gray-700">{{ $tarDeadline?->format('M d, Y') ?? __('N/A') }}</td>
-                                        <td class="px-3 py-3 align-top text-xs font-semibold {{ $computedTarStatus === 'submitted' ? 'text-green-700' : ($computedTarStatus === 'overdue' ? 'text-red-700' : 'text-gray-600') }}">
-                                            {{ $computedTarStatus === 'not_applicable' ? '—' : strtoupper($computedTarStatus) }}
+                                        <td class="px-3 py-3 align-top text-xs font-semibold">
+                                            @if($computedTarStatus === 'submitted')
+                                                <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                                                    <i class="fa-solid fa-file-lines"></i>
+                                                    <span>{{ __('Submitted') }}</span>
+                                                </span>
+                                            @elseif($computedTarStatus === 'overdue')
+                                                <span class="inline-flex items-center gap-1.5 rounded-full border border-red-100 bg-red-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-red-700">
+                                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                                    <span>{{ __('Overdue') }}</span>
+                                                </span>
+                                            @elseif($computedTarStatus === 'not_applicable')
+                                                <span class="text-gray-400">—</span>
+                                            @else
+                                                <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-slate-600">
+                                                    <i class="fa-regular fa-clock"></i>
+                                                    <span>{{ __('Pending') }}</span>
+                                                </span>
+                                            @endif
                                         </td>
-                                        <td class="px-3 py-3 text-right align-top">
-                                            <div class="flex items-center justify-end gap-1">
+                                        <td class="px-3 py-3 text-center align-top">
+                                            <div class="mx-auto grid w-fit grid-cols-2 place-items-center gap-x-2 gap-y-1">
                                                 <a href="{{ route('travel-orders.show', $order) }}" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition hover:bg-indigo-50 hover:text-indigo-900" title="{{ __('View') }}">
                                                     <i class="fa-solid fa-eye text-sm"></i>
                                                 </a>
                                                 <a href="{{ route('travel-orders.print', $order) }}" target="_blank" rel="noopener" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-50 hover:text-slate-900" title="{{ __('Print') }}">
                                                     <i class="fa-solid fa-print text-sm"></i>
                                                 </a>
+                                                @if($computedTarStatus === 'submitted')
+                                                    <a href="{{ $acknowledgementReportUrl }}" target="_blank" rel="noopener" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-700 transition hover:bg-blue-50 hover:text-blue-900" title="{{ __('View Acknowledgement Report') }}" aria-label="{{ __('View Acknowledgement Report') }}">
+                                                        <i class="fa-solid fa-file-circle-check text-sm"></i>
+                                                    </a>
+                                                @endif
                                                 @if($section === 'my' && $mainStatus === 'approved')
-                                                    <button type="button" @click="openTarModal('{{ route('travel-orders.submit-tar', $order) }}', '{{ $taNumber }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900" title="{{ __('Submit Travel Accomplishment Report') }}" aria-label="{{ __('Submit Travel Accomplishment Report') }}">
+                                                    <button type="button" @click="openTarModal('{{ route('travel-orders.submit-tar', $order) }}', '{{ $taNumber }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900" title="{{ __('Submit Acknowledgement Report') }}" aria-label="{{ __('Submit Acknowledgement Report') }}">
                                                         <i class="fa-solid fa-file-arrow-up text-sm"></i>
                                                     </button>
                                                 @endif
@@ -307,13 +332,13 @@
         <div x-cloak x-show="tarModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
             <div @click.away="closeTarModal()" class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
                 <div class="border-b border-gray-100 px-5 py-4">
-                    <h2 class="text-sm font-black uppercase tracking-widest text-gray-900">{{ __('Submit TAR') }}</h2>
+                    <h2 class="text-sm font-black uppercase tracking-widest text-gray-900">{{ __('Submit AR') }}</h2>
                     <p class="mt-1 text-xs text-gray-500" x-text="tarTitle"></p>
                 </div>
                 <form :action="tarAction" method="POST" enctype="multipart/form-data" class="space-y-4 px-5 py-5">
                     @csrf
                     <div>
-                        <label class="mb-1 block text-sm font-semibold text-gray-700">{{ __('Travel Accomplishment Report (PDF)') }}</label>
+                        <label class="mb-1 block text-sm font-semibold text-gray-700">{{ __('Acknowledgement Report (PDF)') }}</label>
                         <input type="file" name="tar_attachment" accept="application/pdf,.pdf" class="block w-full rounded-lg border border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
                     </div>
                     <div>
@@ -322,7 +347,7 @@
                     </div>
                     <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
                         <button type="button" @click="closeTarModal()" class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">{{ __('Cancel') }}</button>
-                        <button type="submit" class="inline-flex items-center rounded-lg bg-blue-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-800">{{ __('Submit TAR') }}</button>
+                        <button type="submit" class="inline-flex items-center rounded-lg bg-blue-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-800">{{ __('Submit AR') }}</button>
                     </div>
                 </form>
             </div>

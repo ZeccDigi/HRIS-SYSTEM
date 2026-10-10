@@ -21,7 +21,7 @@ class EnsurePasswordChanged
         }
 
         $routeName = $request->route()?->getName();
-        $allowedRoutes = ['profile.edit', 'password.update', 'logout'];
+        $allowedRoutes = ['profile.edit', 'password.otp.send', 'password.update', 'logout'];
 
         if ($routeName && in_array($routeName, $allowedRoutes, true)) {
             return $next($request);

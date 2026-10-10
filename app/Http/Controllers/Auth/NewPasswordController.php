@@ -24,6 +24,13 @@ class NewPasswordController extends Controller
         return view('auth.reset-password', ['request' => $request]);
     }
 
+    public function createOtp(Request $request): View
+    {
+        return view('auth.reset-password-otp', [
+            'email' => $request->query('email', ''),
+        ]);
+    }
+
     /**
      * Handle an incoming new password request.
      *
@@ -59,5 +66,44 @@ class NewPasswordController extends Controller
                     ? redirect()->route('login')->with('status', __($status))
                     : back()->withInput($request->only('email'))
                         ->withErrors(['email' => __($status)]);
+    }
+
+    public function storeOtp(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'otp' => ['required', 'digits:6'],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+        ]);
+
+        $user = User::query()
+            ->where('email', strtolower($validated['email']))
+            ->first();
+
+        if (! $user || ! $user->otp || ! hash_equals((string) $user->otp, (string) $validated['otp'])) {
+            throw ValidationException::withMessages([
+                'otp' => 'The OTP is invalid.',
+            ]);
+        }
+
+        if ($user->isOtpExpired()) {
+            throw ValidationException::withMessages([
+                'otp' => 'The OTP has expired. Please request a new password reset OTP.',
+            ]);
+        }
+
+        $user->forceFill([
+            'password' => Hash::make($validated['password']),
+            'remember_token' => Str::random(60),
+            'otp' => null,
+            'otp_expires_at' => null,
+            'must_change_password' => false,
+        ])->save();
+
+        event(new PasswordReset($user));
+
+        return redirect()
+            ->route('login')
+            ->with('status', 'Your password has been reset. Please sign in with your new password.');
     }
 }
