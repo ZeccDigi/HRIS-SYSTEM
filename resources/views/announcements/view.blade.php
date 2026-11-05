@@ -91,7 +91,7 @@
                 id="publicAnnouncementFilterForm"
                 method="GET"
                 action="{{ route('announcements.view') }}"
-                class="mt-8 flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50/70 p-3 shadow-sm sm:flex-row sm:items-center"
+                class="mt-8 flex flex-col gap-2 sm:flex-row sm:items-center"
             >
                 {{-- Search --}}
                 <div class="relative min-w-0 sm:flex-1">

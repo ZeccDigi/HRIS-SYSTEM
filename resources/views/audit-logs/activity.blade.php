@@ -253,11 +253,10 @@
                             <thead>
                                 <tr class="bg-gray-50">
                                     <th class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('User') }}</th>
-                                    <th class="w-[18%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Action / Event') }}</th>
-                                    <th class="w-[15%] px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Module') }}</th>
-                                    <th class="w-[23%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Description') }}</th>
-                                    <th class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Date') }}</th>
-                                    <th class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Time') }}</th>
+                                    <th class="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Action / Event') }}</th>
+                                    <th class="w-[44%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Description') }}</th>
+                                    <th class="w-[10%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Date') }}</th>
+                                    <th class="w-[10%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Time') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -271,13 +270,8 @@
                                         <td class="px-4 py-4 text-sm font-medium text-gray-900">
                                             <div class="truncate">{{ $act->action }}</div>
                                         </td>
-                                        <td class="px-4 py-4 text-center">
-                                            <span class="max-w-full truncate px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">
-                                                {{ $act->module ?: 'General' }}
-                                            </span>
-                                        </td>
-                                        <td class="px-4 py-4 text-sm text-gray-500">
-                                            <div class="truncate">{{ $act->description }}</div>
+                                        <td class="px-4 py-4 text-sm leading-snug text-gray-500">
+                                            <div class="line-clamp-2 break-words" title="{{ $act->description }}">{{ $act->description }}</div>
                                         </td>
                                         <td class="px-4 py-4 text-sm text-gray-500">
                                             {{ $act->created_at ? $act->created_at->format('M d, Y') : 'N/A' }}
@@ -288,7 +282,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-6 py-10 text-center text-gray-500">
+                                        <td colspan="5" class="px-6 py-10 text-center text-gray-500">
                                             <div class="flex flex-col items-center">
                                                 <svg class="w-12 h-12 text-gray-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -303,9 +297,7 @@
                     </div>
 
                     @if($activityAudits->hasPages())
-                        <div class="mt-4">
-                            {{ $activityAudits->links() }}
-                        </div>
+                        @include('audit-logs.simple-pagination', ['paginator' => $activityAudits])
                     @endif
 
                 </div>

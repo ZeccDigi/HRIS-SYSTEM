@@ -54,10 +54,18 @@ class LocatorSlipNotification extends Notification
      */
     public function toArray(object $notifiable): array
     {
+        $role = strtolower((string) ($notifiable->role ?? ''));
+        $actionUrl = in_array($role, ['admin', 'hrstaff', 'chief', 'regionaldirector'], true)
+            ? route('hr.locator-slips.show', $this->locatorSlip->id)
+            : route('locator-slips.show', $this->locatorSlip->id);
+
         return [
+            'type' => 'locator_slip',
             'locator_slip_id' => $this->locatorSlip->id,
             'title' => $this->title,
             'message' => $this->message,
+            'action_url' => $actionUrl,
+            'icon' => 'locator',
         ];
     }
 }

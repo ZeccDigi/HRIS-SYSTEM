@@ -18,7 +18,7 @@ class PdsPdfExporter
 
     public function download(Employee $employee, string $disposition = 'attachment'): Response
     {
-        $employee->load([
+        $employee->loadMissing([
             'user',
             'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation',
             'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks',

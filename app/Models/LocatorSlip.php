@@ -16,12 +16,21 @@ class LocatorSlip extends Model
         'purpose',
         'type',
         'time_from',
+        'out_scanned_at',
         'time_to',
         'status',
         'chief_remarks',
         'recommending_approval_id',
         'approved_by_id',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'date_covered' => 'date',
+            'out_scanned_at' => 'datetime',
+        ];
+    }
 
     public function employee()
     {

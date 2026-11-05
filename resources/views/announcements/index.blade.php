@@ -6,9 +6,10 @@
 
         $canPost = in_array(
             $role,
-            ['admin', 'hrstaff', 'regionaldirector'],
+            ['admin', 'hrstaff', 'chief', 'regionaldirector'],
             true
         );
+        $isChief = $role === 'chief';
 
         $shouldOpenCreateModal =
             request()->boolean('openCreate') ||
@@ -201,7 +202,7 @@
                 method="GET"
                 action="{{ route('announcements.index') }}"
                 data-filter-url="{{ route('announcements.filter') }}"
-                class="mt-8 flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50/70 p-3 shadow-sm sm:flex-row sm:items-center"
+                class="mt-8 flex flex-col gap-2 sm:flex-row sm:items-center"
             >
                 <input
                     type="hidden"
@@ -455,20 +456,28 @@
                                     {{ __('Announcement Type') }}
                                 </label>
 
-                                <select
-                                    id="modalTags"
-                                    name="tags"
-                                    class="block w-full rounded-lg border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 @error('tags') border-red-400 @enderror"
-                                >
-                                    @foreach($categories as $option)
-                                        <option
-                                            value="{{ $option }}"
-                                            {{ old('tags', 'General') === $option ? 'selected' : '' }}
-                                        >
-                                            {{ $option }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                @if($isChief)
+                                    <input type="hidden" name="tags" value="Office Orders">
+                                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700">
+                                        {{ __('Office Orders') }}
+                                        <span class="ml-2 text-xs font-medium text-gray-400">{{ __('Your division only') }}</span>
+                                    </div>
+                                @else
+                                    <select
+                                        id="modalTags"
+                                        name="tags"
+                                        class="block w-full rounded-lg border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 @error('tags') border-red-400 @enderror"
+                                    >
+                                        @foreach($categories as $option)
+                                            <option
+                                                value="{{ $option }}"
+                                                {{ old('tags', 'General') === $option ? 'selected' : '' }}
+                                            >
+                                                {{ $option }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                @endif
 
                                 @error('tags')
                                     <p class="mt-1 text-sm text-red-600">

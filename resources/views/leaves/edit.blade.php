@@ -26,8 +26,28 @@
                             query: '',
                             selectedId: '{{ old('leave_type_id', $leaf->leave_type_id) }}',
                             selectedName: '',
+                            detailType: {{ Js::from(old('leave_detail_type', $leaf->leave_detail_type ?? '')) }},
                             types: {{ Js::from($leaveTypePicker) }},
                             get info() { return this.types[this.selectedId] || null; },
+                            get normalizedName() { return (this.info?.name || '').toLowerCase(); },
+                            get isVacationLike() { return this.normalizedName.includes('vacation') || this.normalizedName.includes('special privilege'); },
+                            get isSickLeave() { return this.normalizedName.includes('sick'); },
+                            get isWomenLeave() { return this.normalizedName.includes('women'); },
+                            get isStudyLeave() { return this.normalizedName.includes('study'); },
+                            defaultDetailType() {
+                                if (this.isVacationLike) return 'within_philippines';
+                                if (this.isSickLeave) return 'out_patient';
+                                if (this.isWomenLeave) return 'women_illness';
+                                if (this.isStudyLeave) return 'masters_degree';
+                                return '';
+                            },
+                            ensureDetailType() {
+                                const allowed = this.isVacationLike ? ['within_philippines', 'abroad']
+                                    : this.isSickLeave ? ['in_hospital', 'out_patient']
+                                    : this.isWomenLeave ? ['women_illness']
+                                    : this.isStudyLeave ? ['masters_degree', 'board_review'] : [];
+                                if (!allowed.includes(this.detailType)) this.detailType = this.defaultDetailType();
+                            },
                             matchesType(id) {
                                 const info = this.types[id];
                                 if (!info) return false;
@@ -47,6 +67,7 @@
                                 this.query = this.selectedName;
                                 this.open = false;
                                 this.applySelectedPolicy();
+                                this.ensureDetailType();
                             },
                             clearSelectionIfSearching() {
                                 if (this.query !== this.selectedName) {
@@ -59,7 +80,10 @@
                                     this.selectedName = this.types[this.selectedId].name;
                                     this.query = this.selectedName;
                                 }
-                                this.$nextTick(() => this.applySelectedPolicy());
+                                this.$nextTick(() => {
+                                    this.applySelectedPolicy();
+                                    this.ensureDetailType();
+                                });
                             }
                         }" @click.outside="open = false" class="relative">
                             <x-input-label for="leave_type_id" :value="__('Type of Leave')" class="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] mb-2" />
@@ -145,6 +169,46 @@
                                 </p>
                             </div>
 
+                            @php($savedDetail = old('leave_detail', $leaf->leave_detail))
+                            <div x-show="isVacationLike || isSickLeave || isWomenLeave || isStudyLeave" x-cloak class="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                                <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">{{ __('Details of Leave') }}</p>
+                                <input type="hidden" name="leave_detail_type" :value="detailType" :disabled="!(isVacationLike || isSickLeave || isWomenLeave || isStudyLeave)">
+
+                                <div x-show="isVacationLike" class="mt-3 space-y-3">
+                                    <p class="text-xs font-semibold text-gray-600">{{ __('In case of Vacation/Special Privilege Leave') }}</p>
+                                    <div class="grid gap-2 sm:grid-cols-2">
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="within_philippines" x-model="detailType" :disabled="!isVacationLike"> {{ __('Within the Philippines') }}</label>
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="abroad" x-model="detailType" :disabled="!isVacationLike"> {{ __('Abroad') }}</label>
+                                    </div>
+                                    <input type="text" name="leave_detail" value="{{ $savedDetail }}" :disabled="!isVacationLike" class="block w-full rounded-lg border-gray-200 bg-white text-sm" placeholder="{{ __('Specify location') }}">
+                                </div>
+
+                                <div x-show="isSickLeave" class="mt-3 space-y-3">
+                                    <p class="text-xs font-semibold text-gray-600">{{ __('In case of Sick Leave') }}</p>
+                                    <div class="grid gap-2 sm:grid-cols-2">
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="in_hospital" x-model="detailType" :disabled="!isSickLeave"> {{ __('In Hospital') }}</label>
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="out_patient" x-model="detailType" :disabled="!isSickLeave"> {{ __('Out Patient') }}</label>
+                                    </div>
+                                    <input type="text" name="leave_detail" value="{{ $savedDetail }}" :disabled="!isSickLeave" class="block w-full rounded-lg border-gray-200 bg-white text-sm" placeholder="{{ __('Specify illness') }}">
+                                </div>
+
+                                <div x-show="isWomenLeave" class="mt-3 space-y-3">
+                                    <p class="text-xs font-semibold text-gray-600">{{ __('In case of Special Leave Benefits for Women') }}</p>
+                                    <input type="text" name="leave_detail" value="{{ $savedDetail }}" :disabled="!isWomenLeave" class="block w-full rounded-lg border-gray-200 bg-white text-sm" placeholder="{{ __('Specify illness') }}">
+                                </div>
+
+                                <div x-show="isStudyLeave" class="mt-3 space-y-3">
+                                    <p class="text-xs font-semibold text-gray-600">{{ __('In case of Study Leave') }}</p>
+                                    <div class="grid gap-2 sm:grid-cols-2">
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="masters_degree" x-model="detailType" :disabled="!isStudyLeave"> {{ __("Completion of Master's Degree") }}</label>
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="board_review" x-model="detailType" :disabled="!isStudyLeave"> {{ __('BAR/Board Examination Review') }}</label>
+                                    </div>
+                                </div>
+
+                                <x-input-error class="mt-2" :messages="$errors->get('leave_detail_type')" />
+                                <x-input-error class="mt-2" :messages="$errors->get('leave_detail')" />
+                            </div>
+
                         </div>
 
                         <!-- Date Range -->
@@ -176,6 +240,17 @@
                                 </label>
                             </div>
                             <x-input-error class="mt-2" :messages="$errors->get('is_paid')" />
+                        </div>
+
+                        <!-- Commutation -->
+                        <div>
+                            <span class="block text-sm font-medium text-gray-700">{{ __('Commutation') }}</span>
+                            @php($commutation = old('commutation_requested', $leaf->commutation_requested === null ? '1' : ($leaf->commutation_requested ? '1' : '0')))
+                            <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <label class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold"><input type="radio" name="commutation_requested" value="0" {{ (string) $commutation === '0' ? 'checked' : '' }}> {{ __('Not Requested') }}</label>
+                                <label class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold"><input type="radio" name="commutation_requested" value="1" {{ (string) $commutation === '1' ? 'checked' : '' }}> {{ __('Requested') }}</label>
+                            </div>
+                            <x-input-error class="mt-2" :messages="$errors->get('commutation_requested')" />
                         </div>
 
                         <!-- Reason -->

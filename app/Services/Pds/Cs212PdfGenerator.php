@@ -17,7 +17,7 @@ class Cs212PdfGenerator
 
     public function printPage1(Employee $employee, bool $showGuide = false): Response
     {
-        $employee->load(['user', 'pdsPersonal']);
+        $employee->loadMissing(['user', 'pdsPersonal']);
 
         $pdf = $this->buildPage1Calibration($employee, $showGuide);
         $personal = $employee->pdsPersonal;
@@ -154,7 +154,7 @@ class Cs212PdfGenerator
 
     public function download(Employee $employee, string $disposition = 'attachment'): Response
     {
-        $employee->load([
+        $employee->loadMissing([
             'user',
             'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation',
             'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks',
@@ -294,10 +294,10 @@ class Cs212PdfGenerator
         $this->writeAt($pdf, $m['weight']['x'], $m['weight']['y'], $m['weight']['w'], PdsFormatter::val($p?->weight_kg));
         $this->writeAt($pdf, $m['blood_type']['x'], $m['blood_type']['y'], $m['blood_type']['w'], PdsFormatter::val($p?->blood_type));
         $this->writeAt($pdf, $m['gsis']['x'], $m['gsis']['y'], $m['gsis']['w'], PdsFormatter::val($p?->gsis_id_no));
-        $this->writeAt($pdf, $m['pagibig']['x'], $m['pagibig']['y'], $m['pagibig']['w'], PdsFormatter::val($p?->pagibig_id_no));
-        $this->writeAt($pdf, $m['philhealth']['x'], $m['philhealth']['y'], $m['philhealth']['w'], PdsFormatter::val($p?->philhealth_no));
-        $this->writeAt($pdf, $m['sss']['x'], $m['sss']['y'], $m['sss']['w'], PdsFormatter::val($p?->sss_no));
-        $this->writeAt($pdf, $m['tin']['x'], $m['tin']['y'], $m['tin']['w'], PdsFormatter::val($p?->tin_no));
+        $this->writeAt($pdf, $m['pagibig']['x'], $m['pagibig']['y'], $m['pagibig']['w'], PdsFormatter::pagibigIdNo($p?->pagibig_id_no));
+        $this->writeAt($pdf, $m['philhealth']['x'], $m['philhealth']['y'], $m['philhealth']['w'], PdsFormatter::philhealthNo($p?->philhealth_no));
+        $this->writeAt($pdf, $m['sss']['x'], $m['sss']['y'], $m['sss']['w'], PdsFormatter::sssNo($p?->sss_no));
+        $this->writeAt($pdf, $m['tin']['x'], $m['tin']['y'], $m['tin']['w'], PdsFormatter::tinNo($p?->tin_no));
         $this->writeAt($pdf, $m['agency_employee']['x'], $m['agency_employee']['y'], $m['agency_employee']['w'], PdsFormatter::val($p?->agency_employee_no));
 
         $citizenship = PdsFormatter::val($p?->citizenship, 'Filipino');

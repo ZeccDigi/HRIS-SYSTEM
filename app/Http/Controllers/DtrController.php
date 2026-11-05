@@ -4,7 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Imports\AttendanceImport;
 use App\Models\DtrRecord;
+use App\Models\Holiday;
+use App\Models\LeaveRequest;
+use App\Models\TravelOrder;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
+use Illuminate\Support\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -77,6 +82,11 @@ class DtrController extends Controller
                 ->pluck('employment_status');
 
             $dtrRecords = DtrRecord::whereDate('date', $selectedDate)->get()->groupBy('employee_id');
+            $approvedEvents = $this->approvedAttendanceEvents(
+                Carbon::parse($selectedDate),
+                Carbon::parse($selectedDate),
+                $employees->pluck('id')->all()
+            );
 
             $stats = [
                 'scanned' => 0,
@@ -88,26 +98,31 @@ class DtrController extends Controller
                 'total' => $employees->count(),
             ];
 
-            $attendanceRecords = $employees->map(function ($employee) use ($dtrRecords, &$stats) {
+            $attendanceRecords = $employees->map(function ($employee) use ($dtrRecords, $approvedEvents, $selectedDate, &$stats) {
                 $record = $dtrRecords->get($employee->id)?->first();
+                $approvedEvent = $approvedEvents->get($employee->id . '|' . $selectedDate);
 
                 $timeIn = $record?->time_in;
                 $amOut = $record?->am_out;
                 $pmIn = $record?->pm_in;
                 $timeOut = $record?->time_out;
-                $remarks = $record?->status ?? '';
+                $remarks = $approvedEvent['remarks'] ?? ($record?->status ?? '');
 
-                $status = 'Not Yet In';
-                $lateMinutes = 0;
-                $undertimeMinutes = 0;
-                $hoursWorked = '0.00';
+                $hasScan = $timeIn || $amOut || $pmIn || $timeOut;
+                $lateMinutes = $this->lateMinutes($record);
+                $workedMinutes = $this->actualWorkedMinutes($record);
+                $undertimeMinutes = $this->undertimeMinutes($record);
+                $hoursWorked = number_format($workedMinutes / 60, 2);
 
-                if ($timeIn) {
+                if ($approvedEvent) {
+                    $status = $approvedEvent['status'];
+                    $lateMinutes = 0;
+                    $undertimeMinutes = 0;
+                    $hoursWorked = number_format($workedMinutes / 60, 2);
+                } elseif ($hasScan) {
                     $stats['scanned']++;
-                    $carbonIn = Carbon::parse($timeIn);
 
-                    if ($carbonIn->format('H:i:s') > '08:00:00') {
-                        $lateMinutes = $carbonIn->diffInMinutes(Carbon::parse('08:00:00'));
+                    if ($lateMinutes > 0) {
                         $status = 'Late';
                         $stats['late']++;
                     } else {
@@ -116,30 +131,13 @@ class DtrController extends Controller
                     }
 
                     if ($timeOut) {
-                        $status = 'Completed';
-                        $carbonOut = Carbon::parse($timeOut);
-
-                        if ($carbonOut->format('H:i:s') < '17:00:00') {
-                            $undertimeMinutes = Carbon::parse('17:00:00')->diffInMinutes($carbonOut);
-                        }
-
-                        $minutes = 0;
-                        if ($amOut && $pmIn) {
-                            $minutes += $carbonIn->diffInMinutes(Carbon::parse($amOut));
-                            $minutes += Carbon::parse($pmIn)->diffInMinutes($carbonOut);
-                        } else {
-                            $minutes = $carbonIn->diffInMinutes($carbonOut);
-                            if ($minutes > 240) {
-                                $minutes -= 60; // Lunch break deduction
-                            }
-                        }
-
-                        $hoursWorked = number_format($minutes / 60, 2);
+                        $status = $lateMinutes > 0 ? 'Late' : 'Completed';
                         $stats['completed']++;
                     } else {
                         $stats['in_office']++;
                     }
                 } else {
+                    $status = $approvedEvent['status'] ?? 'Not Yet In';
                     $stats['no_record']++;
                 }
 
@@ -151,6 +149,7 @@ class DtrController extends Controller
                     'time_out' => $timeOut,
                     'status' => $status,
                     'remarks' => $remarks,
+                    'approved_absence' => $approvedEvent !== null,
                     'hours_worked' => $hoursWorked,
                     'late_minutes' => $lateMinutes,
                     'undertime_minutes' => $undertimeMinutes,
@@ -196,11 +195,11 @@ class DtrController extends Controller
                             $employee->division ?? 'N/A',
                             $employee->position ?? 'N/A',
                             $employee->employment_status ?? 'N/A',
-                            $item['time_in'] ? Carbon::parse($item['time_in'])->format('h:i A') : 'N/A',
-                            $item['time_out'] ? Carbon::parse($item['time_out'])->format('h:i A') : 'N/A',
+                            $item['time_in'] ? Carbon::parse($item['time_in'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A'),
+                            $item['time_out'] ? Carbon::parse($item['time_out'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A'),
                             $item['hours_worked'],
-                            $item['late_minutes'] ?: 0,
-                            $item['undertime_minutes'] ?: 0,
+                            number_format((float) ($item['late_minutes'] ?: 0), 3, '.', ''),
+                            number_format((float) ($item['undertime_minutes'] ?: 0), 3, '.', ''),
                             $item['status'],
                             $item['remarks'] ?: 'N/A',
                         ]);
@@ -248,16 +247,20 @@ class DtrController extends Controller
 
         $dtrRecords = $query->orderBy('date')->orderBy('time_in')->get();
 
-        $actualMinutes = $dtrRecords->sum(function ($record) {
-            if (! $record->time_in || ! $record->time_out) {
-                return 0;
-            }
+        $attendanceEventsByDate = collect();
+        if (isset($employee) && $employee) {
+            $monthStart = Carbon::create($selectedYear, $selectedMonth, 1)->startOfDay();
+            $monthEnd = $monthStart->copy()->endOfMonth();
+            $attendanceEventsByDate = $this->approvedAttendanceEvents($monthStart, $monthEnd, [$employee->id])
+                ->mapWithKeys(function (array $event, string $key) {
+                    return [substr($key, strpos($key, '|') + 1) => $event];
+                });
+        }
 
-            return Carbon::parse($record->time_in)->diffInMinutes(Carbon::parse($record->time_out));
-        });
+        $actualMinutes = $dtrRecords->sum(fn ($record) => $this->actualWorkedMinutes($record));
 
         $lateRecords = $dtrRecords
-            ->filter(fn ($record) => strtolower((string) $record->status) === 'late')
+            ->filter(fn ($record) => $this->lateMinutes($record) > 0)
             ->values();
 
         $selectedDate = Carbon::create($selectedYear, $selectedMonth, 1);
@@ -276,7 +279,237 @@ class DtrController extends Controller
 
         $isPersonal = $personalOnly;
 
-        return view('dtr.index', compact('dtrRecords', 'isPersonal', 'selectedMonth', 'selectedYear', 'dtrSummary', 'lateRecords'));
+        return view('dtr.index', compact(
+            'dtrRecords',
+            'isPersonal',
+            'selectedMonth',
+            'selectedYear',
+            'dtrSummary',
+            'lateRecords',
+            'attendanceEventsByDate'
+        ));
+    }
+
+    /**
+     * Return approved leave and travel-authority events keyed by employee ID and date.
+     * Biometric punches remain untouched; these values are presentation-only DTR remarks.
+     */
+    private function approvedAttendanceEvents(Carbon $start, Carbon $end, array $employeeIds): Collection
+    {
+        if ($employeeIds === []) {
+            return collect();
+        }
+
+        $events = collect();
+        $holidayDates = Holiday::query()
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->pluck('date')
+            ->mapWithKeys(fn ($date) => [Carbon::parse($date)->toDateString() => true]);
+
+        $leaves = LeaveRequest::query()
+            ->with('leaveType:id,name')
+            ->where('status', 'approved')
+            ->whereIn('employee_id', $employeeIds)
+            ->whereDate('start_date', '<=', $end->toDateString())
+            ->whereDate('end_date', '>=', $start->toDateString())
+            ->get();
+
+        foreach ($leaves as $leave) {
+            $leaveLabel = $this->leaveDtrLabel($leave->leaveType?->name);
+            $rangeStart = Carbon::parse($leave->start_date)->max($start);
+            $rangeEnd = Carbon::parse($leave->end_date)->min($end);
+
+            foreach (CarbonPeriod::create($rangeStart, $rangeEnd) as $date) {
+                $dateKey = $date->toDateString();
+                if ($date->isWeekend() || $holidayDates->has($dateKey)) {
+                    continue;
+                }
+
+                $this->addAttendanceEvent(
+                    $events,
+                    (int) $leave->employee_id,
+                    $dateKey,
+                    $leaveLabel,
+                    $leaveLabel,
+                    strtoupper($leaveLabel)
+                );
+            }
+        }
+
+        $travelOrders = TravelOrder::query()
+            ->with('companions:id')
+            ->where('status', 'approved')
+            ->whereDate('travel_date_start', '<=', $end->toDateString())
+            ->whereDate('travel_date_end', '>=', $start->toDateString())
+            ->where(function ($query) use ($employeeIds) {
+                $query->whereIn('employee_id', $employeeIds)
+                    ->orWhereHas('companions', fn ($companions) => $companions->whereIn('employees.id', $employeeIds));
+            })
+            ->get();
+
+        foreach ($travelOrders as $travelOrder) {
+            $coveredEmployeeIds = collect([(int) $travelOrder->employee_id])
+                ->merge($travelOrder->companions->pluck('id')->map(fn ($id) => (int) $id))
+                ->intersect($employeeIds)
+                ->unique();
+            $rangeStart = Carbon::parse($travelOrder->travel_date_start)->max($start);
+            $rangeEnd = Carbon::parse($travelOrder->travel_date_end)->min($end);
+
+            foreach ($coveredEmployeeIds as $employeeId) {
+                foreach (CarbonPeriod::create($rangeStart, $rangeEnd) as $date) {
+                    $this->addAttendanceEvent(
+                        $events,
+                        $employeeId,
+                        $date->toDateString(),
+                        'TA',
+                        'TA',
+                        'TA'
+                    );
+                }
+            }
+        }
+
+        return $events;
+    }
+
+    private function leaveDtrLabel(?string $leaveType): string
+    {
+        $abbreviation = match ($leaveType) {
+            'Vacation Leave' => 'VL',
+            'Mandatory/Force Leave' => 'MFL',
+            'Sick Leave' => 'SL',
+            'Maternity Leave' => 'ML',
+            'Paternity Leave' => 'PL',
+            'Special Privilege Leave' => 'SPL',
+            'Solo Parent Leave' => 'Solo PL',
+            'Study Leave' => 'Study L',
+            'VAWC Leave' => 'VAWC',
+            'Rehabilitation Leave' => 'RL',
+            'Special Leave Benefits for Women' => 'SLBW',
+            'Special Emergency (Calamity) Leave' => 'SECL',
+            'Adoption Leave' => 'AL',
+            'Wellness Leave' => 'WL',
+            default => 'Approved',
+        };
+
+        return $abbreviation . ' Leave';
+    }
+
+    private function addAttendanceEvent(
+        Collection $events,
+        int $employeeId,
+        string $date,
+        string $status,
+        string $remarks,
+        string $printLabel
+    ): void {
+        $key = $employeeId . '|' . $date;
+        $existing = $events->get($key);
+
+        if (! $existing) {
+            $events->put($key, [
+                'status' => $status,
+                'remarks' => $remarks,
+                'print_label' => $printLabel,
+            ]);
+
+            return;
+        }
+
+        $events->put($key, [
+            'status' => $existing['status'] . ' / ' . $status,
+            'remarks' => $existing['remarks'] . '; ' . $remarks,
+            'print_label' => $existing['print_label'] . ' / ' . $printLabel,
+        ]);
+    }
+
+    private function actualWorkedMinutes(?DtrRecord $record): int
+    {
+        if (! $record) {
+            return 0;
+        }
+
+        $minutes = 0;
+
+        if ($record->time_in && $record->am_out) {
+            $minutes += Carbon::parse($record->time_in)->diffInMinutes(Carbon::parse($record->am_out));
+        }
+
+        if ($record->pm_in && $record->time_out) {
+            $minutes += Carbon::parse($record->pm_in)->diffInMinutes(Carbon::parse($record->time_out));
+        }
+
+        if ($minutes === 0 && $record->time_in && $record->time_out) {
+            $minutes = Carbon::parse($record->time_in)->diffInMinutes(Carbon::parse($record->time_out));
+
+            if ($minutes > 240) {
+                $minutes -= 60;
+            }
+        }
+
+        return max(0, $minutes);
+    }
+
+    private function lateMinutes(?DtrRecord $record): int
+    {
+        if (! $record) {
+            return 0;
+        }
+
+        $minutes = 0;
+
+        if ($record->time_in) {
+            $minutes += $this->minutesAfterExpectedIn($record->time_in, '08:00:00');
+        }
+
+        if ($record->pm_in) {
+            $minutes += $this->minutesAfterExpectedIn($record->pm_in, '13:00:00');
+        }
+
+        return $minutes;
+    }
+
+    private function undertimeMinutes(?DtrRecord $record): int
+    {
+        if (! $record) {
+            return 0;
+        }
+
+        $minutes = 0;
+
+        if ($record->am_out) {
+            $minutes += $this->minutesBeforeExpectedOut($record->am_out, '12:00:00');
+        }
+
+        if ($record->time_out) {
+            $minutes += $this->minutesBeforeExpectedOut($record->time_out, '17:00:00');
+        }
+
+        return $minutes;
+    }
+
+    private function minutesAfterExpectedIn(string $time, string $expectedIn): int
+    {
+        $actual = Carbon::parse($time);
+        $expected = Carbon::parse($expectedIn);
+
+        if ($actual->format('H:i:s') <= $expected->format('H:i:s')) {
+            return 0;
+        }
+
+        return $expected->diffInMinutes($actual);
+    }
+
+    private function minutesBeforeExpectedOut(string $time, string $expectedOut): int
+    {
+        $actual = Carbon::parse($time);
+        $expected = Carbon::parse($expectedOut);
+
+        if ($actual->format('H:i:s') >= $expected->format('H:i:s')) {
+            return 0;
+        }
+
+        return $actual->diffInMinutes($expected);
     }
 
     public function syncFromFile(): RedirectResponse

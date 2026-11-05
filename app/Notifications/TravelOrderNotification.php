@@ -41,7 +41,7 @@ class TravelOrderNotification extends Notification
             'title' => $this->title,
             'message' => $this->message,
             'travel_order_id' => $this->travelOrder->id,
-            'action_url' => str_contains(strtolower($this->title), 'acknowledgement')
+            'action_url' => str_contains(strtolower($this->title), 'acknowledgement') || str_starts_with(strtolower($this->title), 'tar')
                 ? route('travel-orders.ar.show', $this->travelOrder->id)
                 : route('travel-orders.show', $this->travelOrder->id),
             'icon' => 'travel',

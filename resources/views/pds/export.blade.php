@@ -99,15 +99,15 @@
         </tr>
         <tr>
             <td class="label">PAG-IBIG ID NO.</td>
-            <td class="value">{{ $employee->pdsPersonal->pagibig_id_no ?? '---' }}</td>
+            <td class="value">{{ \App\Support\PdsFormatter::pagibigIdNo($employee->pdsPersonal?->pagibig_id_no, '---') }}</td>
             <td class="label">PHILHEALTH NO.</td>
-            <td class="value">{{ $employee->pdsPersonal->philhealth_no ?? '---' }}</td>
+            <td class="value">{{ \App\Support\PdsFormatter::philhealthNo($employee->pdsPersonal?->philhealth_no, '---') }}</td>
         </tr>
         <tr>
             <td class="label">SSS NO.</td>
-            <td class="value">{{ $employee->pdsPersonal->sss_no ?? '---' }}</td>
+            <td class="value">{{ \App\Support\PdsFormatter::sssNo($employee->pdsPersonal?->sss_no, '---') }}</td>
             <td class="label">TIN NO.</td>
-            <td class="value">{{ $employee->pdsPersonal->tin_no ?? '---' }}</td>
+            <td class="value">{{ \App\Support\PdsFormatter::tinNo($employee->pdsPersonal?->tin_no, '---') }}</td>
         </tr>
         <tr>
             <td class="label">RESIDENTIAL ADDRESS</td>

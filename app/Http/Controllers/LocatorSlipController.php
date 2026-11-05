@@ -3,17 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Listeners\AuditLogListener;
+use App\Models\Employee;
 use App\Models\LocatorSlip;
 use App\Models\User;
 use App\Notifications\LocatorSlipNotification;
+use App\Notifications\LocatorSlipQrReadyNotification;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
 
 class LocatorSlipController extends Controller
 {
+    private const MAX_LOCATOR_SLIP_HOURS = 8;
+
     public function index(Request $request)
     {
         $employee = Auth::user()->employee;
@@ -46,8 +51,12 @@ class LocatorSlipController extends Controller
             $this->filterLocatorSlips($employeeLocatorQuery, $search, $type, $status, $year),
             'latest'
         )
-            ->get()
-            ->map(fn (LocatorSlip $locatorSlip) => $this->appendQrMetadata($locatorSlip));
+            ->paginate(5)
+            ->withQueryString();
+
+        $locatorSlips->getCollection()->transform(
+            fn (LocatorSlip $locatorSlip) => $this->appendQrMetadata($locatorSlip)
+        );
 
         $latestRejectedRemark = LocatorSlip::query()
             ->where('employee_id', $employee->id)
@@ -106,9 +115,7 @@ class LocatorSlipController extends Controller
             'status' => 'pending',
         ]);
 
-        $chiefs = User::whereHas('employee', function ($query) {
-            $query->where('account_role', 'CHIEF');
-        })->get();
+        $chiefs = $this->chiefUsersForEmployee(Auth::user()->employee);
 
         foreach ($chiefs as $chief) {
             $chief->notify(new LocatorSlipNotification(
@@ -137,7 +144,7 @@ class LocatorSlipController extends Controller
         $year = (string) $request->query('year', now()->year);
 
         $allLocatorSlips = $this->sortLocatorSlips($this->filterLocatorSlips(
-            LocatorSlip::with('employee')->whereIn('status', ['approved', 'rejected', 'approved by chief']),
+            $this->scopeLocatorSlipsForRole(LocatorSlip::with('employee')->whereIn('status', ['approved', 'rejected', 'approved by chief'])),
             $search,
             $type,
             $status,
@@ -186,7 +193,7 @@ class LocatorSlipController extends Controller
     {
         $user = Auth::user();
 
-        if (strtolower($user->role) === 'chief' && $locatorSlip->status === 'pending') {
+        if (strtolower($user->role) === 'chief' && $locatorSlip->status === 'pending' && $this->chiefCanReviewEmployee($locatorSlip->employee)) {
             $validated = request()->validate([
                 'remarks' => 'nullable|string|max:1000',
             ]);
@@ -206,6 +213,8 @@ class LocatorSlipController extends Controller
                 'Your locator slip for ' . $locatorSlip->date_covered . ' has been approved.'
             ));
 
+            $this->sendApprovedLocatorQrEmail($locatorSlip);
+
             AuditLogListener::logActivity(
                 'Approve Locator Slip',
                 'Attendance',
@@ -221,7 +230,9 @@ class LocatorSlipController extends Controller
 
     public function reject(Request $request, LocatorSlip $locatorSlip)
     {
-        if (strtolower(Auth::user()->role) !== 'chief' || strtolower((string) $locatorSlip->status) !== 'pending') {
+        if (strtolower(Auth::user()->role) !== 'chief'
+            || strtolower((string) $locatorSlip->status) !== 'pending'
+            || ! $this->chiefCanReviewEmployee($locatorSlip->employee)) {
             abort(403);
         }
 
@@ -257,6 +268,10 @@ class LocatorSlipController extends Controller
 
         $locatorSlip->load('employee');
 
+        if (strtolower(Auth::user()->role) === 'chief' && ! $this->chiefCanReviewEmployee($locatorSlip->employee)) {
+            abort(403);
+        }
+
         return view('locator-slip.hr.show', compact('locatorSlip'));
     }
 
@@ -268,6 +283,12 @@ class LocatorSlipController extends Controller
 
         $locatorSlip = $this->appendQrMetadata($locatorSlip->load('employee'));
 
+        if (Auth::user()->employee?->id !== $locatorSlip->employee_id
+            && strtolower(Auth::user()->role) === 'chief'
+            && ! $this->chiefCanReviewEmployee($locatorSlip->employee)) {
+            abort(403);
+        }
+
         return view('locator-slip.show', compact('locatorSlip'));
     }
 
@@ -278,6 +299,12 @@ class LocatorSlipController extends Controller
         }
 
         $locatorSlip->load('employee.user');
+
+        if (Auth::user()->employee?->id !== $locatorSlip->employee_id
+            && strtolower(Auth::user()->role) === 'chief'
+            && ! $this->chiefCanReviewEmployee($locatorSlip->employee)) {
+            abort(403);
+        }
 
         return view('locator-slip.print', compact('locatorSlip'));
     }
@@ -333,11 +360,29 @@ class LocatorSlipController extends Controller
 
         if (! $locatorSlip->time_from) {
             $locatorSlip->time_from = $now->format('H:i:s');
+            $locatorSlip->out_scanned_at = $now;
             $locatorSlip->save();
 
-            $message = 'OUT time recorded successfully.';
+            $returnDeadline = $now->copy()->addHours(self::MAX_LOCATOR_SLIP_HOURS);
+            $message = 'OUT time recorded successfully. Please scan again to record your IN time on or before '
+                .$returnDeadline->format('h:i A').'.';
             $status = 'success';
         } elseif (! $locatorSlip->time_to) {
+            $outAt = $locatorSlip->out_scanned_at
+                ? $locatorSlip->out_scanned_at->copy()
+                : Carbon::parse($locatorSlip->date_covered->format('Y-m-d').' '.$locatorSlip->time_from);
+            $returnDeadline = $outAt->copy()->addHours(self::MAX_LOCATOR_SLIP_HOURS);
+
+            if ($now->gt($returnDeadline)) {
+                return response()->view('locator-slip.scan', [
+                    'title' => 'Locator Slip QR',
+                    'message' => 'The 8-hour return window expired at '.$returnDeadline->format('h:i A')
+                        .'. IN time was not recorded. Please contact HR for assistance.',
+                    'status' => 'warning',
+                    'locatorSlip' => $locatorSlip->fresh()->load('employee'),
+                ], 422);
+            }
+
             $locatorSlip->time_to = $now->format('H:i:s');
             $locatorSlip->save();
 
@@ -358,7 +403,7 @@ class LocatorSlipController extends Controller
 
     private function getPendingLocatorSlips(string $sort = 'latest', string $search = '', string $type = '', string $status = '', string $year = '')
     {
-        $query = LocatorSlip::with('employee');
+        $query = $this->scopeLocatorSlipsForRole(LocatorSlip::with('employee'));
         $query->where('status', 'pending');
 
         if ($status !== '' && $status !== 'pending') {
@@ -367,6 +412,49 @@ class LocatorSlipController extends Controller
 
         return $this->sortLocatorSlips($this->filterLocatorSlips($query, $search, $type, '', $year), $sort)
             ->get();
+    }
+
+    private function scopeLocatorSlipsForRole($query)
+    {
+        if (strtolower(Auth::user()->role ?? '') !== 'chief') {
+            return $query;
+        }
+
+        $division = $this->currentChiefDivision();
+
+        if ($division === '') {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas('employee', fn ($employeeQuery) => $employeeQuery->where('division', $division));
+    }
+
+    private function chiefUsersForEmployee(?Employee $employee)
+    {
+        $division = trim((string) $employee?->division);
+
+        if ($division === '') {
+            return collect();
+        }
+
+        return User::whereHas('employee', function ($query) use ($division) {
+            $query
+                ->whereIn('account_role', ['chief', 'CHIEF'])
+                ->where('division', $division);
+        })->get();
+    }
+
+    private function chiefCanReviewEmployee(?Employee $employee): bool
+    {
+        $chiefDivision = $this->currentChiefDivision();
+        $employeeDivision = trim((string) $employee?->division);
+
+        return $chiefDivision !== '' && $employeeDivision !== '' && strcasecmp($chiefDivision, $employeeDivision) === 0;
+    }
+
+    private function currentChiefDivision(): string
+    {
+        return trim((string) Auth::user()?->employee?->division);
     }
 
     private function filterLocatorSlips($query, string $search, string $type, string $status, string $year = '')
@@ -402,6 +490,7 @@ class LocatorSlipController extends Controller
                     }
                 });
             })
+            ->when($status === 'pending', fn ($query) => $query->where('status', 'pending'))
             ->when($status === 'approved', fn ($query) => $query->whereIn('status', ['approved', 'approved by chief']))
             ->when($status === 'rejected', fn ($query) => $query->where('status', 'rejected'))
             ->when($year !== '', fn ($query) => $query->whereYear('date_covered', $year));
@@ -454,6 +543,30 @@ class LocatorSlipController extends Controller
         return $locatorSlip;
     }
 
+    private function sendApprovedLocatorQrEmail(LocatorSlip $locatorSlip): void
+    {
+        $locatorSlip = $this->appendQrMetadata($locatorSlip->fresh(['employee.user']));
+        $user = $locatorSlip->employee?->user;
+
+        if (! $user || ! $locatorSlip->employee?->notification_email) {
+            return;
+        }
+
+        try {
+            $user->notify(new LocatorSlipQrReadyNotification(
+                $locatorSlip,
+                $locatorSlip->qr_svg,
+                $this->buildQrPngData($locatorSlip->scan_url)
+            ));
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to send approved locator slip QR email.', [
+                'locator_slip_id' => $locatorSlip->id,
+                'employee_id' => $locatorSlip->employee_id,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+    }
+
     private function buildQrSvg(string $value): ?string
     {
         $barcodeClass = base_path('vendor/tecnickcom/tcpdf/tcpdf_barcodes_2d.php');
@@ -469,6 +582,40 @@ class LocatorSlipController extends Controller
 
             return $barcode->getBarcodeSVGCode(5, 5, 'black');
         } catch (\Throwable $exception) {
+            return null;
+        }
+    }
+
+    private function buildQrPngData(?string $value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        $barcodeClass = base_path('vendor/tecnickcom/tcpdf/tcpdf_barcodes_2d.php');
+
+        if (! file_exists($barcodeClass)) {
+            return null;
+        }
+
+        require_once $barcodeClass;
+
+        try {
+            $barcode = new \TCPDF2DBarcode($value, 'QRCODE,H');
+            $png = $barcode->getBarcodePngData(8, 8, [0, 0, 0]);
+
+            if ($png instanceof \Imagick) {
+                $png->setImageFormat('png');
+
+                return $png->getImagesBlob();
+            }
+
+            return is_string($png) ? $png : null;
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to generate locator slip QR PNG.', [
+                'message' => $exception->getMessage(),
+            ]);
+
             return null;
         }
     }

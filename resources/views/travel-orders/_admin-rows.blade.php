@@ -40,9 +40,7 @@
             $computedTarStatus = 'not_applicable';
         }
 
-        $acknowledgementReportUrl = $order->tar_attachment_path
-            ? route('travel-orders.ar.file', $order)
-            : route('travel-orders.ar.print', $order);
+        $acknowledgementReportUrl = route('travel-orders.ar.show', $order);
 
         $recordsOfficerName = $order->recordsOfficer
             ? trim(
@@ -282,78 +280,13 @@
                         rel="noopener"
                         data-no-transition
                         class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-700 transition hover:bg-blue-50 hover:text-blue-900"
-                        title="{{ __('View Acknowledgement Report') }}"
-                        aria-label="{{ __('View Acknowledgement Report') }}"
+                        title="{{ __('View TAR') }}"
+                        aria-label="{{ __('View TAR') }}"
                     >
                         <i class="fa-solid fa-file-circle-check text-sm"></i>
                     </a>
                 @endif
 
-                @if(
-                    ($actionMode ?? 'view') === 'review' &&
-                    ($canRecordsReview || $canDirectorReview)
-                )
-                    <form
-                        action="{{ route('travel-orders.update-status', $order->id) }}"
-                        method="POST"
-                        id="travelApproveForm_{{ $order->id }}"
-                        class="m-0 flex h-8 w-8 items-center justify-center"
-                    >
-                        @csrf
-                        @method('PUT')
-
-                        <input
-                            type="hidden"
-                            name="status"
-                            value="approved"
-                        >
-
-                        <button
-                            type="button"
-                            onclick="openTravelApproveModal({{ $order->id }}, @js($taNumber))"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 transition hover:bg-green-50 hover:text-green-800"
-                            title="{{ __('Approve') }}"
-                            aria-label="{{ __('Approve travel authority') }}"
-                        >
-                            <i class="fa-solid fa-check text-sm"></i>
-                        </button>
-                    </form>
-
-                    <form
-                        action="{{ route('travel-orders.update-status', $order->id) }}"
-                        method="POST"
-                        id="travelRejectForm_{{ $order->id }}"
-                        class="m-0 flex h-8 w-8 items-center justify-center"
-                    >
-                        @csrf
-                        @method('PUT')
-
-                        <input
-                            type="hidden"
-                            name="status"
-                            value="rejected"
-                        >
-
-                        <input
-                            type="hidden"
-                            name="remarks"
-                            id="travelRejectRemarks_{{ $order->id }}"
-                            value=""
-                        >
-
-                        <button
-                            type="button"
-                            onclick="submitTravelReject(this)"
-                            data-travel-id="{{ $order->id }}"
-                            data-travel-title="{{ $taNumber }}"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-800"
-                            title="{{ __('Reject') }}"
-                            aria-label="{{ __('Reject travel authority') }}"
-                        >
-                            <i class="fa-solid fa-xmark text-sm"></i>
-                        </button>
-                    </form>
-                @endif
             </div>
         </td>
     </tr>

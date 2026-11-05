@@ -32,6 +32,7 @@ class AnnouncementController extends Controller
         $mine = $request->boolean('mine');
         $categories = ['General', 'Meeting', 'Memo', 'Training', 'Workshop', 'Office Orders', 'Advisory'];
         $years = Announcement::query()
+            ->visibleTo($request->user())
             ->latest()
             ->get(['created_at'])
             ->map(fn ($announcement) => (int) $announcement->created_at->format('Y'))
@@ -78,6 +79,7 @@ class AnnouncementController extends Controller
     private function announcementIndexQuery(?string $search, string $status, string $category, int $year, string $month, bool $mine, string $sort)
     {
         $query = Announcement::with('author.employee')
+            ->visibleTo(auth()->user())
             ->when($search, function ($query, $search) {
                 $query->where(function ($innerQuery) use ($search) {
                     $innerQuery
@@ -115,6 +117,7 @@ class AnnouncementController extends Controller
         $sort = $request->query('sort', 'latest');
         $month = preg_match('/^\d{4}-\d{2}$/', $month) ? $month : 'all';
         $months = Announcement::published()
+            ->visibleTo($request->user())
             ->latest()
             ->get(['created_at'])
             ->map(fn ($announcement) => [
@@ -126,6 +129,7 @@ class AnnouncementController extends Controller
 
         $announcements = Announcement::with('author.employee')
             ->published()
+            ->visibleTo($request->user())
             ->when($search, function ($query, $search) {
                 $query->where(function ($innerQuery) use ($search) {
                     $innerQuery
@@ -167,6 +171,8 @@ class AnnouncementController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->ensureCanCreateAnnouncement($request);
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'content' => 'required|string',
@@ -182,12 +188,16 @@ class AnnouncementController extends Controller
 
         $announcement = new Announcement($validated);
         $announcement->author_id = auth()->id();
+        if ($this->isChief($request->user())) {
+            $announcement->tags = 'Office Orders';
+            $announcement->audience_division = trim((string) $request->user()->employee?->division);
+        }
         $announcement->is_published = true;
         $announcement->published_at = Carbon::now();
 
         $announcement->save();
 
-        Notification::send(User::all(), new NewAnnouncementNotification($announcement));
+        Notification::send($this->announcementRecipients($announcement), new NewAnnouncementNotification($announcement));
 
         AuditLogListener::logActivity(
             'Post Announcement',
@@ -205,6 +215,8 @@ class AnnouncementController extends Controller
      */
     public function show(Announcement $announcement): View
     {
+        $this->ensureCanViewAnnouncement($announcement);
+
         if (!$announcement->is_published && !in_array(auth()->user()->role, ['admin', 'hrstaff'])) {
             abort(403, 'Unauthorized access to draft announcements.');
         }
@@ -214,6 +226,8 @@ class AnnouncementController extends Controller
 
     public function attachment(Announcement $announcement): BinaryFileResponse
     {
+        $this->ensureCanViewAnnouncement($announcement);
+
         if (!$announcement->attachment_path || !Storage::disk('public')->exists($announcement->attachment_path)) {
             abort(404);
         }
@@ -228,6 +242,8 @@ class AnnouncementController extends Controller
      */
     public function edit(Announcement $announcement): View
     {
+        $this->ensureCanManageAnnouncement($announcement);
+
         return view('announcements.edit', compact('announcement'));
     }
 
@@ -236,6 +252,8 @@ class AnnouncementController extends Controller
      */
     public function update(Request $request, Announcement $announcement): RedirectResponse
     {
+        $this->ensureCanManageAnnouncement($announcement);
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'content' => 'required|string',
@@ -256,6 +274,10 @@ class AnnouncementController extends Controller
         unset($validated['attachment']);
 
         $announcement->fill($validated);
+        if ($this->isChief($request->user())) {
+            $announcement->tags = 'Office Orders';
+            $announcement->audience_division = trim((string) $request->user()->employee?->division);
+        }
         $announcement->is_published = true;
 
         if ($announcement->is_published && !$was_published) {
@@ -267,7 +289,7 @@ class AnnouncementController extends Controller
         $announcement->save();
 
         if ($announcement->is_published && !$was_published) {
-            Notification::send(User::all(), new NewAnnouncementNotification($announcement));
+            Notification::send($this->announcementRecipients($announcement), new NewAnnouncementNotification($announcement));
         }
 
         AuditLogListener::logActivity(
@@ -286,6 +308,8 @@ class AnnouncementController extends Controller
      */
     public function destroy(Announcement $announcement): RedirectResponse
     {
+        $this->ensureCanManageAnnouncement($announcement);
+
         if ($announcement->attachment_path) {
             Storage::disk('public')->delete($announcement->attachment_path);
         }
@@ -301,5 +325,43 @@ class AnnouncementController extends Controller
 
         return redirect()->route('announcements.index')
             ->with('success', 'Announcement deleted successfully.');
+    }
+
+    private function isChief(?User $user): bool
+    {
+        return strtolower((string) $user?->role) === 'chief';
+    }
+
+    private function ensureCanCreateAnnouncement(Request $request): void
+    {
+        if ($this->isChief($request->user()) && trim((string) $request->user()->employee?->division) === '') {
+            abort(422, 'A Chief must have an assigned division before posting an announcement.');
+        }
+    }
+
+    private function ensureCanViewAnnouncement(Announcement $announcement): void
+    {
+        abort_unless($announcement->isVisibleTo(auth()->user()), 403);
+    }
+
+    private function ensureCanManageAnnouncement(Announcement $announcement): void
+    {
+        $user = auth()->user();
+        $role = strtolower((string) $user?->role);
+        $canManage = in_array($role, ['admin', 'hrstaff', 'regionaldirector'], true)
+            || ($role === 'chief' && $announcement->author_id === $user?->id);
+
+        abort_unless($canManage, 403);
+    }
+
+    private function announcementRecipients(Announcement $announcement)
+    {
+        if (! $announcement->audience_division) {
+            return User::all();
+        }
+
+        return User::query()
+            ->whereHas('employee', fn ($query) => $query->where('division', $announcement->audience_division))
+            ->get();
     }
 }

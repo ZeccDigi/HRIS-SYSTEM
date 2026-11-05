@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::post('password/otp', [PasswordController::class, 'sendOtp'])->name('password.otp.send');
 
     Route::put('password', [PasswordController::class, 'update'])->name('password.update');
+    Route::put('password/confirm-otp', [PasswordController::class, 'confirm'])->name('password.confirm-otp');
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');

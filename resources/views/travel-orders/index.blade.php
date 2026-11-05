@@ -5,8 +5,8 @@
         $currentYear = now()->year;
     @endphp
 
-    <div class="py-10" x-data="travelAuthorityPage()" x-init="init()">
-        <div class="mx-auto w-full max-w-[95rem] px-4 sm:px-6 lg:px-8">
+    <div class="px-1 py-3 sm:px-2 lg:px-3" x-data="travelAuthorityPage()" x-init="init()">
+        <div class="w-full">
             @if(session('success'))
                 <div class="mb-4 rounded-xl border-l-4 border-green-500 bg-green-100 px-4 py-3 text-sm text-green-700">
                     {{ session('success') }}
@@ -39,26 +39,27 @@
                 </div>
             </div>
 
+            <section class="rounded-2xl border border-slate-100 bg-white p-2 shadow-sm sm:p-3">
             {{-- Tabs styled like the Leave blade --}}
-            <div class="mb-6 border-b border-gray-200">
+            <div class="mb-3 border-b border-gray-200 px-1">
                 <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                     <button
                         type="button"
-                        @click="tab = 'my'; applyFilters()"
+                        @click="setTab('my')"
                         :class="tab === 'my'
                             ? 'border-blue-500 text-blue-600'
                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-                        class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-bold uppercase tracking-widest transition-colors duration-200"
+                        class="whitespace-nowrap border-b-2 px-1 py-3 text-sm font-bold uppercase tracking-widest transition-colors duration-200"
                     >
                         {{ __('My TA') }}
                     </button>
                     <button
                         type="button"
-                        @click="tab = 'tagged'; applyFilters()"
+                        @click="setTab('tagged')"
                         :class="tab === 'tagged'
                             ? 'border-blue-500 text-blue-600'
                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-                        class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-bold uppercase tracking-widest transition-colors duration-200"
+                        class="whitespace-nowrap border-b-2 px-1 py-3 text-sm font-bold uppercase tracking-widest transition-colors duration-200"
                     >
                         {{ __('Tagged') }}
                     </button>
@@ -66,8 +67,8 @@
             </div>
 
             {{-- Search and filters kept on one line --}}
-            <div class="mb-4 flex w-full flex-nowrap items-center gap-2 overflow-x-auto rounded-xl border border-gray-100 bg-gray-50/70 p-2">
-                <div class="relative min-w-[280px] flex-1">
+            <div class="mb-3 flex w-full flex-nowrap items-center gap-2">
+                <div class="relative min-w-0 flex-1">
                     <label for="travel_authority_search" class="sr-only">{{ __('Search travel authorities') }}</label>
                     <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,7 +78,7 @@
                     <input id="travel_authority_search" type="search" x-model="search" @input.debounce.200ms="applyFilters()" placeholder="{{ __('Search TA no., destination, or approver...') }}" class="block h-9 w-full rounded-lg border-gray-300 pl-10 pr-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                 </div>
 
-                <div class="w-44 shrink-0">
+                <div class="w-40 shrink-0">
                     <label for="travel_authority_status" class="sr-only">{{ __('Filter by status') }}</label>
                     <select id="travel_authority_status" x-model="status" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         <option value="">{{ __('Status') }}</option>
@@ -87,7 +88,7 @@
                     </select>
                 </div>
 
-                <div class="w-44 shrink-0">
+                <div class="w-40 shrink-0">
                     <label for="travel_authority_month" class="sr-only">{{ __('Filter by month') }}</label>
                     <select id="travel_authority_month" x-model="month" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         <option value="">{{ __('Months') }}</option>
@@ -111,19 +112,29 @@
                 </button>
             </div>
 
-            <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                <div class="overflow-x-auto">
-                    <table class="min-w-full table-fixed border-collapse text-left">
-                        <thead class="bg-gray-50">
+            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div>
+                    <table class="w-full table-fixed border-collapse text-left">
+                        <colgroup>
+                            <col class="w-[13%]">
+                            <col class="w-[14%]">
+                            <col class="w-[13%]">
+                            <col class="w-[10%]">
+                            <col class="w-[10%]">
+                            <col class="w-[12%]">
+                            <col class="w-[11%]">
+                            <col class="w-[17%]">
+                        </colgroup>
+                        <thead class="bg-slate-50">
                             <tr>
-                                <th class="w-[10%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('TA Stamp') }}</th>
-                                <th class="w-[12%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Date of Travel') }}</th>
-                                <th class="w-[20%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Destination') }}</th>
-                                <th class="w-[22%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Records Officer') }}</th>
-                                <th class="w-[22%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Regional Director') }}</th>
-                                <th class="w-[10%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('AR Deadline') }}</th>
-                                <th class="w-[8%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('AR Status') }}</th>
-                                <th class="w-[7%] px-3 py-3 text-center text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Actions') }}</th>
+                                <th class="px-2 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TA Stamp') }}</th>
+                                <th class="px-2 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Date of Travel') }}</th>
+                                <th class="px-2 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Destination') }}</th>
+                                <th class="px-2 py-3 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Records Officer') }}</th>
+                                <th class="px-2 py-3 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Regional Director') }}</th>
+                                <th class="px-2 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TAR Deadline') }}</th>
+                                <th class="px-2 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TAR Status') }}</th>
+                                <th class="px-2 py-3 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 bg-white">
@@ -135,8 +146,7 @@
                                 ];
                             @endphp
 
-                            @foreach (['my' => $myTravelOrders, 'tagged' => $taggedTravelOrders] as $section => $orders)
-                                @forelse ($orders as $order)
+                                @forelse ($travelOrders as $order)
                                     @php
                                         $recordStatus = strtolower((string) ($order->recordofficer_status ?: 'pending'));
                                         $rdStatus = strtolower((string) ($order->rd_status ?: 'pending'));
@@ -165,9 +175,28 @@
                                         ])));
 
                                         $taNumber = $order->ta_number ?: 'TA-' . optional($order->created_at)->format('Y-m-d') . '-' . str_pad((string) $order->id, 3, '0', STR_PAD_LEFT);
-                                        $acknowledgementReportUrl = $order->tar_attachment_path
-                                            ? route('travel-orders.ar.file', $order)
-                                            : route('travel-orders.ar.print', $order);
+                                        $acknowledgementReportUrl = route('travel-orders.ar.show', $order);
+                                        $dmwParticipantNames = collect([$order->employee])
+                                            ->merge($order->companions)
+                                            ->filter()
+                                            ->map(fn ($participant) => trim(($participant->firstname ?? '') . ' ' . ($participant->middlename ?? '') . ' ' . ($participant->lastname ?? '') . ' ' . ($participant->suffix ?? '')))
+                                            ->filter()
+                                            ->implode(', ');
+                                        $arDefaults = [
+                                            'activity' => $order->tar_activity ?: $order->purpose,
+                                            'activity_date' => $order->tar_activity_date?->format('Y-m-d') ?: $order->travel_date_end?->format('Y-m-d'),
+                                            'venue' => $order->tar_venue ?: $order->places_of_travel,
+                                            'participants_present' => $order->tar_participants_present ?: '',
+                                            'dmw_participants' => $order->tar_dmw_participants ?: $dmwParticipantNames,
+                                            'objectives' => $order->tar_objectives ?: '',
+                                            'highlights' => $order->tar_highlights ?: '',
+                                            'results' => $order->tar_results ?: '',
+                                            'recommendations' => $order->tar_recommendations ?: '',
+                                            'commitments' => $order->tar_commitments ?: '',
+                                            'attachments' => $order->tar_attachments ?: [],
+                                            'other_attachment' => $order->tar_other_attachment ?: '',
+                                            'remarks' => $order->tar_remarks ?: '',
+                                        ];
                                         $previewPayload = [
                                             'title' => $taNumber,
                                             'date' => $order->created_at?->format('M d, Y') ?? 'N/A',
@@ -186,32 +215,32 @@
                                     <tr
                                         class="transition hover:bg-blue-50/40"
                                         data-ta-row
-                                        data-tab="{{ $section }}"
+                                        data-tab="{{ $tab }}"
                                         data-search="{{ $searchText }}"
                                         data-status="{{ $mainStatus }}"
                                         data-year="{{ $order->created_at?->year ?? $currentYear }}"
                                         data-month="{{ $order->travel_date_start?->format('m') ?? '' }}"
                                     >
-                                        <td class="px-3 py-3 align-top text-xs font-bold text-gray-900 break-words">{{ $taNumber }}</td>
-                                        <td class="px-3 py-3 align-top text-xs text-gray-700">
+                                        <td class="px-2 py-2.5 align-middle text-xs font-bold text-gray-900 break-words">{{ $taNumber }}</td>
+                                        <td class="px-2 py-2.5 align-middle text-xs text-gray-700">
                                             <div class="leading-5">{{ $order->travel_date_start?->format('M d, Y') }}</div>
                                             @if($order->travel_date_end && $order->travel_date_end->ne($order->travel_date_start))
                                                 <div class="leading-5">{{ $order->travel_date_end->format('M d, Y') }}</div>
                                             @endif
                                         </td>
-                                        <td class="px-3 py-3 align-top text-xs font-semibold text-gray-900 break-words">{{ $order->places_of_travel }}</td>
-                                        <td class="px-3 py-3 align-top">
+                                        <td class="px-2 py-2.5 align-middle text-xs font-semibold text-gray-900 break-words">{{ $order->places_of_travel }}</td>
+                                        <td class="px-2 py-2.5 align-middle">
                                             <div class="flex justify-center">
-                                                <span class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($recordStatus) }}" title="Records Officer: {{ ucfirst($recordStatus) }}"></span>
+                                                <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($recordStatus) }}" title="Records Officer: {{ ucfirst($recordStatus) }}"></span>
                                             </div>
                                         </td>
-                                        <td class="px-3 py-3 align-top">
+                                        <td class="px-2 py-2.5 align-middle">
                                             <div class="flex justify-center">
-                                                <span class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($rdStatus) }}" title="Regional Director: {{ ucfirst($rdStatus) }}"></span>
+                                                <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($rdStatus) }}" title="Regional Director: {{ ucfirst($rdStatus) }}"></span>
                                             </div>
                                         </td>
-                                        <td class="px-3 py-3 align-top text-xs text-gray-700">{{ $tarDeadline?->format('M d, Y') ?? __('N/A') }}</td>
-                                        <td class="px-3 py-3 align-top text-xs font-semibold">
+                                        <td class="px-2 py-2.5 align-middle text-xs text-gray-700">{{ $tarDeadline?->format('M d, Y') ?? __('N/A') }}</td>
+                                        <td class="px-2 py-2.5 align-middle text-xs font-semibold">
                                             @if($computedTarStatus === 'submitted')
                                                 <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">
                                                     <i class="fa-solid fa-file-lines"></i>
@@ -231,7 +260,7 @@
                                                 </span>
                                             @endif
                                         </td>
-                                        <td class="px-3 py-3 text-center align-top">
+                                        <td class="px-2 py-2.5 text-center align-middle">
                                             <div class="mx-auto grid w-fit grid-cols-2 place-items-center gap-x-2 gap-y-1">
                                                 <a href="{{ route('travel-orders.show', $order) }}" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition hover:bg-indigo-50 hover:text-indigo-900" title="{{ __('View') }}">
                                                     <i class="fa-solid fa-eye text-sm"></i>
@@ -240,12 +269,12 @@
                                                     <i class="fa-solid fa-print text-sm"></i>
                                                 </a>
                                                 @if($computedTarStatus === 'submitted')
-                                                    <a href="{{ $acknowledgementReportUrl }}" target="_blank" rel="noopener" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-700 transition hover:bg-blue-50 hover:text-blue-900" title="{{ __('View Acknowledgement Report') }}" aria-label="{{ __('View Acknowledgement Report') }}">
+                                                    <a href="{{ $acknowledgementReportUrl }}" target="_blank" rel="noopener" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-700 transition hover:bg-blue-50 hover:text-blue-900" title="{{ __('View TAR') }}" aria-label="{{ __('View TAR') }}">
                                                         <i class="fa-solid fa-file-circle-check text-sm"></i>
                                                     </a>
                                                 @endif
-                                                @if($section === 'my' && $mainStatus === 'approved')
-                                                    <button type="button" @click="openTarModal('{{ route('travel-orders.submit-tar', $order) }}', '{{ $taNumber }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900" title="{{ __('Submit Acknowledgement Report') }}" aria-label="{{ __('Submit Acknowledgement Report') }}">
+                                                @if($tab === 'my' && $mainStatus === 'approved')
+                                                    <button type="button" @click='openTarModal(@js(route("travel-orders.submit-tar", $order)), @js($taNumber), @js($arDefaults))' class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900" title="{{ __('Submit TAR') }}" aria-label="{{ __('Submit TAR') }}">
                                                         <i class="fa-solid fa-file-arrow-up text-sm"></i>
                                                     </button>
                                                 @endif
@@ -253,21 +282,18 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr data-empty-row="{{ $section }}">
+                                    <tr>
                                         <td colspan="9" class="px-6 py-8 text-center text-sm text-gray-500">
-                                            {{ $section === 'my' ? __('No travel authorities found.') : __('No tagged travel authorities found.') }}
+                                            {{ $tab === 'my' ? __('No travel authorities found.') : __('No tagged travel authorities found.') }}
                                         </td>
                                     </tr>
                                 @endforelse
-                            @endforeach
-
-                            <tr x-show="noResults" style="display: none;">
-                                <td colspan="9" class="px-6 py-8 text-center text-sm text-gray-500">{{ __('No travel authorities match your current filters.') }}</td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
+                @include('partials.table-pagination', ['paginator' => $travelOrders, 'label' => __('travel authorities')])
             </div>
+            </section>
         </div>
 
         <template x-teleport="body">
@@ -329,25 +355,109 @@
             </div>
         </template>
 
-        <div x-cloak x-show="tarModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-            <div @click.away="closeTarModal()" class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-                <div class="border-b border-gray-100 px-5 py-4">
-                    <h2 class="text-sm font-black uppercase tracking-widest text-gray-900">{{ __('Submit AR') }}</h2>
-                    <p class="mt-1 text-xs text-gray-500" x-text="tarTitle"></p>
+        <div x-cloak x-show="tarModalOpen" class="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-900/60 p-3 sm:p-5" @keydown.escape.window="closeTarModal()">
+            <div @click.outside="closeTarModal()" class="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div class="flex shrink-0 items-center justify-between border-b border-blue-950 bg-blue-900 px-5 py-4 text-white">
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200">{{ __('Travel Authority Report (TAR)') }}</p>
+                        <h2 class="mt-1 text-lg font-black">{{ __('Submit TAR') }}</h2>
+                        <p class="mt-0.5 text-xs text-blue-100" x-text="tarTitle"></p>
+                    </div>
+                    <button type="button" @click="closeTarModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/15" aria-label="{{ __('Close') }}">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
                 </div>
-                <form :action="tarAction" method="POST" enctype="multipart/form-data" class="space-y-4 px-5 py-5">
+
+                <form :action="tarAction" method="POST" enctype="multipart/form-data" class="flex min-h-0 flex-1 flex-col">
                     @csrf
-                    <div>
-                        <label class="mb-1 block text-sm font-semibold text-gray-700">{{ __('Acknowledgement Report (PDF)') }}</label>
-                        <input type="file" name="tar_attachment" accept="application/pdf,.pdf" class="block w-full rounded-lg border border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50 px-5 py-5 sm:px-7">
+                        <section class="rounded-xl border border-slate-200 bg-white p-4">
+                            <h3 class="mb-4 text-xs font-black uppercase tracking-widest text-blue-900">{{ __('Activity Information') }}</h3>
+                            <div class="grid gap-4 md:grid-cols-3">
+                                <div class="md:col-span-2">
+                                    <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Activity') }} <span class="text-red-500">*</span></label>
+                                    <input type="text" name="tar_activity" x-model="tarForm.activity" required maxlength="255" class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600">
+                                </div>
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Date') }} <span class="text-red-500">*</span></label>
+                                    <input type="date" name="tar_activity_date" x-model="tarForm.activity_date" required class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600">
+                                </div>
+                                <div class="md:col-span-3">
+                                    <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Venue') }} <span class="text-red-500">*</span></label>
+                                    <input type="text" name="tar_venue" x-model="tarForm.venue" required maxlength="255" class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600">
+                                </div>
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Participants Present') }} <span class="text-red-500">*</span></label>
+                                    <textarea name="tar_participants_present" x-model="tarForm.participants_present" rows="3" required class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600"></textarea>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Participants from DMW') }} <span class="text-red-500">*</span></label>
+                                    <textarea name="tar_dmw_participants" x-model="tarForm.dmw_participants" rows="3" required class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600"></textarea>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="rounded-xl border border-slate-200 bg-white p-4">
+                            <h3 class="mb-4 text-xs font-black uppercase tracking-widest text-blue-900">{{ __('Activity Report Details') }}</h3>
+                            <div class="grid gap-4 lg:grid-cols-2">
+                                @foreach([
+                                    ['objectives', 'I. Objective/s of the Activity'],
+                                    ['highlights', 'II. Facts/Highlights of the Activity'],
+                                    ['results', 'III. Result/s of the Activity'],
+                                    ['recommendations', 'IV. Recommendations/Resolutions'],
+                                ] as [$field, $label])
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-bold text-slate-700">{{ __($label) }} <span class="text-red-500">*</span></label>
+                                        <textarea name="tar_{{ $field }}" x-model="tarForm.{{ $field }}" rows="4" required class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600"></textarea>
+                                    </div>
+                                @endforeach
+                                <div class="lg:col-span-2">
+                                    <label class="mb-1.5 block text-xs font-bold text-slate-700">{{ __('V. Commitments/Requested Action from DMW') }} <span class="text-red-500">*</span></label>
+                                    <textarea name="tar_commitments" x-model="tarForm.commitments" rows="4" required class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600"></textarea>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="rounded-xl border border-slate-200 bg-white p-4">
+                            <h3 class="mb-3 text-xs font-black uppercase tracking-widest text-blue-900">{{ __('VI. Attachments (check applicable)') }}</h3>
+                            <div class="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                                @foreach([
+                                    'photo_documentation' => 'Photo documentation',
+                                    'lecture_materials' => 'Lecture material/s',
+                                    'activity_materials' => 'Activity material/s',
+                                    'certificate' => 'Certificate of participation/attendance',
+                                    'program_flow' => 'Program flow',
+                                    'others' => 'Others (specify)',
+                                ] as $value => $label)
+                                    <label class="flex items-start gap-2 text-sm text-slate-700">
+                                        <input type="checkbox" name="tar_attachments[]" value="{{ $value }}" x-model="tarForm.attachments" class="mt-0.5 rounded border-slate-300 text-blue-900 focus:ring-blue-600">
+                                        <span>{{ __($label) }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            <div x-show="tarForm.attachments.includes('others')" class="mt-3" x-cloak>
+                                <input type="text" name="tar_other_attachment" x-model="tarForm.other_attachment" :required="tarForm.attachments.includes('others')" maxlength="255" placeholder="{{ __('Specify other attachment') }}" class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600">
+                            </div>
+                        </section>
+
+                        <section class="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2">
+                            <div>
+                                <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Supporting PDF (optional)') }}</label>
+                                <input type="file" name="tar_attachment" accept="application/pdf,.pdf" class="block w-full rounded-lg border border-slate-300 bg-white text-sm shadow-sm file:mr-3 file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:font-semibold">
+                            </div>
+                            <div>
+                                <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Remarks (optional)') }}</label>
+                                <textarea name="tar_remarks" x-model="tarForm.remarks" rows="2" class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600"></textarea>
+                            </div>
+                        </section>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-semibold text-gray-700">{{ __('Remarks') }}</label>
-                        <textarea name="tar_remarks" rows="3" class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
-                    </div>
-                    <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
-                        <button type="button" @click="closeTarModal()" class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">{{ __('Cancel') }}</button>
-                        <button type="submit" class="inline-flex items-center rounded-lg bg-blue-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-800">{{ __('Submit AR') }}</button>
+
+                    <div class="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-white px-5 py-3 sm:px-7">
+                        <button type="button" @click="closeTarModal()" class="inline-flex min-w-28 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-black uppercase tracking-wider text-slate-700 transition hover:bg-slate-50">{{ __('Cancel') }}</button>
+                        <button type="submit" class="inline-flex min-w-40 items-center justify-center gap-2 rounded-lg bg-blue-900 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white transition hover:bg-blue-800">
+                            <i class="fa-solid fa-paper-plane"></i>
+                            {{ __('Submit TAR') }}
+                        </button>
                     </div>
                 </form>
             </div>
@@ -481,11 +591,11 @@
     <script>
         function travelAuthorityPage() {
             return {
-                tab: 'my',
-                search: '',
-                status: '',
-                month: '',
-                year: '{{ $currentYear }}',
+                tab: @js($tab),
+                search: @js($search),
+                status: @js($status),
+                month: @js($month),
+                year: @js((string) $year),
                 rows: [],
                 noResults: false,
                 createModalOpen: false,
@@ -504,37 +614,45 @@
                 tarModalOpen: false,
                 tarAction: '',
                 tarTitle: '',
+                tarForm: {
+                    activity: '', activity_date: '', venue: '', participants_present: '', dmw_participants: '',
+                    objectives: '', highlights: '', results: '', recommendations: '', commitments: '',
+                    attachments: [], other_attachment: '', remarks: '',
+                },
                 init() {
                     this.rows = Array.from(document.querySelectorAll('[data-ta-row]'));
+                },
+                setTab(tab) {
+                    this.tab = tab;
                     this.applyFilters();
                 },
                 applyFilters() {
-                    const search = this.search.trim().toLowerCase();
-                    let visible = 0;
+                    const url = new URL(@js(route('travel-orders.index')));
 
-                    this.rows.forEach((row) => {
-                        const matches = row.dataset.tab === this.tab
-                            && (!search || row.dataset.search.includes(search))
-                            && (!this.status || row.dataset.status === this.status)
-                            && (!this.month || row.dataset.month === this.month)
-                            && row.dataset.year === this.year;
+                    if (this.tab) {
+                        url.searchParams.set('tab', this.tab);
+                    }
 
-                        row.classList.toggle('hidden', !matches);
-                        if (matches) visible++;
-                    });
+                    if (this.search.trim()) {
+                        url.searchParams.set('search', this.search.trim());
+                    }
 
-                    document.querySelectorAll('[data-empty-row]').forEach((row) => {
-                        row.classList.toggle('hidden', row.dataset.emptyRow !== this.tab);
-                    });
+                    if (this.status) {
+                        url.searchParams.set('status', this.status);
+                    }
 
-                    this.noResults = this.rows.filter((row) => row.dataset.tab === this.tab).length > 0 && visible === 0;
+                    if (this.month) {
+                        url.searchParams.set('month', this.month);
+                    }
+
+                    if (this.year) {
+                        url.searchParams.set('year', this.year);
+                    }
+
+                    window.location.href = url.toString();
                 },
                 reset() {
-                    this.search = '';
-                    this.status = '';
-                    this.month = '';
-                    this.year = '{{ $currentYear }}';
-                    this.applyFilters();
+                    window.location.href = @js(route('travel-orders.index'));
                 },
                 openCreateModal(url, title) {
                     this.createModalUrl = url;
@@ -565,15 +683,34 @@
                 toggleRemarks() {
                     this.showRemarks = !this.showRemarks;
                 },
-                openTarModal(action, title) {
+                openTarModal(action, title, defaults = {}) {
                     this.tarAction = action;
                     this.tarTitle = title;
+                    this.tarForm = {
+                        activity: defaults.activity || '',
+                        activity_date: defaults.activity_date || '',
+                        venue: defaults.venue || '',
+                        participants_present: defaults.participants_present || '',
+                        dmw_participants: defaults.dmw_participants || '',
+                        objectives: defaults.objectives || '',
+                        highlights: defaults.highlights || '',
+                        results: defaults.results || '',
+                        recommendations: defaults.recommendations || '',
+                        commitments: defaults.commitments || '',
+                        attachments: Array.isArray(defaults.attachments) ? defaults.attachments : [],
+                        other_attachment: defaults.other_attachment || '',
+                        remarks: defaults.remarks || '',
+                    };
                     this.tarModalOpen = true;
+                    document.documentElement.classList.add('overflow-hidden');
+                    document.body.classList.add('overflow-hidden');
                 },
                 closeTarModal() {
                     this.tarModalOpen = false;
                     this.tarAction = '';
                     this.tarTitle = '';
+                    document.documentElement.classList.remove('overflow-hidden');
+                    document.body.classList.remove('overflow-hidden');
                 },
             };
         }

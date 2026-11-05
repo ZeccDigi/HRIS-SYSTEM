@@ -8,10 +8,10 @@
     @endphp
 
     <div
-        class="py-12"
+        class="px-1 py-3 sm:px-2 lg:px-3"
         x-data="leaveApplicationPreviewPage()"
     >
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto w-full min-w-0">
 
             @if(session('success'))
                 <div class="mb-4 rounded-lg border-l-4 border-green-500 bg-green-100 p-4 text-green-700">
@@ -58,7 +58,7 @@
                 method="GET"
                 action="{{ route('leave-applications.index') }}"
                 data-filter-url="{{ route('leave-applications.filter') }}"
-                class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/70 p-2 sm:flex-row sm:items-center"
+                class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:flex-row sm:items-center"
             >
                 {{-- Search --}}
                 <div class="relative min-w-0 sm:flex-1">
@@ -177,9 +177,9 @@
             </form>
 
             {{-- Leave applications table --}}
-            <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
                 <div class="w-full min-w-0">
-                    <table class="w-full table-fixed divide-y divide-gray-100">
+                    <table class="w-full table-fixed divide-y divide-slate-200">
                         <colgroup>
                             <col class="w-[9%]"> {{-- Date Filed --}}
     <col class="w-[15%]"> {{-- Name --}}
@@ -191,7 +191,7 @@
     <col class="w-[12%]"> {{-- Actions --}}
                         </colgroup>
 
-                        <thead class="bg-gray-50">
+                        <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                             <tr>
                                 <th
                                     scope="col"
@@ -254,7 +254,7 @@
 
                         <tbody
                             id="leaveApplicationTableBody"
-                            class="divide-y divide-gray-100 bg-white"
+                            class="divide-y divide-slate-200 bg-white"
                         >
                             @include('leaves.applications._rows', [
                                 'leaves' => $leaves,

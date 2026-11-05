@@ -660,6 +660,9 @@
     $leaveTypeLower = strtolower($leaveType);
     $reason = trim((string) $leaveRequest->reason);
     $reasonLower = strtolower($reason);
+    $detailType = trim((string) $leaveRequest->leave_detail_type);
+    $detailText = trim((string) $leaveRequest->leave_detail);
+    $hasStructuredDetail = $detailType !== '';
     $start = Carbon::parse($leaveRequest->start_date);
     $end = Carbon::parse($leaveRequest->end_date);
     $dateFiled = $leaveRequest->date_filed ? Carbon::parse($leaveRequest->date_filed)->format('F j, Y') : '';
@@ -695,10 +698,10 @@
     $check = fn (bool $condition) => $condition ? '✓' : '';
     $typeCheck = fn (string $needle) => str_contains($leaveTypeLower, $needle);
     $isVacationLike = $typeCheck('vacation') || $typeCheck('special privilege');
-    $isAbroad = str_contains($reasonLower, 'abroad');
-    $isHospital = str_contains($reasonLower, 'hospital');
-    $isMaster = str_contains($reasonLower, 'master');
-    $isBar = str_contains($reasonLower, 'bar') || str_contains($reasonLower, 'board');
+    $isAbroad = $hasStructuredDetail ? $detailType === 'abroad' : str_contains($reasonLower, 'abroad');
+    $isHospital = $hasStructuredDetail ? $detailType === 'in_hospital' : str_contains($reasonLower, 'hospital');
+    $isMaster = $hasStructuredDetail ? $detailType === 'masters_degree' : str_contains($reasonLower, 'master');
+    $isBar = $hasStructuredDetail ? $detailType === 'board_review' : (str_contains($reasonLower, 'bar') || str_contains($reasonLower, 'board'));
     $isMonetization = str_contains($reasonLower, 'monetization') || str_contains($leaveTypeLower, 'monetization');
     $isTerminal = str_contains($reasonLower, 'terminal') || str_contains($leaveTypeLower, 'terminal');
 @endphp
@@ -823,18 +826,18 @@
                     <div class="subhead">6.B DETAILS OF LEAVE</div>
                     <div class="detail-block">
                         <div class="detail-title">In case of Vacation/Special Privilege Leave:</div>
-                        <div class="detail-row"><span class="box">{{ $check($isVacationLike && ! $isAbroad) }}</span><span class="detail-text">Within the Philippines</span><span class="detail-line">{{ $isVacationLike && ! $isAbroad ? $reason : '' }}</span></div>
-                        <div class="detail-row"><span class="box">{{ $check($isVacationLike && $isAbroad) }}</span><span class="detail-text">Abroad (Specify)</span><span class="detail-line">{{ $isVacationLike && $isAbroad ? $reason : '' }}</span></div>
+                        <div class="detail-row"><span class="box">{{ $check($isVacationLike && ! $isAbroad) }}</span><span class="detail-text">Within the Philippines</span><span class="detail-line">{{ $isVacationLike && ! $isAbroad ? ($detailText ?: $reason) : '' }}</span></div>
+                        <div class="detail-row"><span class="box">{{ $check($isVacationLike && $isAbroad) }}</span><span class="detail-text">Abroad (Specify)</span><span class="detail-line">{{ $isVacationLike && $isAbroad ? ($detailText ?: $reason) : '' }}</span></div>
                     </div>
                     <div class="detail-block compact">
                         <div class="detail-title">In case of Sick Leave:</div>
-                        <div class="detail-row"><span class="box">{{ $check($isSick && $isHospital) }}</span><span class="detail-text">In Hospital (Specify Illness)</span><span class="detail-line">{{ $isSick && $isHospital ? $reason : '' }}</span></div>
-                        <div class="detail-row"><span class="box">{{ $check($isSick && ! $isHospital) }}</span><span class="detail-text">Out Patient (Specify Illness)</span><span class="detail-line">{{ $isSick && ! $isHospital ? $reason : '' }}</span></div>
+                        <div class="detail-row"><span class="box">{{ $check($isSick && $isHospital) }}</span><span class="detail-text">In Hospital (Specify Illness)</span><span class="detail-line">{{ $isSick && $isHospital ? ($detailText ?: $reason) : '' }}</span></div>
+                        <div class="detail-row"><span class="box">{{ $check($isSick && ! $isHospital) }}</span><span class="detail-text">Out Patient (Specify Illness)</span><span class="detail-line">{{ $isSick && ! $isHospital ? ($detailText ?: $reason) : '' }}</span></div>
                         <span class="full-detail-line"></span>
                     </div>
                     <div class="detail-block compact">
                         <div class="detail-title">In case of Special Leave Benefits for Women:</div>
-                        <div class="detail-row"><span class="detail-text">(Specify Illness)</span><span class="detail-line">{{ $typeCheck('women') ? $reason : '' }}</span></div>
+                        <div class="detail-row"><span class="detail-text">(Specify Illness)</span><span class="detail-line">{{ $typeCheck('women') ? ($detailText ?: $reason) : '' }}</span></div>
                         <span class="full-detail-line"></span>
                     </div>
                     <div class="detail-block compact">
@@ -867,8 +870,8 @@
                 </td>
                 <td>
                     <div>6.D&nbsp;&nbsp;COMMUTATION</div>
-                    <div class="workday-choice"><span class="box"></span>Not Requested</div>
-                    <div class="workday-choice"><span class="box">{{ $check(true) }}</span>Requested</div>
+                    <div class="workday-choice"><span class="box">{{ $check(! ($leaveRequest->commutation_requested ?? true)) }}</span>Not Requested</div>
+                    <div class="workday-choice"><span class="box">{{ $check((bool) ($leaveRequest->commutation_requested ?? true)) }}</span>Requested</div>
                     <div class="signature-block">
                         <span class="signature-line">
                         @if($signatureUrl)

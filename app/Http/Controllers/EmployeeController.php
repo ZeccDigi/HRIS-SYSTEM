@@ -6,8 +6,8 @@ use App\Listeners\AuditLogListener;
 use App\Mail\HrisAccountCreatedMail;
 use App\Models\Employee;
 use App\Models\LeaveCreditTransaction;
-use App\Models\UtilityOption;
 use App\Models\User;
+use App\Models\UtilityOption;
 use App\Support\UtilityOptionRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,23 +41,8 @@ class EmployeeController extends Controller
 
         $employees = $this->employeeIndexQuery($search, $division, $sort, $divisionOptions)->get();
         $archivedEmployees = Employee::onlyTrashed()->with('user')->latest('deleted_at')->get();
-        $pendingAccounts = User::query()
-            ->with('employee')
-            ->whereNotNull('email_verified_at')
-            ->where('is_approved', false)
-            ->where('account_status', '!=', 'disabled')
-            ->latest()
-            ->get();
 
-        $approvedAccounts = User::query()
-            ->with('employee')
-            ->whereNotNull('email_verified_at')
-            ->where('is_approved', true)
-            ->where('account_status', 'active')
-            ->latest()
-            ->get();
-
-        return view('employees.index', compact('employees', 'archivedEmployees', 'pendingAccounts', 'approvedAccounts', 'divisionOptions', 'search', 'division', 'sort'));
+        return view('employees.index', compact('employees', 'archivedEmployees', 'divisionOptions', 'search', 'division', 'sort'));
     }
 
     public function filter(Request $request)
@@ -121,13 +106,13 @@ class EmployeeController extends Controller
             'lastname' => 'required|string|max:255',
             'firstname' => 'required|string|max:255',
             'middlename' => 'nullable|string|max:255',
-            'contact_number' => 'nullable|string|max:20',
+            'contact_number' => 'required|string|max:20',
             'notification_email' => 'required|email|max:255',
             'division' => ['required', 'string', Rule::in($this->divisionOptions())],
             'position' => 'required|string|max:255',
             'account_role' => 'required|string|in:employee,hrstaff,recordofficer,chief,regionaldirector,admin',
-            'employment_status' => 'nullable|string|in:Regular,Job Order,Contract of Service',
-            'service_start_date' => 'nullable|date',
+            'employment_status' => 'required|string|in:Regular,Job Order,Contract of Service',
+            'service_start_date' => 'required|date',
             'hris_username' => ['required', 'string', 'max:64', 'regex:/^[a-z0-9._-]+$/'],
             'rfid_number' => 'nullable|string|max:255|unique:employees,rfid_number',
         ], [
@@ -293,6 +278,7 @@ class EmployeeController extends Controller
             'Work Experience' => $this->changedReviewPayload($reviews->get('Work Experience')),
             'Voluntary Work' => $this->changedReviewPayload($reviews->get('Voluntary Work')),
             'Training' => $this->changedReviewPayload($reviews->get('Training')),
+            'Other Information' => $this->changedReviewPayload($reviews->get('Other Information')),
             'Questionnaire' => $this->changedReviewPayload($reviews->get('Questionnaire')),
             'References' => $this->changedReviewPayload($reviews->get('References')),
         ];

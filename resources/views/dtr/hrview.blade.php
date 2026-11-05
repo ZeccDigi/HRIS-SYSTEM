@@ -2,7 +2,7 @@
     <x-slot name="title">{{ __('Daily Attendance Monitoring') }}</x-slot>
 
     <div
-        class="py-8"
+        class="pt-4 pb-3"
         x-data="attendanceMonitor({
             search: @js($search),
             division: @js($divisionFilter),
@@ -11,7 +11,7 @@
         })"
         x-init="init()"
     >
-        <div class="mx-auto max-w-7xl space-y-5 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-7xl space-y-4 sm:px-5 lg:px-6">
             @if(session('success'))
                 <div class="no-print rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700 shadow-sm">
                     {{ session('success') }}
@@ -46,10 +46,6 @@
                         <h1 class="text-2xl font-black tracking-tight text-slate-900">
                             {{ __('Daily Attendance Monitoring') }}
                         </h1>
-                        <p class="mt-1 flex items-center gap-2 text-sm font-medium text-slate-500">
-                            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                            <span>{{ \Carbon\Carbon::parse($selectedDate)->format('F j, Y') }}</span>
-                        </p>
                     </div>
 
                     <div class="relative w-full max-w-sm lg:ml-auto lg:w-80" @click.outside="activePicker = false">
@@ -127,45 +123,7 @@
                     </div>
                 </div>
 
-                <div class="mt-6 grid grid-cols-2 gap-5 md:grid-cols-4">
-                    <div class="flex flex-col justify-between rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm">
-                        <span class="text-[9px] font-black uppercase tracking-wider text-slate-400">
-                            {{ __('Total Employees') }}
-                        </span>
-                        <span class="mt-2 text-2xl font-black text-slate-900">
-                            {{ $stats['total'] }}
-                        </span>
-                    </div>
-
-                    <div class="flex flex-col justify-between rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm">
-                        <span class="text-[9px] font-black uppercase tracking-wider text-slate-400">
-                            {{ __('Present') }}
-                        </span>
-                        <span class="mt-2 text-2xl font-black text-emerald-600">
-                            {{ $stats['present'] }}
-                        </span>
-                    </div>
-
-                    <div class="flex flex-col justify-between rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm">
-                        <span class="text-[9px] font-black uppercase tracking-wider text-slate-400">
-                            {{ __('Late') }}
-                        </span>
-                        <span class="mt-2 text-2xl font-black text-amber-500">
-                            {{ $stats['late'] }}
-                        </span>
-                    </div>
-
-                    <div class="flex flex-col justify-between rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm">
-                        <span class="text-[9px] font-black uppercase tracking-wider text-slate-400">
-                            {{ __('Completed') }}
-                        </span>
-                        <span class="mt-2 text-2xl font-black text-blue-600">
-                            {{ $stats['completed'] }}
-                        </span>
-                    </div>
-                </div>
-
-                <div class="no-print mt-5 border-b border-slate-200 bg-slate-50/70 p-3">
+                <div class="no-print mt-4 border-b border-slate-200 bg-slate-50/70 p-3">
                     <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
                         <div class="relative min-w-0 sm:flex-1">
                             <label for="attendance_search" class="sr-only">{{ __('Search attendance records') }}</label>
@@ -216,19 +174,19 @@
                     </div>
                 </div>
 
-                <div class="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div class="overflow-x-auto">
-                        <table class="w-full border-collapse text-left text-[11px] leading-tight">
+                        <table class="w-full table-fixed border-collapse text-left text-[11px] leading-tight">
                             <thead>
                                 <tr class="border-b border-slate-200 bg-slate-50 text-[9px] font-black uppercase tracking-wider text-slate-400">
-                                    <th class="px-3 py-3">Employee</th>
-                                    <th class="px-3 py-3">Department</th>
-                                    <th class="px-3 py-3">Position</th>
-                                    <th class="px-3 py-3">AM In</th>
-                                    <th class="px-3 py-3">AM Out</th>
-                                    <th class="px-3 py-3">PM In</th>
-                                    <th class="px-3 py-3">PM Out</th>
-                                    <th class="px-3 py-3 text-center">Actions</th>
+                                    <th class="w-[24%] px-3 py-2.5">Employee</th>
+                                    <th class="w-[22%] px-3 py-2.5">Department</th>
+                                    <th class="w-[13%] px-3 py-2.5">Position</th>
+                                    <th class="w-[8%] px-3 py-2.5">AM In</th>
+                                    <th class="w-[8%] px-3 py-2.5">AM Out</th>
+                                    <th class="w-[8%] px-3 py-2.5">PM In</th>
+                                    <th class="w-[8%] px-3 py-2.5">PM Out</th>
+                                    <th class="w-[9%] px-3 py-2.5 text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 text-slate-700">
@@ -243,6 +201,8 @@
                                             $employee->position ?? '',
                                             $employee->employment_status ?? '',
                                             $employeeNumber,
+                                            $item['status'] ?? '',
+                                            $item['remarks'] ?? '',
                                         ]));
                                         $scans = [];
 
@@ -289,23 +249,25 @@
                                         data-division="{{ Str::lower($employee->division ?? 'n/a') }}"
                                         data-employment-status="{{ Str::lower($employee->employment_status ?? 'n/a') }}"
                                     >
-                                        <td class="px-3 py-3 align-top">
-                                            <div class="min-w-[12rem] max-w-[14rem] whitespace-normal break-words">
+                                        <td class="px-3 py-2.5 align-top">
+                                            <div class="max-w-[10rem] whitespace-normal break-words">
                                                 <p class="text-[11px] font-bold leading-tight text-slate-900">{{ $displayName ?: 'N/A' }}</p>
                                                 <p class="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400">{{ $employee->employment_status ?: 'N/A' }}</p>
                                             </div>
                                         </td>
-                                        <td class="px-3 py-3 align-top text-[11px] font-semibold text-slate-600">
-                                            <div class="max-w-[11rem] whitespace-normal break-words">{{ $employee->division ?: 'N/A' }}</div>
+                                        <td class="px-3 py-2.5 align-top text-[11px] font-semibold text-slate-600">
+                                            <div class="max-w-[12rem] whitespace-normal break-words">{{ $employee->division ?: 'N/A' }}</div>
                                         </td>
-                                        <td class="px-3 py-3 align-top text-[11px] font-semibold text-slate-600">
+                                        <td class="px-3 py-2.5 align-top text-[11px] font-semibold text-slate-600">
                                             <div class="max-w-[11rem] whitespace-normal break-words">{{ $employee->position ?: 'N/A' }}</div>
                                         </td>
-                                        <td class="px-3 py-3 align-top text-[11px] font-bold text-slate-900 whitespace-normal break-words">{{ $item['time_in'] ? \Carbon\Carbon::parse($item['time_in'])->format('h:i A') : 'N/A' }}</td>
-                                        <td class="px-3 py-3 align-top text-[11px] font-bold text-slate-900 whitespace-normal break-words">{{ $item['am_out'] ? \Carbon\Carbon::parse($item['am_out'])->format('h:i A') : 'N/A' }}</td>
-                                        <td class="px-3 py-3 align-top text-[11px] font-bold text-slate-900 whitespace-normal break-words">{{ $item['pm_in'] ? \Carbon\Carbon::parse($item['pm_in'])->format('h:i A') : 'N/A' }}</td>
-                                        <td class="px-3 py-3 align-top text-[11px] font-bold text-slate-900 whitespace-normal break-words">{{ $item['time_out'] ? \Carbon\Carbon::parse($item['time_out'])->format('h:i A') : 'N/A' }}</td>
-                                        <td class="px-3 py-3 text-center align-top">
+                                        <td class="px-3 py-2.5 align-top text-[11px] font-bold whitespace-normal break-words {{ ! $item['time_in'] && $item['approved_absence'] ? 'text-blue-700' : 'text-slate-900' }}">
+                                            {{ $item['time_in'] ? \Carbon\Carbon::parse($item['time_in'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A') }}
+                                        </td>
+                                        <td class="px-3 py-2.5 align-top text-[11px] font-bold whitespace-normal break-words {{ ! $item['am_out'] && $item['approved_absence'] ? 'text-blue-700' : 'text-slate-900' }}">{{ $item['am_out'] ? \Carbon\Carbon::parse($item['am_out'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A') }}</td>
+                                        <td class="px-3 py-2.5 align-top text-[11px] font-bold whitespace-normal break-words {{ ! $item['pm_in'] && $item['approved_absence'] ? 'text-blue-700' : 'text-slate-900' }}">{{ $item['pm_in'] ? \Carbon\Carbon::parse($item['pm_in'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A') }}</td>
+                                        <td class="px-3 py-2.5 align-top text-[11px] font-bold whitespace-normal break-words {{ ! $item['time_out'] && $item['approved_absence'] ? 'text-blue-700' : 'text-slate-900' }}">{{ $item['time_out'] ? \Carbon\Carbon::parse($item['time_out'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A') }}</td>
+                                        <td class="px-3 py-2.5 text-center align-top">
                                             <button
                                                 type="button"
                                                 data-scans="{{ json_encode($scans) }}"
@@ -317,8 +279,8 @@
                                                 data-rfid="{{ $employee->rfid_number ?: 'N/A' }}"
                                                 data-attendance-status="{{ $item['status'] }}"
                                                 data-hours="{{ $item['hours_worked'] }} hrs"
-                                                data-late="{{ $item['late_minutes'] > 0 ? $item['late_minutes'] . 'm' : 'N/A' }}"
-                                                data-undertime="{{ $item['undertime_minutes'] > 0 ? $item['undertime_minutes'] . 'm' : 'N/A' }}"
+                                                data-late="{{ $item['late_minutes'] > 0 ? number_format($item['late_minutes'], 3) . ' min' : 'N/A' }}"
+                                                data-undertime="{{ $item['undertime_minutes'] > 0 ? number_format($item['undertime_minutes'], 3) . ' min' : 'N/A' }}"
                                                 data-remarks="{{ $item['remarks'] ?: 'N/A' }}"
                                                 @click="
                                                     rawScans = JSON.parse($el.dataset.scans);
@@ -363,7 +325,7 @@
 
                 <div x-show="rawScansModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="rawScansModalOpen = false"></div>
-                    <div class="relative w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl flex flex-col max-h-[50vh]">
+                    <div class="relative flex max-h-[78vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
                         <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4 shrink-0">
                             <div>
                                 <h3 class="text-[9px] font-black uppercase tracking-wider text-slate-400">{{ __('Attendance Details') }}</h3>
@@ -375,7 +337,7 @@
                             </button>
                         </div>
 
-                        <div class="p-6 overflow-y-auto flex-1">
+                        <div class="flex-1 overflow-y-auto p-6">
                             <div class="space-y-5">
                                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -403,7 +365,7 @@
                                         <p class="mt-1 text-sm font-bold text-slate-900" x-text="selectedHoursWorked"></p>
                                     </div>
                                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                        <p class="text-[9px] font-black uppercase tracking-wider text-slate-400">Late</p>
+                                        <p class="text-[9px] font-black uppercase tracking-wider text-slate-400">Late Minutes</p>
                                         <p class="mt-1 text-sm font-bold text-slate-900" x-text="selectedLateMinutes"></p>
                                     </div>
                                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">

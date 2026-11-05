@@ -7,11 +7,11 @@
     @endphp
 
     <div
-        class="py-8"
+        class="px-1 py-3 sm:px-2 lg:px-3"
         x-data='manageCtoRequests(@json($tab), @json($currentYear))'
         x-init="init()"
     >
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto w-full min-w-0">
 
             {{-- Success message --}}
             @if(session('success'))
@@ -85,7 +85,7 @@
             </div>
 
             {{-- Search and filters --}}
-            <div class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/70 p-2 sm:flex-row sm:items-center">
+            <div class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:flex-row sm:items-center">
 
                 {{-- Search --}}
                 <div class="relative min-w-0 sm:flex-1">
@@ -201,9 +201,9 @@
                 x-show="tab === 'pending'"
                 x-cloak
             >
-                <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
                     <div class="w-full overflow-x-auto">
-                        <table class="w-full table-fixed divide-y divide-gray-100">
+                        <table class="w-full table-fixed divide-y divide-slate-200">
                             <colgroup>
                                 <col class="w-[11%]">
                                 <col class="w-[19%]">
@@ -215,7 +215,7 @@
                                 <col class="w-[9%]">
                             </colgroup>
 
-                            <thead class="bg-gray-50/80">
+                            <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                                 <tr>
                                     <th
                                         scope="col"
@@ -277,7 +277,7 @@
 
                             <tbody
                                 id="pendingCtoRows"
-                                class="divide-y divide-gray-100 bg-white"
+                                class="divide-y divide-slate-200 bg-white"
                             >
                                 @include('my-cto._admin-rows', [
                                     'requests' => $pendingCtoRequests,
@@ -309,9 +309,9 @@
                 x-show="tab === 'all'"
                 x-cloak
             >
-                <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
                     <div class="w-full overflow-x-auto">
-                        <table class="w-full table-fixed divide-y divide-gray-100">
+                        <table class="w-full table-fixed divide-y divide-slate-200">
                             <colgroup>
                                 <col class="w-[11%]">
                                 <col class="w-[19%]">
@@ -323,7 +323,7 @@
                                 <col class="w-[9%]">
                             </colgroup>
 
-                            <thead class="bg-gray-50/80">
+                            <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                                 <tr>
                                     <th
                                         scope="col"
@@ -385,7 +385,7 @@
 
                             <tbody
                                 id="allCtoRows"
-                                class="divide-y divide-gray-100 bg-white"
+                                class="divide-y divide-slate-200 bg-white"
                             >
                                 @include('my-cto._admin-rows', [
                                     'requests' => $allCtoRequests,

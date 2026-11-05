@@ -4,6 +4,8 @@
     @php
         $isReadOnly = $isReadOnly ?? false;
         $pdsReviewChangedInputNames = $pdsReviewChangedInputNames ?? [];
+        $selectedYear = $selectedYear ?? (int) now()->year;
+        $pdsYears = $pdsYears ?? collect([(int) now()->year]);
     @endphp
 
     <style>
@@ -66,6 +68,12 @@
     <div class="pds-line-page min-h-screen bg-slate-50 py-4" x-data="{ 
         init() {
             this.normalizeMobileNumber();
+            this.normalizePagibigIdNo();
+            this.normalizePhilhealthNo();
+            this.normalizeUmidNo();
+            this.normalizeSssNo();
+            this.normalizePhilsysNo();
+            this.normalizeTinNo();
         },
         tab: @js($initialTab),
         children: {{ $employee->pdsChildren->count() > 0 ? $employee->pdsChildren->toJson() : '[{fullname: \'\', date_of_birth: \'\'}]' }},
@@ -89,6 +97,12 @@
             perm_zip_code: @js(old('personal.perm_zip_code', $employee->pdsPersonal?->perm_zip_code))
         },
         mobile_no: @js(old('personal.mobile_no', $employee->pdsPersonal?->mobile_no)),
+        umid_no: @js(old('personal.umid_no', \App\Support\PdsFormatter::umidNo($employee->pdsPersonal?->umid_no, ''))),
+        pagibig_id_no: @js(old('personal.pagibig_id_no', \App\Support\PdsFormatter::pagibigIdNo($employee->pdsPersonal?->pagibig_id_no, ''))),
+        philhealth_no: @js(old('personal.philhealth_no', \App\Support\PdsFormatter::philhealthNo($employee->pdsPersonal?->philhealth_no, ''))),
+        sss_no: @js(old('personal.sss_no', \App\Support\PdsFormatter::sssNo($employee->pdsPersonal?->sss_no, ''))),
+        philsys_no: @js(old('personal.philsys_no', \App\Support\PdsFormatter::philsysNo($employee->pdsPersonal?->philsys_no, ''))),
+        tin_no: @js(old('personal.tin_no', \App\Support\PdsFormatter::tinNo($employee->pdsPersonal?->tin_no, ''))),
         locationOptions: {
             regions: @js($locationOptionSets['ph_regions']),
             provinces: @js($locationOptionSets['ph_provinces']),
@@ -167,6 +181,74 @@
         normalizeMobileNumber() {
             this.mobile_no = this.formatMobileNumber(this.mobile_no);
         },
+        formatUmidNo(value) {
+            const digits = String(value || '').replace(/\D/g, '').slice(0, 12);
+            const first = digits.slice(0, 4);
+            const second = digits.slice(4, 11);
+            const third = digits.slice(11, 12);
+
+            return [first, second, third].filter(Boolean).join('-');
+        },
+        normalizeUmidNo() {
+            this.umid_no = this.formatUmidNo(this.umid_no);
+        },
+        formatPagibigIdNo(value) {
+            const digits = String(value || '').replace(/\D/g, '').slice(0, 12);
+            const first = digits.slice(0, 4);
+            const second = digits.slice(4, 8);
+            const third = digits.slice(8, 12);
+
+            return [first, second, third].filter(Boolean).join('-');
+        },
+        normalizePagibigIdNo() {
+            this.pagibig_id_no = this.formatPagibigIdNo(this.pagibig_id_no);
+        },
+        formatPhilhealthNo(value) {
+            const digits = String(value || '').replace(/\D/g, '').slice(0, 12);
+            const first = digits.slice(0, 2);
+            const second = digits.slice(2, 11);
+            const third = digits.slice(11, 12);
+
+            return [first, second, third].filter(Boolean).join('-');
+        },
+        normalizePhilhealthNo() {
+            this.philhealth_no = this.formatPhilhealthNo(this.philhealth_no);
+        },
+        formatSssNo(value) {
+            const digits = String(value || '').replace(/\D/g, '').slice(0, 10);
+            const first = digits.slice(0, 2);
+            const second = digits.slice(2, 9);
+            const third = digits.slice(9, 10);
+
+            return [first, second, third].filter(Boolean).join('-');
+        },
+        normalizeSssNo() {
+            this.sss_no = this.formatSssNo(this.sss_no);
+        },
+        formatPhilsysNo(value) {
+            const digits = String(value || '').replace(/\D/g, '').slice(0, 16);
+            const first = digits.slice(0, 4);
+            const second = digits.slice(4, 8);
+            const third = digits.slice(8, 12);
+            const fourth = digits.slice(12, 16);
+
+            return [first, second, third, fourth].filter(Boolean).join('-');
+        },
+        normalizePhilsysNo() {
+            this.philsys_no = this.formatPhilsysNo(this.philsys_no);
+        },
+        formatTinNo(value) {
+            const digits = String(value || '').replace(/\D/g, '').slice(0, 12);
+            const first = digits.slice(0, 3);
+            const second = digits.slice(3, 6);
+            const third = digits.slice(6, 9);
+            const fourth = digits.slice(9, 12);
+
+            return [first, second, third, fourth].filter(Boolean).join('-');
+        },
+        normalizeTinNo() {
+            this.tin_no = this.formatTinNo(this.tin_no);
+        },
         signaturePreview: @js($employee->effective_signature_url),
         photoPreview: @js($employee->profile_picture_url)
     }">
@@ -181,19 +263,29 @@
                             {{ __('Back') }}
                         </a>
                     @else
-                        <a href="{{ route('employees.show', $employee) }}" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-indigo-600">
+                        <a href="{{ route('employees.show', ['employee' => $employee, 'tab' => 'pds']) }}" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-indigo-600">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
                             </svg>
                             {{ __('Back') }}
                         </a>
                     @endif
-                    <div class="flex flex-wrap gap-2">
-                        <a href="{{ route('pds.download') }}" data-no-transition class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-white px-4 text-xs font-black uppercase tracking-widest text-indigo-700 ring-1 ring-indigo-100 hover:bg-indigo-50">Download PDF</a>
+                    <div class="flex flex-wrap items-center gap-2">
+                        @unless($isReadOnly)
+                            <div class="flex h-11 items-center gap-2">
+                                <label for="pds_record_year" class="text-[10px] font-black uppercase tracking-widest text-slate-400">{{ __('Year') }}</label>
+                                <select id="pds_record_year" onchange="window.location.href = @js(route('pds.print')) + '?year=' + this.value" class="h-11 w-28 rounded-lg border-gray-100 bg-indigo-50/60 px-3 text-sm font-bold text-slate-700 shadow-sm outline-none focus:border-indigo-500 focus:ring-indigo-500">
+                                    @foreach($pdsYears as $pdsYear)
+                                        <option value="{{ $pdsYear }}" @selected((int) $selectedYear === (int) $pdsYear)>{{ $pdsYear }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endunless
+                        <a href="{{ route('pds.download', ['year' => $selectedYear]) }}" data-no-transition class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-white px-4 text-xs font-black uppercase tracking-widest text-indigo-700 ring-1 ring-indigo-100 hover:bg-indigo-50">Download PDF</a>
                         {{--
                         <a href="{{ route('pds.download-excel') }}" data-no-transition class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-white px-4 text-xs font-black uppercase tracking-widest text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-50">Download Excel</a>
                         --}}
-                        <a href="{{ route('pds.print') }}" data-no-transition target="_blank" rel="noopener noreferrer" class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-indigo-700 px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-800">Preview PDS</a>
+                        <a href="{{ route('pds.print', ['year' => $selectedYear]) }}" data-no-transition target="_blank" rel="noopener noreferrer" class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-indigo-700 px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-800">Preview PDS</a>
                     </div>
                 </div>
                 <div>
@@ -389,12 +481,12 @@
                                     <!-- IDs 10-15 -->
                                     <div class="col-span-full border-t border-slate-100 pt-4">
                                         <div class="pds-field-table pds-field-table-4">
-                                        <div class="space-y-1"><x-input-label value="UMID ID NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[umid_no]" :value="old('personal.umid_no', $employee->pdsPersonal?->umid_no)" /></div>
-                                        <div class="space-y-1"><x-input-label value="PAG-IBIG ID NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[pagibig_id_no]" :value="old('personal.pagibig_id_no', $employee->pdsPersonal?->pagibig_id_no)" /></div>
-                                        <div class="space-y-1"><x-input-label value="PHILHEALTH NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[philhealth_no]" :value="old('personal.philhealth_no', $employee->pdsPersonal?->philhealth_no)" /></div>
-                                        <div class="space-y-1"><x-input-label value="SSS NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[sss_no]" :value="old('personal.sss_no', $employee->pdsPersonal?->sss_no)" /></div>
-                                        <div class="space-y-1"><x-input-label value="PhilSys No. (PSN)" class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[philsys_no]" :value="old('personal.philsys_no', $employee->pdsPersonal?->philsys_no)" /></div>
-                                        <div class="space-y-1"><x-input-label value="TIN NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[tin_no]" :value="old('personal.tin_no', $employee->pdsPersonal?->tin_no)" /></div>
+                                        <div class="space-y-1"><x-input-label value="UMID ID NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[umid_no]" x-model="umid_no" @input="umid_no = formatUmidNo($event.target.value)" placeholder="0000-0000000-0" inputmode="numeric" maxlength="14" /></div>
+                                        <div class="space-y-1"><x-input-label value="PAG-IBIG ID NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[pagibig_id_no]" x-model="pagibig_id_no" @input="pagibig_id_no = formatPagibigIdNo($event.target.value)" placeholder="0000-0000-0000" inputmode="numeric" maxlength="14" /></div>
+                                        <div class="space-y-1"><x-input-label value="PHILHEALTH NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[philhealth_no]" x-model="philhealth_no" @input="philhealth_no = formatPhilhealthNo($event.target.value)" placeholder="01-234567890-1" inputmode="numeric" maxlength="14" /></div>
+                                        <div class="space-y-1"><x-input-label value="SSS NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[sss_no]" x-model="sss_no" @input="sss_no = formatSssNo($event.target.value)" placeholder="00-0000000-0" inputmode="numeric" maxlength="12" /></div>
+                                        <div class="space-y-1"><x-input-label value="PhilSys No. (PSN)" class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[philsys_no]" x-model="philsys_no" @input="philsys_no = formatPhilsysNo($event.target.value)" placeholder="0000-0000-0000-0000" inputmode="numeric" maxlength="19" /></div>
+                                        <div class="space-y-1"><x-input-label value="TIN NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[tin_no]" x-model="tin_no" @input="tin_no = formatTinNo($event.target.value)" placeholder="000-000-000-000" inputmode="numeric" maxlength="15" /></div>
                                             <div class="space-y-1"><x-input-label value="AGENCY EMPLOYEE NO." class="text-[9px] font-black text-gray-400" /><x-text-input class="w-full text-xs font-bold border-gray-100" name="personal[agency_employee_no]" :value="old('personal.agency_employee_no', $employee->pdsPersonal?->agency_employee_no)" /></div>
                                         </div>
                                     </div>

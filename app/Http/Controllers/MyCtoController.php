@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Listeners\AuditLogListener;
+use App\Models\Employee;
 use App\Models\User;
 use App\Notifications\CtoRequestNotification;
 use Carbon\Carbon;
@@ -17,16 +18,51 @@ use Illuminate\View\View;
 
 class MyCtoController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $employee = auth()->user()->employee;
         if (! $employee) {
             abort(404, 'Employee record not found.');
         }
 
-        $ctoRequests = $employee->ctoRequests()->with(['chief', 'hrstaff', 'regionalDirector'])->latest()->get();
+        $search = trim((string) $request->query('search', ''));
+        $year = (string) $request->query('year', now()->year);
+        $type = (string) $request->query('type', '');
+        $status = (string) $request->query('status', '');
 
-        return view('my-cto.index', compact('employee', 'ctoRequests'));
+        $typeOptions = $employee->ctoRequests()
+            ->get()
+            ->pluck('type_label')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        $ctoRequests = $employee->ctoRequests()
+            ->with(['chief', 'hrstaff', 'regionalDirector'])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query
+                        ->where('type', 'like', "%{$search}%")
+                        ->orWhere('purpose', 'like', "%{$search}%")
+                        ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhere('date_start', 'like', "%{$search}%");
+                });
+            })
+            ->when($type !== '', function ($query) use ($type) {
+                if (str_contains($type, 'earn')) {
+                    $query->where('type', 'earn');
+                } elseif (str_contains($type, 'use')) {
+                    $query->where('type', 'use');
+                }
+            })
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($year !== '', fn ($query) => $query->whereYear('created_at', $year))
+            ->latest()
+            ->paginate(5)
+            ->withQueryString();
+
+        return view('my-cto.index', compact('employee', 'ctoRequests', 'typeOptions', 'search', 'year', 'type', 'status'));
     }
 
     public function create(): View
@@ -153,6 +189,12 @@ class MyCtoController extends Controller
 
         $ctoRequest->load(['employee', 'chief', 'hrstaff', 'regionalDirector']);
 
+        if ($ctoRequest->employee_id !== $employee?->id
+            && strtolower(auth()->user()->role ?? '') === 'chief'
+            && ! $this->chiefCanReviewEmployee($ctoRequest->employee)) {
+            abort(403);
+        }
+
         return view('my-cto.show', compact('ctoRequest'));
     }
 
@@ -167,7 +209,21 @@ class MyCtoController extends Controller
 
         $ctoRequest->load(['employee.user', 'chief', 'hrstaff', 'regionalDirector']);
 
+        if ($ctoRequest->employee_id !== $employee?->id
+            && strtolower(auth()->user()->role ?? '') === 'chief'
+            && ! $this->chiefCanReviewEmployee($ctoRequest->employee)) {
+            abort(403);
+        }
+
         return view('my-cto.print', compact('ctoRequest'));
+    }
+
+    private function chiefCanReviewEmployee(?Employee $employee): bool
+    {
+        $chiefDivision = trim((string) auth()->user()?->employee?->division);
+        $employeeDivision = trim((string) $employee?->division);
+
+        return $chiefDivision !== '' && $employeeDivision !== '' && strcasecmp($chiefDivision, $employeeDivision) === 0;
     }
 
     private function validateCtoDates(string $startDate, string $endDate): void

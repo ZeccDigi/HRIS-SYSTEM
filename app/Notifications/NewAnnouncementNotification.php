@@ -37,10 +37,10 @@ class NewAnnouncementNotification extends Notification
     {
         return [
             'type' => 'announcement',
-            'title' => 'Official Announcement',
+            'title' => $this->announcement->tags === 'Office Orders' ? 'Office Order' : 'Official Announcement',
             'message' => "{$this->announcement->author->name} posted a new announcement: {$this->announcement->title}",
             'announcement_id' => $this->announcement->id,
-            'action_url' => route('announcements.view'),
+            'action_url' => route('announcements.show', $this->announcement),
             'icon' => 'announcement',
         ];
     }

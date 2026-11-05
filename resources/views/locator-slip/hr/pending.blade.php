@@ -39,13 +39,6 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" onclick="event.stopPropagation()">
                                     <div class="flex items-center gap-3">
                                         <a href="{{ route('hr.locator-slips.show', $slip->id) }}" class="text-indigo-600 hover:text-indigo-900 font-bold uppercase tracking-wider text-xs"> <i class="fa-solid fa-eye"></i></a>
-                                        @if(strtolower(Auth::user()->role) === 'chief')
-                                            <form action="{{ route('locator-slips.approve', $slip->id) }}" method="POST" class="inline">
-                                                @csrf
-                                                @method('PATCH')
-                                                <button type="submit" class="text-green-600 hover:text-green-900 font-bold uppercase tracking-wider text-xs"><i class="fa-solid fa-check"></i></button>
-                                            </form>
-                                        @endif
                                         <!-- @if(in_array(strtolower(Auth::user()->role), ['chief', 'admin', 'hrstaff']))
                                             <form action="{{ route('locator-slips.reject', $slip->id) }}" method="POST" class="inline">
                                                 @csrf

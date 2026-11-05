@@ -8,6 +8,8 @@ use App\Models\Employee;
 use App\Models\LeaveCredit;
 use App\Models\LeaveRequest;
 use App\Models\LocatorSlip;
+use App\Models\PdsSnapshot;
+use App\Models\Saln;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -20,7 +22,7 @@ class ReportController extends Controller
         $today = now()->toDateString();
         $firstDay = now()->startOfMonth()->toDateString();
 
-        $selectedType = $request->query('type', 'employee_report');
+        $selectedType = $request->query('type', 'employee_compliance');
         $from = $this->validDate($request->query('from'), $firstDay);
         $to = $this->validDate($request->query('to'), $today);
         $division = trim((string) $request->query('division', 'All Divisions'));
@@ -68,8 +70,15 @@ class ReportController extends Controller
             ->orderBy('firstname')
             ->get();
 
+        $reportTypes = $this->reportTypes();
+        $reportGroups = $this->reportGroups();
+        $selectedType = in_array($selectedType, array_column($reportTypes, 'value'), true) ? $selectedType : 'employee_compliance';
+        $selectedCategory = collect($reportGroups)
+            ->first(fn (array $group) => collect($group['reports'])->contains('value', $selectedType))['value'] ?? 'employee';
+
         $reportData = [
-            'selectedType' => in_array($selectedType, array_column($this->reportTypes(), 'value'), true) ? $selectedType : 'employee_report',
+            'selectedType' => $selectedType,
+            'selectedCategory' => $selectedCategory,
             'filters' => [
                 'from' => $from,
                 'to' => $to,
@@ -78,13 +87,18 @@ class ReportController extends Controller
             ],
             'divisions' => $divisions,
             'employmentStatuses' => $employmentStatuses,
-            'reportTypes' => $this->reportTypes(),
+            'reportTypes' => $reportTypes,
+            'reportGroups' => $reportGroups,
             'reports' => [
-                'employee_report' => $this->employeeReport($employees),
-                'attendance_report' => $this->attendanceReport($employees, $from, $to),
-                'leave_report' => $this->leaveReport($reportDivision, $reportEmploymentStatus, $from, $to),
+                'employee_compliance' => $this->employeeComplianceReport($employees, Carbon::parse($to)->year),
+                'employee_awards' => $this->employeeAwardsReport($employees, $from, $to),
+                'employee_education' => $this->employeeEducationReport($employees),
+                'employee_birthdays' => $this->employeeBirthdayReport($employees),
+                'attendance_tardiness' => $this->attendanceTardinessReport($employees, $from, $to),
+                'leave_monetization' => $this->leaveMonetizationReport($reportDivision, $reportEmploymentStatus, $from, $to),
+                'leave_mandatory_missing' => $this->missingMandatoryLeaveReport($employees, Carbon::parse($to)->year),
+                'locator_frequency' => $this->locatorFrequencyReport($reportDivision, $reportEmploymentStatus, $from, $to),
                 'leave_balance' => $this->leaveBalanceReport($employees),
-                'locator_slip' => $this->locatorSlipReport($reportDivision, $reportEmploymentStatus, $from, $to),
                 'overtime' => $this->overtimeReport($reportDivision, $reportEmploymentStatus, $from, $to),
                 'cto' => $this->ctoReport($employees),
             ],
@@ -93,6 +107,17 @@ class ReportController extends Controller
         $reportData['reports']['overtime_cto'] = $reportData['reports']['overtime'];
 
         return view('reports.index', compact('reportData'));
+    }
+
+    public function print(Request $request): View
+    {
+        $reportData = $this->index($request)->getData()['reportData'];
+        $report = $reportData['reports'][$reportData['selectedType']];
+        $reportGroup = collect($reportData['reportGroups'])->firstWhere('value', $reportData['selectedCategory']);
+        $reportTypeLabel = $reportGroup['label'] ?? 'HRIS Reports';
+        $subReportLabel = collect($reportGroup['reports'] ?? [])->firstWhere('value', $reportData['selectedType'])['label'] ?? $report['title'];
+
+        return view('reports.print', compact('reportData', 'report', 'reportTypeLabel', 'subReportLabel'));
     }
 
     private function employeeBaseQuery(string $division, string $employmentStatus)
@@ -105,13 +130,228 @@ class ReportController extends Controller
     private function reportTypes(): array
     {
         return [
-            ['value' => 'employee_report', 'label' => 'Employee Report', 'filters' => ['dateRange', 'division']],
-            ['value' => 'attendance_report', 'label' => 'Attendance Report', 'filters' => ['dateRange', 'division']],
-            ['value' => 'leave_report', 'label' => 'Leave Report', 'filters' => ['dateRange', 'division']],
-            ['value' => 'leave_balance', 'label' => 'Leave Balance', 'filters' => ['dateRange', 'division']],
-            ['value' => 'locator_slip', 'label' => 'Locator Slip Report', 'filters' => ['dateRange', 'division']],
-            ['value' => 'overtime_cto', 'label' => 'Overtime & CTO', 'filters' => ['dateRange', 'division']],
+            ['value' => 'employee_compliance', 'label' => 'PDS & SALN Compliance', 'filters' => ['dateRange']],
+            ['value' => 'employee_awards', 'label' => 'Loyalty & Attendance Awards', 'filters' => ['dateRange']],
+            ['value' => 'employee_education', 'label' => 'Education Qualifications', 'filters' => []],
+            ['value' => 'employee_birthdays', 'label' => 'Birthdays', 'filters' => []],
+            ['value' => 'attendance_tardiness', 'label' => 'Tardiness', 'filters' => ['dateRange']],
+            ['value' => 'leave_monetization', 'label' => 'Monetization Applications', 'filters' => ['dateRange']],
+            ['value' => 'leave_mandatory_missing', 'label' => 'Mandatory/Force Leave Remaining', 'filters' => ['dateRange']],
+            ['value' => 'leave_balance', 'label' => 'Leave Balance', 'filters' => ['dateRange']],
+            ['value' => 'locator_frequency', 'label' => 'Frequency & Duration', 'filters' => ['dateRange']],
+            ['value' => 'overtime_cto', 'label' => 'Overtime & CTO Summary', 'filters' => ['dateRange']],
         ];
+    }
+
+    private function reportGroups(): array
+    {
+        $subReports = collect($this->reportTypes())->keyBy('value');
+
+        return collect([
+            ['value' => 'employee', 'label' => 'Employee Reports', 'reports' => ['employee_compliance', 'employee_awards', 'employee_education', 'employee_birthdays']],
+            ['value' => 'attendance', 'label' => 'Attendance Reports', 'reports' => ['attendance_tardiness']],
+            ['value' => 'leave', 'label' => 'Leave Reports', 'reports' => ['leave_monetization', 'leave_mandatory_missing', 'leave_balance']],
+            ['value' => 'locator', 'label' => 'Locator Slip Reports', 'reports' => ['locator_frequency']],
+            ['value' => 'overtime_cto', 'label' => 'Overtime & CTO Reports', 'reports' => ['overtime_cto']],
+        ])->map(function (array $group) use ($subReports) {
+            $group['reports'] = collect($group['reports'])
+                ->map(fn (string $value) => $subReports->get($value))
+                ->filter()
+                ->values()
+                ->all();
+
+            return $group;
+        })->all();
+    }
+
+    private function employeeComplianceReport(Collection $employees, int $year): array
+    {
+        $employeeIds = $employees->pluck('id');
+        $pds = PdsSnapshot::query()->where('year', $year)->whereIn('employee_id', $employeeIds)->get()->keyBy('employee_id');
+        $salns = Saln::query()
+            ->whereYear('as_of_date', $year)
+            ->whereIn('employee_id', $employeeIds)
+            ->orderByDesc('submitted_at')
+            ->get()
+            ->groupBy('employee_id')
+            ->map->first();
+        $pdsDeadline = Carbon::create($year, 12, 31)->endOfDay();
+        $salnDeadline = Carbon::create($year + 1, 4, 30)->endOfDay();
+
+        $rows = $employees->map(function (Employee $employee) use ($pds, $salns, $pdsDeadline, $salnDeadline) {
+            $pdsRecord = $pds->get($employee->id);
+            $saln = $salns->get($employee->id);
+            $pdsDate = $pdsRecord?->updated_at;
+            $salnDate = $saln?->submitted_at ?? $saln?->created_at;
+
+            return $this->row([
+                $this->employeeName($employee),
+                $employee->division ?: 'N/A',
+                $pdsDate?->format('M d, Y') ?? 'Not Submitted',
+                $this->submissionStatus($pdsDate, $pdsDeadline),
+                $salnDate?->format('M d, Y') ?? 'Not Submitted',
+                $this->submissionStatus($salnDate, $salnDeadline),
+            ], $employee);
+        })->values();
+
+        return $this->reportPayload(
+            "PDS & SALN Compliance — {$year}",
+            [
+                $this->metric('Employees', $employees->count(), 'blue', 'users'),
+                $this->metric('Missing PDS', $rows->where('cells.2', 'Not Submitted')->count(), 'red', 'x'),
+                $this->metric('Missing SALN', $rows->where('cells.4', 'Not Submitted')->count(), 'red', 'x'),
+                $this->metric('Complete', $rows->filter(fn ($row) => $row['cells'][2] !== 'Not Submitted' && $row['cells'][4] !== 'Not Submitted')->count(), 'green', 'check'),
+            ],
+            'Compliance by Division',
+            $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned')),
+            ['Employee', 'Division', 'PDS Submitted', 'PDS Status', 'SALN Submitted', 'SALN Status'],
+            $rows->all(),
+            $employees,
+            [
+                $this->chart('PDS Submission', 'doughnut', $this->countCells($rows, 3)),
+                $this->chart('SALN Submission', 'doughnut', $this->countCells($rows, 5)),
+                $this->chart('Employees by Division', 'bar', $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned'))),
+            ]
+        );
+    }
+
+    private function employeeAwardsReport(Collection $employees, string $from, string $to): array
+    {
+        $absences = DtrRecord::query()
+            ->whereBetween('date', [$from, $to])
+            ->whereIn('employee_id', $employees->pluck('id'))
+            ->whereRaw('LOWER(status) = ?', ['absent'])
+            ->get()
+            ->countBy('employee_id');
+
+        $qualified = $employees->filter(fn (Employee $employee) => $employee->service_start_date);
+        $rows = $qualified->map(function (Employee $employee) use ($absences) {
+            $years = (int) floor($employee->service_start_date->diffInYears(now()));
+            $absenceCount = (int) $absences->get($employee->id, 0);
+            $milestone = $years >= 20 ? '20-Year Loyalty Award' : ($years >= 10 ? '10-Year Loyalty Award' : 'N/A');
+            $qualification = $years >= 10 ? 'Qualified' : 'Unqualified';
+
+            return $this->row([
+                $this->employeeName($employee),
+                $employee->division ?: 'N/A',
+                $employee->service_start_date->format('M d, Y'),
+                (string) $years,
+                $milestone,
+                $qualification,
+                (string) $absenceCount,
+                $absenceCount === 0 ? 'Qualified' : 'Unqualified',
+            ], $employee);
+        })->sortByDesc(fn ($row) => (int) $row['cells'][3])->values();
+
+        return $this->reportPayload(
+            'Loyalty & Attendance Awards',
+            [
+                $this->metric('10+ Years', $rows->filter(fn ($row) => (int) $row['cells'][3] >= 10)->count(), 'blue', 'calendar'),
+                $this->metric('20+ Years', $rows->filter(fn ($row) => (int) $row['cells'][3] >= 20)->count(), 'green', 'check'),
+                $this->metric('No Absences', $rows->where('cells.6', '0')->count(), 'green', 'check'),
+                $this->metric('Missing Start Date', $employees->count() - $qualified->count(), 'amber', 'clock'),
+            ],
+            'Service Years by Employee',
+            $rows->map(fn ($row) => ['label' => $this->abbreviateLabel($row['cells'][0]), 'fullLabel' => $row['cells'][0], 'value' => (int) $row['cells'][3]])->all(),
+            ['Employee', 'Division', 'Service Start', 'Years in Service', 'Award Milestone', 'Loyalty Qualification', 'Absences', 'Attendance Qualification'],
+            $rows->all(),
+            $qualified,
+            [
+                $this->chart('Years in Service', 'bar', $rows->map(fn ($row) => ['label' => $row['cells'][0], 'value' => (int) $row['cells'][3]])),
+                $this->chart('Loyalty Qualification', 'doughnut', $this->countCells($rows, 5)),
+                $this->chart('Attendance Qualification', 'doughnut', $this->countCells($rows, 7)),
+            ]
+        );
+    }
+
+    private function employeeEducationReport(Collection $employees): array
+    {
+        $employees->loadMissing('pdsEducation');
+        $rows = $employees->map(function (Employee $employee) {
+            $education = $employee->pdsEducation
+                ->map(function ($record) {
+                    $text = strtolower(implode(' ', array_filter([$record->level, $record->course, $record->highest_level])));
+                    $rank = str_contains($text, 'doctor') ? 3 : (str_contains($text, 'master') ? 2 : (str_contains($text, 'college') || str_contains($text, 'bachelor') || str_contains($text, 'baccalaureate') ? 1 : 0));
+
+                    return ['record' => $record, 'rank' => $rank];
+                })
+                ->sortByDesc('rank')
+                ->first();
+
+            if (! $education || $education['rank'] === 0) {
+                return null;
+            }
+
+            $record = $education['record'];
+            $qualification = match ($education['rank']) { 3 => 'Doctorate', 2 => "Master's Degree", default => "Bachelor's Degree" };
+
+            return $this->row([
+                $this->employeeName($employee),
+                $employee->division ?: 'N/A',
+                $qualification,
+                $record->course ?: 'N/A',
+                $record->school_name ?: 'N/A',
+                $record->year_graduated ?: 'N/A',
+            ], $employee);
+        })->filter()->values();
+
+        return $this->reportPayload(
+            'Education Qualifications',
+            [
+                $this->metric('Doctorate', $rows->where('cells.2', 'Doctorate')->count(), 'blue', 'chart'),
+                $this->metric("Master's", $rows->where('cells.2', "Master's Degree")->count(), 'green', 'check'),
+                $this->metric("Bachelor's", $rows->where('cells.2', "Bachelor's Degree")->count(), 'blue', 'users'),
+                $this->metric('With Records', $rows->count(), 'blue', 'users'),
+            ],
+            'Qualifications',
+            $this->bars($rows->countBy(fn ($row) => $row['cells'][2])),
+            ['Employee', 'Division', 'Highest Qualification', 'Course/Degree', 'School', 'Year Graduated'],
+            $rows->all(),
+            $employees,
+            [
+                $this->chart('Highest Qualifications', 'doughnut', $this->countCells($rows, 2)),
+                $this->chart('Qualifications by Division', 'bar', $this->bars($rows->countBy('division'))),
+                $this->chart('Graduation Year', 'bar', $this->countCells($rows, 5)),
+            ]
+        );
+    }
+
+    private function employeeBirthdayReport(Collection $employees): array
+    {
+        $today = now();
+        $birthdayEmployees = $employees->filter(fn (Employee $employee) => $employee->pdsPersonal?->date_of_birth && Carbon::parse($employee->pdsPersonal->date_of_birth)->month === $today->month);
+        $rows = $birthdayEmployees->map(function (Employee $employee) use ($today) {
+            $birthday = Carbon::parse($employee->pdsPersonal->date_of_birth);
+            $isToday = $birthday->month === $today->month && $birthday->day === $today->day;
+
+            return $this->row([
+                $this->employeeName($employee),
+                $employee->division ?: 'N/A',
+                $birthday->format('F d'),
+                (string) $birthday->age,
+                $isToday ? 'Birthday Today' : 'This Month',
+            ], $employee);
+        })->sortBy(fn ($row) => Carbon::parse($row['cells'][2])->day)->values();
+
+        return $this->reportPayload(
+            'Employee Birthdays — '.$today->format('F Y'),
+            [
+                $this->metric('Today', $rows->where('cells.4', 'Birthday Today')->count(), 'green', 'calendar'),
+                $this->metric('This Month', $rows->count(), 'blue', 'calendar'),
+                $this->metric('Birth Dates Available', $employees->filter(fn ($employee) => $employee->pdsPersonal?->date_of_birth)->count(), 'blue', 'users'),
+                $this->metric('Missing Birth Date', $employees->filter(fn ($employee) => ! $employee->pdsPersonal?->date_of_birth)->count(), 'amber', 'clock'),
+            ],
+            'Birthdays by Division',
+            $this->bars($birthdayEmployees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned')),
+            ['Employee', 'Division', 'Birthday', 'Age', 'Schedule'],
+            $rows->all(),
+            $birthdayEmployees,
+            [
+                $this->chart('Birthday Schedule', 'doughnut', $this->countCells($rows, 4)),
+                $this->chart('Birthdays by Division', 'bar', $this->bars($birthdayEmployees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned'))),
+                $this->chart('Birthdays by Day', 'bar', $rows->map(fn ($row) => ['label' => $row['cells'][2], 'value' => 1])),
+            ]
+        );
     }
 
     private function employeeReport(Collection $employees): array
@@ -150,6 +390,229 @@ class ReportController extends Controller
                     'value' => $item['value'],
                     'color' => $item['color'],
                 ])->all()),
+            ]
+        );
+    }
+
+    private function attendanceTardinessReport(Collection $employees, string $from, string $to): array
+    {
+        $records = DtrRecord::query()
+            ->whereBetween('date', [$from, $to])
+            ->whereIn('employee_id', $employees->pluck('id'))
+            ->get()
+            ->groupBy('employee_id');
+
+        $rows = $employees->map(function (Employee $employee) use ($records) {
+            $employeeRecords = $records->get($employee->id, collect());
+            $lateMinutes = $employeeRecords->sum(fn (DtrRecord $record) => $this->lateMinutes($record));
+            $undertimeMinutes = $employeeRecords->sum(fn (DtrRecord $record) => $this->undertimeMinutes($record));
+            $lateDays = $employeeRecords->filter(fn (DtrRecord $record) => $this->lateMinutes($record) > 0)->count();
+            $undertimeDays = $employeeRecords->filter(fn (DtrRecord $record) => $this->undertimeMinutes($record) > 0)->count();
+
+            if ($lateDays === 0 && $undertimeDays === 0) {
+                return null;
+            }
+
+            return $this->row([
+                $this->employeeName($employee),
+                $employee->division ?: 'N/A',
+                (string) $lateDays,
+                number_format($lateMinutes, 3),
+                (string) $undertimeDays,
+                number_format($undertimeMinutes, 3),
+                ($lateDays + $undertimeDays) >= 3 ? 'Frequent Tardiness' : 'Recorded Tardiness',
+            ], $employee);
+        })->filter()->sortByDesc(fn ($row) => (float) $row['cells'][3] + (float) $row['cells'][5])->values();
+
+        return $this->reportPayload(
+            'Attendance Tardiness Report',
+            [
+                $this->metric('Employees Flagged', $rows->count(), 'amber', 'clock'),
+                $this->metric('Frequent Cases', $rows->where('cells.6', 'Frequent Tardiness')->count(), 'red', 'x'),
+                $this->metric('Late Minutes', number_format($rows->sum(fn ($row) => (float) $row['cells'][3]), 3), 'amber', 'clock'),
+                $this->metric('Undertime Minutes', number_format($rows->sum(fn ($row) => (float) $row['cells'][5]), 3), 'blue', 'chart'),
+            ],
+            'Tardiness by Division',
+            $this->bars($rows->countBy('division')),
+            ['Employee', 'Division', 'Late Days', 'Late Minutes', 'Undertime Days', 'Undertime Minutes', 'Classification'],
+            $rows->all(),
+            $employees,
+            [
+                $this->chart('Late Minutes by Employee', 'bar', $rows->map(fn ($row) => ['label' => $row['cells'][0], 'value' => (float) $row['cells'][3]])),
+                $this->chart('Tardiness Classification', 'doughnut', $this->countCells($rows, 6)),
+                $this->chart('Cases by Division', 'bar', $this->bars($rows->countBy('division'))),
+            ]
+        );
+    }
+
+    private function leaveMonetizationReport(string $division, string $employmentStatus, string $from, string $to): array
+    {
+        $requests = LeaveRequest::query()
+            ->with(['employee.pdsPersonal', 'leaveType'])
+            ->whereBetween('date_filed', [$from, Carbon::parse($to)->endOfDay()])
+            ->where(function ($query) {
+                $query->whereRaw('LOWER(COALESCE(reason, ?)) LIKE ?', ['', '%monetization%'])
+                    ->orWhereHas('leaveType', fn ($leaveType) => $leaveType->whereRaw('LOWER(name) LIKE ?', ['%monetization%']));
+            })
+            ->whereHas('employee', fn ($query) => $this->applyEmployeeFilters($query, $division, $employmentStatus))
+            ->latest('date_filed')
+            ->get();
+
+        $rows = $requests->map(fn (LeaveRequest $leave) => $this->row([
+            $this->employeeName($leave->employee),
+            $leave->employee?->division ?: 'N/A',
+            $leave->leaveType?->name ?: 'N/A',
+            $leave->date_filed?->format('M d, Y') ?: 'N/A',
+            optional($leave->start_date)->format('M d, Y') ?: 'N/A',
+            (string) $leave->duration,
+            ucfirst((string) $leave->status),
+            $leave->reason ?: 'Monetization of Leave Credits',
+        ], $leave->employee, $leave->date_filed?->toDateString()))->values();
+
+        return $this->reportPayload(
+            'Leave Monetization Applications',
+            [
+                $this->metric('Applications', $requests->count(), 'blue', 'chart'),
+                $this->metric('Approved', $requests->where('status', 'approved')->count(), 'green', 'check'),
+                $this->metric('Pending', $requests->where('status', 'pending')->count(), 'amber', 'clock'),
+                $this->metric('Rejected', $requests->where('status', 'rejected')->count(), 'red', 'x'),
+            ],
+            'Applications by Division',
+            $this->bars($requests->countBy(fn (LeaveRequest $leave) => $leave->employee?->division ?: 'Unassigned')),
+            ['Employee', 'Division', 'Leave Type', 'Date Filed', 'Effective Date', 'Days', 'Status', 'Purpose'],
+            $rows->all(),
+            $requests->pluck('employee')->filter(),
+            [
+                $this->chart('Application Status', 'doughnut', $this->countCells($rows, 6)),
+                $this->chart('Applications by Division', 'bar', $this->bars($requests->countBy(fn (LeaveRequest $leave) => $leave->employee?->division ?: 'Unassigned'))),
+                $this->chart('Days Requested', 'bar', $rows->map(fn ($row) => ['label' => $row['cells'][0], 'value' => (float) $row['cells'][5]])),
+            ]
+        );
+    }
+
+    private function missingMandatoryLeaveReport(Collection $employees, int $year): array
+    {
+        $mandatoryType = \App\Models\LeaveType::query()
+            ->where(function ($query) {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%mandatory%'])
+                    ->orWhereRaw('LOWER(name) LIKE ?', ['%force leave%']);
+            })
+            ->first();
+        $entitlement = (float) ($mandatoryType?->days_per_year ?: 5);
+        $requests = LeaveRequest::query()
+            ->whereYear('start_date', $year)
+            ->whereIn('employee_id', $employees->pluck('id'))
+            ->whereHas('leaveType', fn ($query) => $query->where(function ($typeQuery) {
+                $typeQuery->whereRaw('LOWER(name) LIKE ?', ['%mandatory%'])
+                    ->orWhereRaw('LOWER(name) LIKE ?', ['%force leave%']);
+            }))
+            ->with('leaveType')
+            ->get()
+            ->groupBy('employee_id');
+        $credits = LeaveCredit::query()
+            ->where('year', $year)
+            ->whereIn('employee_id', $employees->pluck('id'))
+            ->when($mandatoryType, fn ($query) => $query->where('leave_type_id', $mandatoryType->id))
+            ->get()
+            ->keyBy('employee_id');
+
+        $rows = $employees->map(function (Employee $employee) use ($requests, $credits, $entitlement, $year) {
+            $employeeRequests = $requests->get($employee->id, collect());
+            $approvedUsed = (float) $employeeRequests
+                ->where('status', 'approved')
+                ->sum(fn (LeaveRequest $leave) => $leave->duration);
+            $credit = $credits->get($employee->id);
+            $used = $credit ? (float) $credit->used : $approvedUsed;
+            $remaining = $credit ? (float) $credit->balance : max($entitlement - $approvedUsed, 0);
+
+            return $this->row([
+                $this->employeeName($employee),
+                $employee->division ?: 'N/A',
+                number_format($entitlement, 3),
+                number_format($used, 3),
+                number_format(max($remaining, 0), 3),
+                (string) $employeeRequests->count(),
+                (string) $year,
+            ], $employee);
+        })->sortByDesc(fn ($row) => (float) $row['cells'][4])->values();
+        $withRemaining = $rows->filter(fn ($row) => (float) $row['cells'][4] > 0);
+        $fullyUsed = $rows->filter(fn ($row) => (float) $row['cells'][4] <= 0);
+
+        return $this->reportPayload(
+            "Mandatory/Force Leave Remaining — {$year}",
+            [
+                $this->metric('Required Employees', $employees->count(), 'blue', 'users'),
+                $this->metric('With MFL Remaining', $withRemaining->count(), 'amber', 'clock'),
+                $this->metric('Fully Used', $fullyUsed->count(), 'green', 'check'),
+                $this->metric('Total Days Remaining', number_format($rows->sum(fn ($row) => (float) $row['cells'][4]), 3), 'blue', 'chart'),
+            ],
+            'MFL Days Remaining by Division',
+            $this->bars($withRemaining->countBy('division')),
+            ['Employee', 'Division', 'Entitlement', 'Days Used', 'Days Remaining', 'Applications Filed', 'Year'],
+            $rows->all(),
+            $employees,
+            [
+                $this->chart('MFL Utilization', 'doughnut', [
+                    ['label' => 'Fully Used', 'value' => $fullyUsed->count(), 'color' => '#10b981'],
+                    ['label' => 'With Remaining Days', 'value' => $withRemaining->count(), 'color' => '#f59e0b'],
+                ]),
+                $this->chart('Remaining Days by Employee', 'bar', $rows->map(fn ($row) => ['label' => $row['cells'][0], 'value' => (float) $row['cells'][4]])),
+                $this->chart('Employees with Remaining MFL by Division', 'bar', $this->bars($withRemaining->countBy('division'))),
+            ]
+        );
+    }
+
+    private function locatorFrequencyReport(string $division, string $employmentStatus, string $from, string $to): array
+    {
+        $slips = LocatorSlip::query()
+            ->with(['employee.pdsPersonal'])
+            ->whereBetween('date_covered', [$from, $to])
+            ->whereHas('employee', fn ($query) => $this->applyEmployeeFilters($query, $division, $employmentStatus))
+            ->get();
+
+        $rows = $slips->groupBy('employee_id')->map(function (Collection $employeeSlips) {
+            $employee = $employeeSlips->first()?->employee;
+            $durations = $employeeSlips->map(fn (LocatorSlip $slip) => $this->locatorDurationHours($slip));
+            $passSlips = $employeeSlips->filter(fn (LocatorSlip $slip) => str_contains(strtolower((string) $slip->type), 'pass'));
+            $officialBusiness = $employeeSlips->filter(fn (LocatorSlip $slip) => str_contains(strtolower((string) $slip->type), 'official'));
+            $minimumPass = $passSlips->map(fn (LocatorSlip $slip) => $this->locatorDurationHours($slip))->filter(fn ($hours) => $hours > 0)->min();
+            $eightHourCount = $durations->filter(fn ($hours) => $hours >= 8)->count();
+            $overEightCount = $durations->filter(fn ($hours) => $hours > 8)->count();
+
+            return $this->row([
+                $this->employeeName($employee),
+                $employee?->division ?: 'N/A',
+                (string) $employeeSlips->count(),
+                (string) $passSlips->count(),
+                (string) $officialBusiness->count(),
+                number_format($durations->sum(), 3),
+                $minimumPass !== null ? number_format($minimumPass, 3) : 'N/A',
+                (string) $eightHourCount,
+                (string) $overEightCount,
+                $employeeSlips->count() >= 3 ? 'Frequent User' : 'Occasional User',
+            ], $employee);
+        })->sortByDesc(fn ($row) => (int) $row['cells'][2])->values();
+
+        return $this->reportPayload(
+            'Locator Slip Frequency & Duration',
+            [
+                $this->metric('Employees', $rows->count(), 'blue', 'users'),
+                $this->metric('Frequent Users', $rows->where('cells.9', 'Frequent User')->count(), 'amber', 'clock'),
+                $this->metric('8-Hour Slips', $rows->sum(fn ($row) => (int) $row['cells'][7]), 'red', 'clock'),
+                $this->metric('Over 8 Hours', $rows->sum(fn ($row) => (int) $row['cells'][8]), 'red', 'x'),
+            ],
+            'Slip Count by Employee',
+            $rows->map(fn ($row) => ['label' => $row['cells'][0], 'value' => (int) $row['cells'][2]])->all(),
+            ['Employee', 'Division', 'Total Slips', 'Pass Slips', 'Official Business', 'Total Hours', 'Minimum Pass Slip Hours', '8-Hour Slips', 'Over 8 Hours', 'Usage'],
+            $rows->all(),
+            $slips->pluck('employee')->filter()->unique('id')->values(),
+            [
+                $this->chart('Slip Count by Employee', 'bar', $rows->map(fn ($row) => ['label' => $row['cells'][0], 'value' => (int) $row['cells'][2]])),
+                $this->chart('Locator Type Totals', 'doughnut', [
+                    ['label' => 'Pass Slip', 'value' => $rows->sum(fn ($row) => (int) $row['cells'][3])],
+                    ['label' => 'Official Business', 'value' => $rows->sum(fn ($row) => (int) $row['cells'][4])],
+                ]),
+                $this->chart('Total Hours by Employee', 'bar', $rows->map(fn ($row) => ['label' => $row['cells'][0], 'value' => (float) $row['cells'][5]])),
             ]
         );
     }
@@ -662,6 +1125,70 @@ class ReportController extends Controller
         }
 
         return round($minutes / 60, 2);
+    }
+
+    private function submissionStatus($submittedAt, Carbon $deadline): string
+    {
+        if (! $submittedAt) {
+            return now()->greaterThan($deadline) ? 'Missing / Overdue' : 'Not Submitted';
+        }
+
+        return Carbon::parse($submittedAt)->lessThanOrEqualTo($deadline) ? 'On Time' : 'Late';
+    }
+
+    private function countCells(Collection $rows, int $index): array
+    {
+        return $rows
+            ->countBy(fn ($row) => (string) ($row['cells'][$index] ?? 'N/A'))
+            ->map(fn ($value, $label) => ['label' => $label, 'value' => $value])
+            ->values()
+            ->all();
+    }
+
+    private function lateMinutes(DtrRecord $record): int
+    {
+        $minutes = 0;
+
+        if ($record->time_in && Carbon::parse($record->time_in)->format('H:i:s') > '08:00:00') {
+            $minutes += Carbon::parse('08:00:00')->diffInMinutes(Carbon::parse($record->time_in));
+        }
+
+        if ($record->pm_in && Carbon::parse($record->pm_in)->format('H:i:s') > '13:00:00') {
+            $minutes += Carbon::parse('13:00:00')->diffInMinutes(Carbon::parse($record->pm_in));
+        }
+
+        return $minutes;
+    }
+
+    private function undertimeMinutes(DtrRecord $record): int
+    {
+        $minutes = 0;
+
+        if ($record->am_out && Carbon::parse($record->am_out)->format('H:i:s') < '12:00:00') {
+            $minutes += Carbon::parse($record->am_out)->diffInMinutes(Carbon::parse('12:00:00'));
+        }
+
+        if ($record->time_out && Carbon::parse($record->time_out)->format('H:i:s') < '17:00:00') {
+            $minutes += Carbon::parse($record->time_out)->diffInMinutes(Carbon::parse('17:00:00'));
+        }
+
+        return $minutes;
+    }
+
+    private function locatorDurationHours(LocatorSlip $slip): float
+    {
+        if (! $slip->time_from || ! $slip->time_to) {
+            return 0.0;
+        }
+
+        $start = Carbon::parse($slip->time_from);
+        $end = Carbon::parse($slip->time_to);
+
+        if ($end->lessThan($start)) {
+            $end->addDay();
+        }
+
+        return round($start->diffInMinutes($end) / 60, 3);
     }
 
     private function creditBalance(Collection $credits, string $needle): float

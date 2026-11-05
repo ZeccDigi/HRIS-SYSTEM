@@ -22,7 +22,7 @@ class MyLeaveController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
         $employee = auth()->user()->employee;
         if (! $employee) {
@@ -30,10 +30,105 @@ class MyLeaveController extends Controller
         }
 
         $employee->ensureLeaveCredits(now()->year);
-        $leaves = $employee->leaveRequests()->with(['leaveType', 'employee', 'chief', 'hrstaff', 'regionalDirector'])->latest()->get();
+        $search = trim((string) $request->query('search', ''));
+        $year = (string) $request->query('year', now()->year);
+        $status = (string) $request->query('status', '');
+        $leaveType = (string) $request->query('leave_type', '');
+
+        $allLeaveTypes = $employee->leaveRequests()
+            ->with('leaveType')
+            ->get()
+            ->map(fn (LeaveRequest $leave) => (string) \Illuminate\Support\Str::of($leave->leaveType?->name ?? '')
+                ->replaceMatches('/\s+Leave\b/i', '')
+                ->trim())
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        $leaveTypeIds = collect();
+        if ($leaveType !== '') {
+            $leaveTypeIds = LeaveType::query()
+                ->get(['id', 'name'])
+                ->filter(fn (LeaveType $type) => (string) \Illuminate\Support\Str::of($type->name)
+                    ->replaceMatches('/\s+Leave\b/i', '')
+                    ->trim()
+                    ->lower() === $leaveType)
+                ->pluck('id')
+                ->values();
+        }
+
+        $leaves = $employee->leaveRequests()
+            ->with(['leaveType', 'employee', 'chief', 'hrstaff', 'regionalDirector'])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query
+                        ->where('status', 'like', "%{$search}%")
+                        ->orWhere('date_filed', 'like', "%{$search}%")
+                        ->orWhereHas('leaveType', fn ($leaveTypeQuery) => $leaveTypeQuery->where('name', 'like', "%{$search}%"));
+                });
+            })
+            ->when($year !== '', fn ($query) => $query->whereYear('date_filed', $year))
+            ->when($leaveType !== '', fn ($query) => $query->whereIn('leave_type_id', $leaveTypeIds))
+            ->when($status === 'cancelled', fn ($query) => $query->where('status', 'cancelled'))
+            ->when($status === 'rejected', function ($query) {
+                $query->where(function ($query) {
+                    $query
+                        ->where('status', 'rejected')
+                        ->orWhere('hrstaff_status', 'rejected')
+                        ->orWhere('chief_status', 'rejected')
+                        ->orWhere('rd_status', 'rejected');
+                });
+            })
+            ->when($status === 'approved', function ($query) {
+                $query
+                    ->where('status', '!=', 'cancelled')
+                    ->where('hrstaff_status', 'approved')
+                    ->where('chief_status', 'approved')
+                    ->where('rd_status', 'approved');
+            })
+            ->when($status === 'pending', function ($query) {
+                $query
+                    ->whereNotIn('status', ['cancelled', 'rejected'])
+                    ->where(function ($query) {
+                        $query
+                            ->whereNull('hrstaff_status')
+                            ->orWhere('hrstaff_status', 'pending')
+                            ->orWhereNull('chief_status')
+                            ->orWhere('chief_status', 'pending')
+                            ->orWhereNull('rd_status')
+                            ->orWhere('rd_status', 'pending');
+                    })
+                    ->where(function ($query) {
+                        $query
+                            ->whereNull('hrstaff_status')
+                            ->orWhere('hrstaff_status', '!=', 'rejected');
+                    })
+                    ->where(function ($query) {
+                        $query
+                            ->whereNull('chief_status')
+                            ->orWhere('chief_status', '!=', 'rejected');
+                    })
+                    ->where(function ($query) {
+                        $query
+                            ->whereNull('rd_status')
+                            ->orWhere('rd_status', '!=', 'rejected');
+                    });
+            })
+            ->latest()
+            ->paginate(5)
+            ->withQueryString();
         $credits = $employee->leaveCredits()->with('leaveType')->get();
 
-        return view('leaves.index', compact('leaves', 'credits'));
+        return view('leaves.index', [
+            'leaves' => $leaves,
+            'credits' => $credits,
+            'leaveTypes' => $allLeaveTypes,
+            'search' => $search,
+            'year' => $year,
+            'status' => $status,
+            'leaveType' => $leaveType,
+        ]);
     }
 
     /**
@@ -63,16 +158,21 @@ class MyLeaveController extends Controller
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
 
+        $leaveType = LeaveType::find($request->input('leave_type_id'));
         $validated = $request->validate([
             'leave_type_id' => 'required|exists:leave_types,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'reason' => 'required|string',
             'is_paid' => 'required|boolean',
+            'leave_detail_type' => $this->leaveDetailTypeRules($leaveType),
+            'leave_detail' => $this->leaveDetailTextRules($leaveType),
+            'commutation_requested' => 'required|boolean',
             'attachment' => 'nullable|file|mimes:pdf|max:5120', // Max 5MB
         ]);
 
         $leaveType = LeaveType::findOrFail($validated['leave_type_id']);
+        $this->normalizeLeaveDetails($validated, $leaveType);
         $this->validateLeaveEligibilityAndDates($request, $employee, $leaveType);
 
             if ($request->hasFile('attachment')) {
@@ -111,6 +211,9 @@ class MyLeaveController extends Controller
             ->whereDate('start_date', $validated['start_date'])
             ->whereDate('end_date', $validated['end_date'])
             ->where('reason', $validated['reason'])
+            ->where('leave_detail_type', $validated['leave_detail_type'] ?? null)
+            ->where('leave_detail', $validated['leave_detail'] ?? null)
+            ->where('commutation_requested', $validated['commutation_requested'])
             ->where('status', 'pending')
             ->latest()
             ->first();
@@ -236,15 +339,20 @@ class MyLeaveController extends Controller
             abort(403);
         }
 
+        $leaveType = LeaveType::find($request->input('leave_type_id'));
         $validated = $request->validate([
             'leave_type_id' => 'required|exists:leave_types,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'reason' => 'required|string',
             'is_paid' => 'required|boolean',
+            'leave_detail_type' => $this->leaveDetailTypeRules($leaveType),
+            'leave_detail' => $this->leaveDetailTextRules($leaveType),
+            'commutation_requested' => 'required|boolean',
         ]);
 
         $leaveType = LeaveType::findOrFail($validated['leave_type_id']);
+        $this->normalizeLeaveDetails($validated, $leaveType);
         $this->validateLeaveEligibilityAndDates($request, $employee, $leaveType);
         $duration = LeaveRequest::calculateBusinessDays($validated['start_date'], $validated['end_date']);
         $leaveYear = Carbon::parse($validated['start_date'])->year;
@@ -316,6 +424,65 @@ class MyLeaveController extends Controller
         return redirect()->route('leaves.index')->with('success', 'Leave request cancelled successfully.');
     }
 
+    private function leaveDetailTypeRules(?LeaveType $leaveType): string
+    {
+        if (! $leaveType) {
+            return 'nullable|string|max:50';
+        }
+
+        $name = strtolower($leaveType->name);
+
+        if (str_contains($name, 'vacation') || str_contains($name, 'special privilege')) {
+            return 'required|in:within_philippines,abroad';
+        }
+
+        if (str_contains($name, 'sick')) {
+            return 'required|in:in_hospital,out_patient';
+        }
+
+        if (str_contains($name, 'women')) {
+            return 'required|in:women_illness';
+        }
+
+        if (str_contains($name, 'study')) {
+            return 'required|in:masters_degree,board_review';
+        }
+
+        return 'nullable|string|max:50';
+    }
+
+    private function leaveDetailTextRules(?LeaveType $leaveType): string
+    {
+        if (! $leaveType) {
+            return 'nullable|string|max:1000';
+        }
+
+        $name = strtolower($leaveType->name);
+        $needsDetails = str_contains($name, 'vacation')
+            || str_contains($name, 'special privilege')
+            || str_contains($name, 'sick')
+            || str_contains($name, 'women');
+
+        return $needsDetails ? 'required|string|max:1000' : 'nullable|string|max:1000';
+    }
+
+    private function normalizeLeaveDetails(array &$validated, LeaveType $leaveType): void
+    {
+        $name = strtolower($leaveType->name);
+        $hasStructuredDetails = str_contains($name, 'vacation')
+            || str_contains($name, 'special privilege')
+            || str_contains($name, 'sick')
+            || str_contains($name, 'women')
+            || str_contains($name, 'study');
+
+        if (! $hasStructuredDetails) {
+            $validated['leave_detail_type'] = null;
+            $validated['leave_detail'] = null;
+        } elseif (str_contains($name, 'study')) {
+            $validated['leave_detail'] = null;
+        }
+    }
+
     private function validateLeaveEligibilityAndDates(Request $request, $employee, LeaveType $leaveType): void
     {
         validator($request->only(['leave_type_id', 'start_date', 'end_date']), [])->after(function (Validator $validator) use ($request, $employee, $leaveType) {
@@ -370,6 +537,13 @@ class MyLeaveController extends Controller
     private function isLeaveTypeEligibleForEmployee(LeaveType $type, $employee): bool
     {
         $name = $type->name;
+        $employmentStatus = strtolower(trim((string) ($employee?->employment_status ?? '')));
+
+        // Agency policy: Job Order personnel may avail only Wellness Leave.
+        if ($employmentStatus === 'job order') {
+            return $name === 'Wellness Leave';
+        }
+
         $sex = strtolower((string) ($employee?->pdsPersonal?->sex ?? ''));
         $civilStatus = strtolower((string) ($employee?->pdsPersonal?->civil_status ?? ''));
         $soloParentAnswer = $employee?->pdsQuestionnaire?->q40_c ?? false;

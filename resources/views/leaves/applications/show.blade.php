@@ -80,6 +80,8 @@
                 </div>
             </section>
 
+            @include('leaves._attachment-preview', ['leaveRequest' => $leaveApplication])
+
             {{-- Review Action Below Form --}}
             <section class="mt-6 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-7">
                 @if($isMyTurn)

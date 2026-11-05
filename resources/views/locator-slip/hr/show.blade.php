@@ -75,15 +75,21 @@
                 </section>
 
                 @if($canReview)
-    <section class="rounded-3xl bg-indigo-700 p-6 text-white shadow-2xl shadow-indigo-200">
-        <h3 class="text-lg font-black uppercase tracking-widest">
-            {{ __('Review Action') }}
-        </h3>
+    <section class="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-7">
+        <div class="mb-6 border-b border-gray-100 pb-5">
+            <p class="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">
+                {{ __('Current Review Stage') }}
+            </p>
 
-        <div class="mt-6">
+            <h3 class="mt-1 text-xl font-black text-gray-900">
+                {{ __('Review Locator Slip') }}
+            </h3>
+        </div>
+
+        <div>
             <label
                 for="locator_review_remarks"
-                class="mb-3 block text-[10px] font-black uppercase tracking-widest text-indigo-200"
+                class="mb-2 block text-xs font-black uppercase tracking-widest text-gray-600"
             >
                 {{ __('Remarks / Notes') }}
             </label>
@@ -91,56 +97,61 @@
             <textarea
                 id="locator_review_remarks"
                 name="remarks"
-                rows="5"
+                rows="4"
                 form="locator-reject-form"
-                class="w-full resize-y rounded-2xl border border-indigo-400 bg-indigo-500/70 px-5 py-4 text-sm font-medium text-white placeholder-indigo-200 outline-none transition focus:border-white focus:ring-2 focus:ring-white/40"
-                placeholder="{{ __('Add notes here...') }}"
+                class="block w-full resize-y rounded-2xl border-gray-300 bg-gray-50 text-sm text-gray-800 shadow-sm transition focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
+                placeholder="{{ __('Enter remarks or notes here...') }}"
             >{{ old('remarks') }}</textarea>
 
+            <p class="mt-2 text-xs text-gray-400">
+                {{ __('Remarks are optional when approving and required when rejecting.') }}
+            </p>
+
             @error('remarks')
-                <p class="mt-2 text-xs font-semibold text-red-100">
+                <p class="mt-2 text-xs font-semibold text-red-600">
                     {{ $message }}
                 </p>
             @enderror
         </div>
 
-        {{-- Approve button --}}
-        <form
-            id="locator-approve-form"
-            action="{{ route('locator-slips.approve', $locatorSlip) }}"
-            method="POST"
-            class="mt-8"
-        >
-            @csrf
-            @method('PATCH')
-
-            <button
-                type="button"
-                onclick="openLocatorDecisionModal('approved')"
-                class="w-full rounded-2xl bg-white px-5 py-4 text-xs font-black uppercase tracking-widest text-indigo-700 shadow-lg transition hover:bg-indigo-50"
+        <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <form
+                id="locator-reject-form"
+                action="{{ route('locator-slips.reject', $locatorSlip) }}"
+                method="POST"
             >
-                {{ __('Approve Request') }}
-            </button>
-        </form>
+                @csrf
+                @method('PATCH')
 
-        {{-- Reject button --}}
-        <form
-            id="locator-reject-form"
-            action="{{ route('locator-slips.reject', $locatorSlip) }}"
-            method="POST"
-            class="mt-4"
-        >
-            @csrf
-            @method('PATCH')
+                <button
+                    type="button"
+                    onclick="openLocatorDecisionModal('rejected')"
+                    class="inline-flex min-w-44 items-center justify-center rounded-xl border border-red-300 bg-white px-6 py-3 text-xs font-black uppercase tracking-widest text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2"
+                >
+                    <i class="fa-solid fa-xmark mr-2"></i>
+                    {{ __('Reject Request') }}
+                </button>
+            </form>
 
-            <button
-                type="button"
-                onclick="openLocatorDecisionModal('rejected')"
-                class="w-full rounded-2xl border-2 border-indigo-300 bg-indigo-500/60 px-5 py-4 text-xs font-black uppercase tracking-widest text-white transition hover:border-white hover:bg-indigo-500"
+            <form
+                id="locator-approve-form"
+                action="{{ route('locator-slips.approve', $locatorSlip) }}"
+                method="POST"
             >
-                {{ __('Reject Request') }}
-            </button>
-        </form>
+                @csrf
+                @method('PATCH')
+                <input type="hidden" id="locator_approve_remarks" name="remarks" value="">
+
+                <button
+                    type="button"
+                    onclick="openLocatorDecisionModal('approved')"
+                    class="inline-flex min-w-44 items-center justify-center rounded-xl bg-indigo-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                >
+                    <i class="fa-solid fa-check mr-2"></i>
+                    {{ __('Approve Request') }}
+                </button>
+            </form>
+        </div>
 
         <div
             id="locatorDecisionModal"
@@ -254,6 +265,13 @@
         }
 
         document.getElementById('locatorDecisionConfirmButton')?.addEventListener('click', function () {
+            const remarks = document.getElementById('locator_review_remarks')?.value || '';
+            const approveRemarks = document.getElementById('locator_approve_remarks');
+
+            if (approveRemarks) {
+                approveRemarks.value = remarks;
+            }
+
             const form = locatorDecisionAction === 'approved'
                 ? document.getElementById('locator-approve-form')
                 : document.getElementById('locator-reject-form');

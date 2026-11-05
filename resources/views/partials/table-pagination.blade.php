@@ -1,5 +1,9 @@
 @php
     $paginationLabel = is_string($label ?? null) ? $label : 'items';
+    $currentPage = $paginator->currentPage();
+    $lastPage = $paginator->lastPage();
+    $pageStart = max(1, $currentPage - 2);
+    $pageEnd = min($lastPage, $currentPage + 2);
 @endphp
 
 @if($paginator->hasPages() || $paginator->total() > 0)
@@ -42,27 +46,31 @@
                         </a>
                     @endif
 
-                    @foreach($paginator->elements() as $element)
-                        @if(is_string($element))
-                            <span class="inline-flex h-8 min-w-8 items-center justify-center px-1 text-sm font-semibold text-slate-400">
-                                {{ $element }}
-                            </span>
+                    @if($pageStart > 1)
+                        <a href="{{ $paginator->url(1) }}" class="inline-flex h-8 min-w-8 items-center justify-center px-2 text-sm font-semibold text-slate-600 transition hover:text-blue-900">1</a>
+                        @if($pageStart > 2)
+                            <span class="inline-flex h-8 min-w-8 items-center justify-center px-1 text-sm font-semibold text-slate-400">...</span>
                         @endif
+                    @endif
 
-                        @if(is_array($element))
-                            @foreach($element as $page => $url)
-                                @if($page === $paginator->currentPage())
-                                    <span class="inline-flex h-8 min-w-8 items-center justify-center px-2 text-sm font-black text-sky-600">
-                                        {{ $page }}
-                                    </span>
-                                @else
-                                    <a href="{{ $url }}" class="inline-flex h-8 min-w-8 items-center justify-center px-2 text-sm font-semibold text-slate-600 transition hover:text-blue-900">
-                                        {{ $page }}
-                                    </a>
-                                @endif
-                            @endforeach
+                    @for($page = $pageStart; $page <= $pageEnd; $page++)
+                        @if($page === $currentPage)
+                            <span class="inline-flex h-8 min-w-8 items-center justify-center px-2 text-sm font-black text-sky-600">
+                                {{ $page }}
+                            </span>
+                        @else
+                            <a href="{{ $paginator->url($page) }}" class="inline-flex h-8 min-w-8 items-center justify-center px-2 text-sm font-semibold text-slate-600 transition hover:text-blue-900">
+                                {{ $page }}
+                            </a>
                         @endif
-                    @endforeach
+                    @endfor
+
+                    @if($pageEnd < $lastPage)
+                        @if($pageEnd < $lastPage - 1)
+                            <span class="inline-flex h-8 min-w-8 items-center justify-center px-1 text-sm font-semibold text-slate-400">...</span>
+                        @endif
+                        <a href="{{ $paginator->url($lastPage) }}" class="inline-flex h-8 min-w-8 items-center justify-center px-2 text-sm font-semibold text-slate-600 transition hover:text-blue-900">{{ $lastPage }}</a>
+                    @endif
 
                     @if($paginator->hasMorePages())
                         <a href="{{ $paginator->nextPageUrl() }}" class="inline-flex h-8 w-8 items-center justify-center text-sky-500 transition hover:text-blue-900" aria-label="Next page">

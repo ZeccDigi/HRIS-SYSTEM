@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Listeners\AuditLogListener;
+use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
@@ -64,6 +65,7 @@ class LeaveApplicationController extends Controller
      */
     public function all(Request $request): View
     {
+        $role = strtolower(auth()->user()->role ?? '');
         $search = trim((string) $request->query('search', ''));
         $leaveTypeId = $request->query('leave_type_id', '');
         $status = $request->query('status', '');
@@ -71,6 +73,10 @@ class LeaveApplicationController extends Controller
 
         $query = LeaveRequest::with(['employee', 'leaveType'])
             ->when(in_array($status, ['pending', 'approved', 'rejected', 'cancelled'], true), fn ($query) => $query->where('status', $status));
+
+        if ($role === 'chief') {
+            $this->scopeToChiefDivision($query);
+        }
 
         $this->applyFilters($query, $search, $leaveTypeId);
         $this->applySort($query, $sort);
@@ -83,6 +89,7 @@ class LeaveApplicationController extends Controller
 
     public function allFilter(Request $request)
     {
+        $role = strtolower(auth()->user()->role ?? '');
         $search = trim((string) $request->query('search', ''));
         $leaveTypeId = $request->query('leave_type_id', '');
         $status = $request->query('status', '');
@@ -90,6 +97,10 @@ class LeaveApplicationController extends Controller
 
         $query = LeaveRequest::with(['employee', 'leaveType'])
             ->when(in_array($status, ['pending', 'approved', 'rejected', 'cancelled'], true), fn ($query) => $query->where('status', $status));
+
+        if ($role === 'chief') {
+            $this->scopeToChiefDivision($query);
+        }
 
         $this->applyFilters($query, $search, $leaveTypeId);
         $this->applySort($query, $sort);
@@ -118,6 +129,7 @@ class LeaveApplicationController extends Controller
             $query->where('hrstaff_status', 'pending');
         } elseif ($role === 'chief') {
             $query->whereIn('hrstaff_status', ['approved', 'rejected'])->where('chief_status', 'pending');
+            $this->scopeToChiefDivision($query);
         } elseif ($role === 'regionaldirector') {
             $query->whereIn('hrstaff_status', ['approved', 'rejected'])->where('chief_status', 'approved')->where('rd_status', 'pending');
         } else {
@@ -166,6 +178,11 @@ class LeaveApplicationController extends Controller
     public function show(LeaveRequest $leaveApplication): View
     {
         $leaveApplication->load(['employee', 'leaveType', 'chief', 'hrstaff', 'regionalDirector']);
+
+        if (strtolower(auth()->user()->role ?? '') === 'chief' && ! $this->chiefCanReviewEmployee($leaveApplication->employee)) {
+            abort(403);
+        }
+
         $leaveYear = Carbon::parse($leaveApplication->start_date)->year;
         $leaveApplication->employee?->ensureLeaveCredits($leaveYear);
 
@@ -186,6 +203,11 @@ class LeaveApplicationController extends Controller
     public function print(LeaveRequest $leaveApplication): View
     {
         $leaveApplication->load(['employee.user', 'employee.leaveCredits.leaveType', 'employee.pdsGovId', 'leaveType', 'chief', 'hrstaff', 'regionalDirector']);
+
+        if (strtolower(auth()->user()->role ?? '') === 'chief' && ! $this->chiefCanReviewEmployee($leaveApplication->employee)) {
+            abort(403);
+        }
+
         $leaveApplication->employee?->ensureLeaveCredits(Carbon::parse($leaveApplication->start_date)->year);
 
         return view('leaves.print', ['leaveRequest' => $leaveApplication]);
@@ -197,6 +219,12 @@ class LeaveApplicationController extends Controller
         
         if ($role === 'admin') {
             return redirect()->back()->with('error', __('Admin role has read-only viewing access for leave applications. Approvals must be performed by HR, Chief, or Regional Director.'));
+        }
+
+        $leaveApplication->loadMissing('employee');
+
+        if ($role === 'chief' && ! $this->chiefCanReviewEmployee($leaveApplication->employee)) {
+            return redirect()->route('leave-applications.index')->with('error', __('You can only review leave applications from your division.'));
         }
 
         $employeeId = auth()->user()->employee?->id;
@@ -216,10 +244,8 @@ class LeaveApplicationController extends Controller
                     $leaveApplication->approved_by_hrstaff = $employeeId;
                     $leaveApplication->hrstaff_remarks = $remarks;
                     
-                    // Notify Chief
-                    $nextLevelUsers = User::whereHas('employee', function ($query) {
-                        $query->where('account_role', 'chief');
-                    })->get();
+                    // Notify only the chief assigned to the employee's division.
+                    $nextLevelUsers = $this->chiefUsersForEmployee($leaveApplication->employee);
                     Notification::send($nextLevelUsers, new LeaveRequestNotification($leaveApplication));
                 } else {
                     $leaveApplication->status = 'rejected';
@@ -239,10 +265,8 @@ class LeaveApplicationController extends Controller
                     $leaveApplication->approved_by_hrstaff = $employeeId;
                     $leaveApplication->hrstaff_remarks = $remarks;
 
-                    // Notify Chief
-                    $nextLevelUsers = User::whereHas('employee', function ($query) {
-                        $query->where('account_role', 'chief');
-                    })->get();
+                    // Notify only the chief assigned to the employee's division.
+                    $nextLevelUsers = $this->chiefUsersForEmployee($leaveApplication->employee);
                     Notification::send($nextLevelUsers, new LeaveRequestNotification($leaveApplication));
                 } elseif ($role === 'chief') {
                     $leaveApplication->chief_status = 'approved';
@@ -291,5 +315,46 @@ class LeaveApplicationController extends Controller
         );
 
         return redirect()->route('leave-applications.index')->with('success', __('Leave application updated successfully.'));
+    }
+
+    private function scopeToChiefDivision($query): void
+    {
+        $division = $this->currentChiefDivision();
+
+        if ($division === '') {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereHas('employee', fn ($employeeQuery) => $employeeQuery->where('division', $division));
+    }
+
+    private function chiefUsersForEmployee(?Employee $employee)
+    {
+        $division = trim((string) $employee?->division);
+
+        if ($division === '') {
+            return collect();
+        }
+
+        return User::whereHas('employee', function ($query) use ($division) {
+            $query
+                ->whereIn('account_role', ['chief', 'CHIEF'])
+                ->where('division', $division);
+        })->get();
+    }
+
+    private function chiefCanReviewEmployee(?Employee $employee): bool
+    {
+        $chiefDivision = $this->currentChiefDivision();
+        $employeeDivision = trim((string) $employee?->division);
+
+        return $chiefDivision !== '' && $employeeDivision !== '' && strcasecmp($chiefDivision, $employeeDivision) === 0;
+    }
+
+    private function currentChiefDivision(): string
+    {
+        return trim((string) auth()->user()?->employee?->division);
     }
 }

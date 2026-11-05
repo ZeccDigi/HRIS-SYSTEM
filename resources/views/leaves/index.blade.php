@@ -1,8 +1,8 @@
 <x-app-layout>
     <x-slot name="title">{{ __('My Leave Requests') }}</x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8" x-data="myLeaveApplicationTable()" x-init="init()">
+    <div class="p-3 sm:p-4 lg:p-5">
+        <div class="w-full" x-data="myLeaveApplicationTable()" x-init="init()">
             @if(session('success'))
                 <div class="mb-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700">
                     {{ session('success') }}
@@ -16,18 +16,10 @@
 
             @php
                 $currentYear = now()->year;
-                $leaveTypes = $leaves
-                    ->map(fn ($leave) => (string) Str::of($leave->leaveType?->name ?? '')
-                        ->replaceMatches('/\s+Leave\b/i', '')
-                        ->trim())
-                    ->filter()
-                    ->unique()
-                    ->sort()
-                    ->values();
             @endphp
 
             {{-- Year filter and action button positioned like the Travel Authority page --}}
-            <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-end">
+            <div class="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
                 <div class="flex items-center gap-2">
                     <label for="my_leave_year" class="text-sm font-semibold text-gray-700">{{ __('Year') }}</label>
                     <select id="my_leave_year" x-model="year" @change="applyFilters()" class="h-10 w-28 appearance-none rounded-lg border-gray-300 bg-white pl-4 pr-10 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
@@ -47,7 +39,7 @@
 
             <div x-data="{ tab: 'applications' }">
                 <!-- Tabs Navigation -->
-                <div class="border-b border-gray-200 mb-6">
+                <div class="mb-4 border-b border-gray-200">
                     <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                         <button @click="tab = 'applications'"
                                 :class="tab === 'applications' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
@@ -113,7 +105,7 @@
                 <!-- Leave Applications Tab -->
                 <div x-show="tab === 'applications'" style="display: none;" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
                     <!-- Search and Filters -->
-                    <div class="mb-4 flex w-full flex-nowrap items-center gap-2 overflow-x-auto rounded-xl border border-gray-100 bg-gray-50/70 p-2">
+                    <div class="mb-4 flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
                         <div class="relative min-w-[260px] flex-1">
                             <label for="my_leave_search" class="sr-only">{{ __('Search leave application') }}</label>
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -150,8 +142,8 @@
                         </button>
                     </div>
 
-                    <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                        <div class="w-full overflow-x-auto">
+                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
+                        <div class="w-full overflow-x-auto lg:overflow-x-visible">
                              <table class="w-full table-fixed divide-y divide-gray-100">
                                 <colgroup>
                                     <col class="w-[13%]">
@@ -162,7 +154,7 @@
                                     <col class="w-[10%]">
                                     <col class="w-[8%]">
                                 </colgroup>
-                                <thead class="bg-gray-50">
+                                <thead class="bg-slate-50">
                                     <tr>
                                         <th scope="col" class="break-words px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
                                             Date Filed
@@ -317,7 +309,7 @@
                                             </td>
                                         </tr>
                                     @endforelse
-                                    @if($leaves->isNotEmpty())
+                                    @if($leaves->count() > 0)
                                         <tr x-show="noResults" style="display: none;">
                                             <td colspan="7" class="px-6 py-12 text-center">
                                                 <p class="text-gray-500 italic font-medium">
@@ -329,6 +321,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        @include('partials.table-pagination', ['paginator' => $leaves, 'label' => __('leave requests')])
                     </div>
                 </div>
             </div>
@@ -535,10 +528,10 @@
         function myLeaveApplicationTable(initialSelectedId = '') {
             return {
                 selectedId: initialSelectedId ? String(initialSelectedId) : '',
-                search: '',
-                year: '{{ now()->year }}',
-                leaveType: '',
-                status: '',
+                search: @js($search),
+                year: @js((string) $year),
+                leaveType: @js($leaveType),
+                status: @js($status),
                 rows: [],
                 noResults: false,
                 createModalOpen: false,
@@ -556,35 +549,33 @@
                 },
                 init() {
                     this.rows = Array.from(document.querySelectorAll('[data-leave-row]'));
-                    this.applyFilters();
                 },
                 selectRow(id) {
                     this.selectedId = String(id);
                 },
                 applyFilters() {
-                    const search = this.search.trim().toLowerCase();
-                    const tbody = document.getElementById('myLeaveApplicationTableBody');
-                    let visibleCount = 0;
+                    const url = new URL(@js(route('leaves.index')));
 
-                    this.rows.forEach((row) => {
-                            const matchesSearch = !search || row.dataset.search.includes(search);
-                            const matchesYear = !this.year || row.dataset.year === this.year;
-                            const matchesType = !this.leaveType || row.dataset.leaveType === this.leaveType;
-                            const matchesStatus = !this.status || row.dataset.status === this.status;
-                            const isVisible = matchesSearch && matchesYear && matchesType && matchesStatus;
+                    if (this.search.trim()) {
+                        url.searchParams.set('search', this.search.trim());
+                    }
 
-                            row.classList.toggle('hidden', !isVisible);
-                            if (isVisible) visibleCount++;
-                        });
+                    if (this.year) {
+                        url.searchParams.set('year', this.year);
+                    }
 
-                    this.noResults = this.rows.length > 0 && visibleCount === 0;
+                    if (this.leaveType) {
+                        url.searchParams.set('leave_type', this.leaveType);
+                    }
+
+                    if (this.status) {
+                        url.searchParams.set('status', this.status);
+                    }
+
+                    window.location.href = url.toString();
                 },
                 reset() {
-                    this.search = '';
-                    this.year = '{{ now()->year }}';
-                    this.leaveType = '';
-                    this.status = '';
-                    this.applyFilters();
+                    window.location.href = @js(route('leaves.index'));
                 },
                 openCreateModal(url, title) {
                     this.createModalUrl = url;

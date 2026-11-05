@@ -28,23 +28,76 @@
             ? trim(($regionalDirector->firstname ?? '') . ' ' . ($regionalDirector->middlename ? mb_substr($regionalDirector->middlename, 0, 1) . '. ' : '') . ($regionalDirector->lastname ?? ''))
             : 'MARIA CAROLINA B. AGDAMAG';
         $printMonthPeriod = $selectedDate->format('F 1') . ' - ' . $selectedDate->copy()->endOfMonth()->format('F j, Y');
-        $officialEnd = \Carbon\Carbon::parse('17:00:00');
-        $printDays = collect(range(1, 31))->map(function ($dayNumber) use ($selectedDate, $recordsByDate, $officialEnd) {
-            $day = $dayNumber <= $selectedDate->daysInMonth ? $selectedDate->copy()->day($dayNumber) : null;
-            $record = $day ? $recordsByDate->get($day->format('Y-m-d'), collect())->first() : null;
-            $undertimeMinutes = 0;
+        $actualWorkedMinutes = function ($record) {
+            if (! $record) {
+                return 0;
+            }
 
-            if ($day && $record?->time_out && ! $day->isWeekend()) {
-                $timeOut = \Carbon\Carbon::parse($record->time_out);
+            $minutes = 0;
 
-                if ($timeOut->format('H:i:s') < $officialEnd->format('H:i:s')) {
-                    $undertimeMinutes = $officialEnd->diffInMinutes($timeOut);
+            if ($record->time_in && $record->am_out) {
+                $minutes += \Carbon\Carbon::parse($record->time_in)->diffInMinutes(\Carbon\Carbon::parse($record->am_out));
+            }
+
+            if ($record->pm_in && $record->time_out) {
+                $minutes += \Carbon\Carbon::parse($record->pm_in)->diffInMinutes(\Carbon\Carbon::parse($record->time_out));
+            }
+
+            if ($minutes === 0 && $record->time_in && $record->time_out) {
+                $minutes = \Carbon\Carbon::parse($record->time_in)->diffInMinutes(\Carbon\Carbon::parse($record->time_out));
+
+                if ($minutes > 240) {
+                    $minutes -= 60;
                 }
             }
+
+            return max(0, $minutes);
+        };
+        $lateMinutesForRecord = function ($record) {
+            if (! $record) {
+                return 0;
+            }
+
+            $minutes = 0;
+
+            if ($record->time_in && \Carbon\Carbon::parse($record->time_in)->format('H:i:s') > '08:00:00') {
+                $minutes += \Carbon\Carbon::parse('08:00:00')->diffInMinutes(\Carbon\Carbon::parse($record->time_in));
+            }
+
+            if ($record->pm_in && \Carbon\Carbon::parse($record->pm_in)->format('H:i:s') > '13:00:00') {
+                $minutes += \Carbon\Carbon::parse('13:00:00')->diffInMinutes(\Carbon\Carbon::parse($record->pm_in));
+            }
+
+            return $minutes;
+        };
+        $undertimeMinutesForRecord = function ($record) {
+            if (! $record) {
+                return 0;
+            }
+
+            $minutes = 0;
+
+            if ($record->am_out && \Carbon\Carbon::parse($record->am_out)->format('H:i:s') < '12:00:00') {
+                $minutes += \Carbon\Carbon::parse($record->am_out)->diffInMinutes(\Carbon\Carbon::parse('12:00:00'));
+            }
+
+            if ($record->time_out && \Carbon\Carbon::parse($record->time_out)->format('H:i:s') < '17:00:00') {
+                $minutes += \Carbon\Carbon::parse($record->time_out)->diffInMinutes(\Carbon\Carbon::parse('17:00:00'));
+            }
+
+            return $minutes;
+        };
+        $attendanceEventsByDate = collect($attendanceEventsByDate ?? []);
+        $printDays = collect(range(1, 31))->map(function ($dayNumber) use ($selectedDate, $recordsByDate, $undertimeMinutesForRecord, $attendanceEventsByDate) {
+            $day = $dayNumber <= $selectedDate->daysInMonth ? $selectedDate->copy()->day($dayNumber) : null;
+            $record = $day ? $recordsByDate->get($day->format('Y-m-d'), collect())->first() : null;
+            $approvedEvent = $day ? $attendanceEventsByDate->get($day->format('Y-m-d')) : null;
+            $undertimeMinutes = $day && ! $day->isWeekend() && ! $approvedEvent ? $undertimeMinutesForRecord($record) : 0;
 
             return [
                 'day_number' => $dayNumber,
                 'record' => $record,
+                'approved_event' => $approvedEvent,
                 'undertime_hours' => $undertimeMinutes > 0 ? intdiv($undertimeMinutes, 60) : '',
                 'undertime_minutes' => $undertimeMinutes > 0 ? $undertimeMinutes % 60 : '',
                 'total_undertime_minutes' => $undertimeMinutes,
@@ -53,14 +106,14 @@
         $totalUndertimeMinutes = $printDays->sum('total_undertime_minutes');
         $totalUndertimeHours = $totalUndertimeMinutes > 0 ? intdiv($totalUndertimeMinutes, 60) : '';
         $totalUndertimeRemainder = $totalUndertimeMinutes > 0 ? $totalUndertimeMinutes % 60 : '';
-        $recordHours = function ($record) {
-            if (! $record->time_in || ! $record->time_out) {
+        $recordHours = function ($record) use ($actualWorkedMinutes) {
+            $minutes = $actualWorkedMinutes($record);
+
+            if ($minutes <= 0) {
                 return '';
             }
 
-            $hours = \Carbon\Carbon::parse($record->time_in)->diffInMinutes(\Carbon\Carbon::parse($record->time_out)) / 60;
-
-            return number_format($hours, 2);
+            return number_format($minutes / 60, 2);
         };
     @endphp
 
@@ -441,23 +494,24 @@
                                         @php
                                             $record = $recordsByDate->get($day->format('Y-m-d'), collect())->first();
                                             $isWeekend = $day->isWeekend();
+                                            $approvedEvent = $attendanceEventsByDate->get($day->format('Y-m-d'));
                                             $hours = $record ? $recordHours($record) : '';
-                                            $isLate = $record && strtolower($statusText($record)) === 'late';
-                                            $remarks = $record ? $statusText($record) : ($isWeekend ? 'Weekend' : '');
+                                            $lateMinutes = $record && ! $approvedEvent ? $lateMinutesForRecord($record) : 0;
+                                            $remarks = $approvedEvent['remarks'] ?? ($record ? $statusText($record) : ($isWeekend ? 'Weekend' : ''));
                                         @endphp
                                         <tr class="hover:bg-slate-50">
                                             <td class="border border-slate-300 px-2 py-1">{{ $day->day }}</td>
                                             <td class="border border-slate-300 px-2 py-1">{{ $day->format('D') }}</td>
-                                            <td class="border border-slate-300 px-2 py-1">{{ $record ? $formatTime($record->time_in) : '' }}</td>
-                                            <td class="border border-slate-300 px-2 py-1">{{ $record ? $formatTime($record->am_out) : '' }}</td>
-                                            <td class="border border-slate-300 px-2 py-1">{{ $record ? $formatTime($record->pm_in) : '' }}</td>
-                                            <td class="border border-slate-300 px-2 py-1">{{ $record ? $formatTime($record->time_out) : '' }}</td>
+                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->time_in && $approvedEvent ? 'font-semibold text-blue-700' : '' }}">{{ $record?->time_in ? $formatTime($record->time_in) : ($approvedEvent['status'] ?? '') }}</td>
+                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->am_out && $approvedEvent ? 'font-semibold text-blue-700' : '' }}">{{ $record?->am_out ? $formatTime($record->am_out) : ($approvedEvent['status'] ?? '') }}</td>
+                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->pm_in && $approvedEvent ? 'font-semibold text-blue-700' : '' }}">{{ $record?->pm_in ? $formatTime($record->pm_in) : ($approvedEvent['status'] ?? '') }}</td>
+                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->time_out && $approvedEvent ? 'font-semibold text-blue-700' : '' }}">{{ $record?->time_out ? $formatTime($record->time_out) : ($approvedEvent['status'] ?? '') }}</td>
                                             <td class="border border-slate-300 px-2 py-1"></td>
                                             <td class="border border-slate-300 px-2 py-1"></td>
                                             <td class="border border-slate-300 px-2 py-1">{{ $hours }}</td>
                                             <td class="border border-slate-300 px-2 py-1">{{ $isWeekend ? '' : '8.00' }}</td>
                                             <td class="border border-slate-300 px-2 py-1"></td>
-                                            <td class="border border-slate-300 px-2 py-1">{{ $isLate ? 'Late' : '' }}</td>
+                                            <td class="border border-slate-300 px-2 py-1">{{ $lateMinutes > 0 ? number_format($lateMinutes, 3) . ' min' : '' }}</td>
                                             <td class="border border-slate-300 px-2 py-1"></td>
                                             <td class="border border-slate-300 px-2 py-1 text-left">{{ $remarks }}</td>
                                         </tr>
@@ -501,7 +555,7 @@
                                                 <td class="border border-slate-300 px-2 py-1">{{ $lateDate->format('M d, Y') }}</td>
                                                 <td class="border border-slate-300 px-2 py-1">{{ $lateDate->format('D') }}</td>
                                                 <td class="border border-slate-300 px-2 py-1">{{ $formatTime($lateRecord->time_in) ?: 'N/A' }}</td>
-                                                <td class="border border-slate-300 px-2 py-1">Late</td>
+                                                <td class="border border-slate-300 px-2 py-1">{{ number_format($lateMinutesForRecord($lateRecord), 3) }} min</td>
                                                 <td class="border border-slate-300 px-2 py-1">{{ $lateRecord->status ?: 'Late arrival' }}</td>
                                             </tr>
                                         @empty
@@ -611,13 +665,16 @@
                                             </thead>
                                             <tbody>
                                                 @foreach($printDays as $dayRow)
-                                                    @php $record = $dayRow['record']; @endphp
+                                                    @php
+                                                        $record = $dayRow['record'];
+                                                        $approvedEvent = $dayRow['approved_event'];
+                                                    @endphp
                                                     <tr>
                                                         <td>{{ $dayRow['day_number'] }}</td>
-                                                        <td>{{ $record ? $formatTime($record->time_in) : '' }}</td>
-                                                        <td>{{ $record ? $formatTime($record->am_out) : '' }}</td>
-                                                        <td>{{ $record ? $formatTime($record->pm_in) : '' }}</td>
-                                                        <td>{{ $record ? $formatTime($record->time_out) : '' }}</td>
+                                                        <td>{{ $record?->time_in ? $formatTime($record->time_in) : ($approvedEvent['print_label'] ?? '') }}</td>
+                                                        <td>{{ $record?->am_out ? $formatTime($record->am_out) : ($approvedEvent['print_label'] ?? '') }}</td>
+                                                        <td>{{ $record?->pm_in ? $formatTime($record->pm_in) : ($approvedEvent['print_label'] ?? '') }}</td>
+                                                        <td>{{ $record?->time_out ? $formatTime($record->time_out) : ($approvedEvent['print_label'] ?? '') }}</td>
                                                         <td>{{ $dayRow['undertime_hours'] }}</td>
                                                         <td>{{ $dayRow['undertime_minutes'] }}</td>
                                                     </tr>

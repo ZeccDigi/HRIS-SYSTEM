@@ -62,6 +62,19 @@ class LoginRequest extends FormRequest
         // Block unverified users — log them out so the controller can redirect to OTP
         $user = Auth::user();
 
+        if (
+            $user instanceof User
+            && $user->email_verified_at === null
+            && $user->must_change_password
+            && $user->employee
+        ) {
+            $user->forceFill([
+                'email_verified_at' => now(),
+                'is_approved' => true,
+                'account_status' => 'active',
+            ])->save();
+        }
+
         if ($user instanceof User && $user->email_verified_at === null) {
             Auth::logout();
 
@@ -71,6 +84,18 @@ class LoginRequest extends FormRequest
         }
 
         // Block unapproved users — they cannot access the system at all
+        if (
+            $user instanceof User
+            && ! $user->is_approved
+            && $user->must_change_password
+            && $user->employee
+        ) {
+            $user->forceFill([
+                'is_approved' => true,
+                'account_status' => 'active',
+            ])->save();
+        }
+
         if ($user instanceof User && ! $user->is_approved) {
             Auth::logout();
 

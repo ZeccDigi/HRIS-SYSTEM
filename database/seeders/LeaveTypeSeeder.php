@@ -91,6 +91,12 @@ class LeaveTypeSeeder extends Seeder
                 'legal_basis' => 'Sec. 22 of Republic Act No. 8552 (Domestic Adoption Act of 1998)',
                 'days_per_year' => 7,
             ],
+            [
+                'name' => 'Wellness Leave',
+                'description' => 'Leave intended for mental health care, physical wellness activities, or a general break from work. It is separate from Vacation Leave, Sick Leave, and Special Privilege Leave; non-cumulative, non-commutable, and forfeited if unused within the calendar year.',
+                'legal_basis' => 'CSC Memorandum Circular No. 01, s. 2026 (Wellness Leave Policy)',
+                'days_per_year' => 5,
+            ],
         ];
 
         foreach ($leaveTypes as $leaveType) {

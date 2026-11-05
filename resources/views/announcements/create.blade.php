@@ -18,7 +18,12 @@
 
                         <div>
                             <label for="tags" class="block text-sm font-semibold text-gray-700 mb-1">{{ __('Tags (Comma separated)') }}</label>
-                            <input type="text" name="tags" id="tags" value="{{ old('tags') }}" placeholder="HR, Event, Important" class="w-full px-4 py-3 rounded-xl border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all text-sm @error('tags') border-red-500 @enderror">
+                            @if(strtolower(auth()->user()->role ?? '') === 'chief')
+                                <input type="hidden" name="tags" value="Office Orders">
+                                <div class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700">{{ __('Office Orders — Your division only') }}</div>
+                            @else
+                                <input type="text" name="tags" id="tags" value="{{ old('tags') }}" placeholder="HR, Event, Important" class="w-full px-4 py-3 rounded-xl border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all text-sm @error('tags') border-red-500 @enderror">
+                            @endif
                             @error('tags')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror

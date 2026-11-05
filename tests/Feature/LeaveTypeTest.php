@@ -19,7 +19,7 @@ test('leave type seeder creates all leave types with descriptions and legal basi
 
     $leaveTypes = LeaveType::all();
 
-    expect($leaveTypes)->toHaveCount(13);
+    expect($leaveTypes)->toHaveCount(14);
 
     $leaveTypes->each(function ($leaveType) {
         expect($leaveType->description)->not->toBeNull();

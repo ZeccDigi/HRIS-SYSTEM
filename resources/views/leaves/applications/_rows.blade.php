@@ -208,68 +208,6 @@
             <i class="fa-solid fa-print text-sm"></i>
         </a>
 
-        @if(($actionMode ?? 'view') === 'review')
-            {{-- Approve --}}
-            <form
-                action="{{ route('leave-applications.update', $leaf->id) }}"
-                method="POST"
-                id="leaveApproveRowForm_{{ $leaf->id }}"
-                class="m-0 flex h-8 w-8 items-center justify-center"
-            >
-                @csrf
-                @method('PUT')
-
-                <input type="hidden" name="status" value="approved">
-
-                <button
-                    type="button"
-                    onclick="openLeaveApproveModal(
-                        {{ $leaf->id }},
-                        @js('Leave-'.$leaf->id),
-                        {{ $isHR ? 'true' : 'false' }}
-                    )"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 transition-colors hover:bg-green-50 hover:text-green-800"
-                    title="{{ $isHR ? __('Verify') : __('Approve') }}"
-                    aria-label="{{ $isHR ? __('Verify') : __('Approve') }}"
-                >
-                    <i class="fa-solid fa-check text-sm"></i>
-                </button>
-            </form>
-
-            {{-- Reject --}}
-            <form
-                action="{{ route('leave-applications.update', $leaf->id) }}"
-                method="POST"
-                id="leaveRejectRowForm_{{ $leaf->id }}"
-                class="m-0 flex h-8 w-8 items-center justify-center"
-            >
-                @csrf
-                @method('PUT')
-
-                <input type="hidden" name="status" value="rejected">
-
-                <input
-                    type="hidden"
-                    name="remarks"
-                    id="leaveRejectRowRemarks_{{ $leaf->id }}"
-                    value=""
-                >
-
-                <button
-                    type="button"
-                    onclick="openLeaveRejectModal(
-                        {{ $leaf->id }},
-                        @js('Leave-'.$leaf->id),
-                        {{ $isHR ? 'true' : 'false' }}
-                    )"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 hover:text-red-800"
-                    title="{{ __('Decline') }}"
-                    aria-label="{{ __('Decline') }}"
-                >
-                    <i class="fa-solid fa-xmark text-sm"></i>
-                </button>
-            </form>
-        @endif
     </div>
 </td>
 

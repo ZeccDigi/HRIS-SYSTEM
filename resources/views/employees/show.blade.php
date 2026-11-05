@@ -1,7 +1,13 @@
 <x-app-layout>
     <x-slot name="title">{{ __('Employee Details') }} - {{ $employee->firstname }} {{ $employee->lastname }}</x-slot>
 
-    <div class="px-4 py-6 sm:px-5 lg:px-6" x-data="{ tab: 'pds', reviewModalOpen: false, currentSection: '', sectionData: null, changedFields: [], changedEntries: [], reviewStatus: 'pending', reviewRemarks: '', salnModalOpen: false, selectedSaln: null, isChangedField(key, index = null) { return this.changedFields.includes(key) || (index !== null && this.changedEntries.includes(index)); } }" x-init="if (window.location.hash === '#leave-credits') tab = 'leave-credits'">
+    @php
+        $employeeInitialTab = in_array(request('tab'), ['pds', 'leave-credits', 'cto-credits', 'saln'], true)
+            ? request('tab')
+            : 'pds';
+    @endphp
+
+    <div class="px-4 py-6 sm:px-5 lg:px-6" x-data="{ tab: @js($employeeInitialTab), reviewModalOpen: false, currentSection: '', sectionData: null, changedFields: [], changedEntries: [], reviewStatus: 'pending', reviewRemarks: '', salnModalOpen: false, selectedSaln: null, isChangedField(key, index = null) { return this.changedFields.includes(key) || (index !== null && this.changedEntries.includes(index)); } }" x-init="if (window.location.hash === '#leave-credits') tab = 'leave-credits'">
         <div class="mx-auto w-full">
             <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <a href="{{ route('employees.index') }}" class="inline-flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50">
@@ -35,7 +41,7 @@
                             {{ $employee->lastname }}, {{ $employee->firstname }} {{ $employee->middlename }}
                         </h1>
                         <div class="mt-2 flex min-w-0 items-center justify-center gap-3 text-sm font-normal text-gray-500 md:justify-start">
-                            <span class="truncate">{{ $employee->user?->email ?? __('No linked login account') }}</span>
+                            <span class="truncate">{{ $employee->notification_email ?: ($employee->pdsPersonal?->email_address ?: __('No personal email provided')) }}</span>
                             <span class="shrink-0">|</span>
                             <span class="truncate">{{ $employee->position ?: __('No position') }}</span>
                             <span class="shrink-0">|</span>
@@ -65,7 +71,108 @@
             <div class="space-y-6">
                 <!-- PDS Tab -->
                 <div x-show="tab === 'pds'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
-                    <div class="w-full space-y-6">
+                    @php
+                        $pdsReviewSections = [
+                            'Personal Information' => $employee->pdsPersonal,
+                            'Family Background' => [
+                                'family' => $employee->pdsFamily,
+                                'children' => $employee->pdsChildren,
+                            ],
+                            'Educational Background' => $employee->pdsEducation,
+                            'Civil Service Eligibility' => $employee->pdsEligibilities,
+                            'Work Experience' => $employee->pdsWorkExperiences,
+                            'Voluntary Work' => $employee->pdsVoluntaryWorks,
+                            'Training' => $employee->pdsTrainings,
+                            'Other Information' => $employee->pdsOthers,
+                            'Questionnaire' => $employee->pdsQuestionnaire,
+                            'References' => [
+                                'references' => $employee->pdsReferences,
+                                'government_id' => $employee->pdsGovId,
+                            ],
+                        ];
+
+                        $pdsPendingReviews = $employee->pdsSectionReviews
+                            ->filter(function ($review) use ($pdsReviewChangedFields) {
+                                $changed = $pdsReviewChangedFields[$review->section_name] ?? ['fields' => [], 'entries' => []];
+
+                                return $review->status === 'pending'
+                                    && (count($changed['fields']) > 0 || count($changed['entries']) > 0);
+                            })
+                            ->sortBy('section_name')
+                            ->values();
+                    @endphp
+
+                    <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+                        <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h3 class="text-xl font-black tracking-tight text-gray-900">{{ __('PDS Updates for Verification') }}</h3>
+                                <p class="mt-1 text-sm font-medium text-slate-500">{{ __('Pending employee changes that need HR review.') }}</p>
+                            </div>
+                            <a href="{{ route('employees.pds.print', ['employee' => $employee->id]) }}" data-no-transition class="inline-flex h-11 items-center justify-center rounded-xl bg-indigo-600 px-5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700">
+                                {{ __('Open Preview') }}
+                            </a>
+                        </div>
+
+                        <div class="overflow-hidden rounded-xl border border-slate-200">
+                            @if($pdsPendingReviews->isNotEmpty())
+                                <table class="w-full table-fixed divide-y divide-slate-100">
+                                    <thead class="bg-slate-50">
+                                        <tr>
+                                            <th class="w-[42%] px-5 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">{{ __('Section') }}</th>
+                                            <th class="w-[30%] px-5 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">{{ __('Updates') }}</th>
+                                            <th class="w-[16%] px-5 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">{{ __('Status') }}</th>
+                                            <th class="w-[12%] px-5 py-4 text-center text-xs font-black uppercase tracking-widest text-slate-500">{{ __('Actions') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 bg-white">
+                                        @foreach($pdsPendingReviews as $review)
+                                            @php
+                                                $changed = $pdsReviewChangedFields[$review->section_name] ?? ['fields' => [], 'entries' => []];
+                                                $updateCount = count($changed['fields']) + count($changed['entries']);
+                                            @endphp
+                                            <tr>
+                                                <td class="px-5 py-4 align-middle">
+                                                    <div class="text-sm font-black text-slate-900">{{ $review->section_name }}</div>
+                                                </td>
+                                                <td class="px-5 py-4 align-middle">
+                                                    <div class="text-sm font-semibold text-slate-600">
+                                                        {{ $updateCount }} {{ \Illuminate\Support\Str::plural('updated item', $updateCount) }}
+                                                    </div>
+                                                </td>
+                                                <td class="px-5 py-4 align-middle">
+                                                    <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-amber-700">
+                                                        {{ __('Pending') }}
+                                                    </span>
+                                                </td>
+                                                <td class="px-5 py-4 align-middle">
+                                                    <div class="flex justify-center">
+                                                        <button type="button" @click="reviewModalOpen = true; currentSection = @js($review->section_name); sectionData = @js($pdsReviewSections[$review->section_name] ?? null); changedFields = @js($changed['fields']); changedEntries = @js($changed['entries']); reviewStatus = 'approved'; reviewRemarks = @js($review->remarks ?? '')" class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition hover:bg-indigo-100" title="{{ __('Review update') }}">
+                                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.269 2.943 9.542 7-1.273 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            @else
+                                <div class="flex min-h-[220px] flex-col items-center justify-center bg-slate-50 px-6 py-10 text-center">
+                                    <div class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <p class="text-sm font-black text-slate-900">{{ __('No pending PDS updates.') }}</p>
+                                    <p class="mt-1 text-sm font-medium text-slate-500">{{ __('Employee changes that need verification will appear here.') }}</p>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="hidden w-full space-y-6">
                         <div class="bg-white border border-gray-100 p-6 sm:p-8 rounded-2xl shadow-sm">
                             @php
                                 $sections = [
@@ -445,8 +552,19 @@
                     style="display: none;"
                 >
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5">
-                        <div class="flex justify-between items-center mb-5">
-                            <h3 class="text-xl font-black text-gray-900 tracking-tight">{{ __('SALN Records') }}</h3>
+                        <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h3 class="text-xl font-black text-gray-900 tracking-tight">{{ __('SALN Records') }}</h3>
+                                <p class="mt-1 text-sm font-medium text-slate-500">{{ __('Employee Statement of Assets, Liabilities, and Net Worth records.') }}</p>
+                            </div>
+                            @if($employee->salns && $employee->salns->count() > 0)
+                                @php
+                                    $latestSalnRecord = $employee->salns->sortByDesc('as_of_date')->first();
+                                @endphp
+                                <a href="{{ route('salns.show', ['saln' => $latestSalnRecord, 'back' => route('employees.show', ['employee' => $employee, 'tab' => 'saln'])]) }}" data-no-transition class="inline-flex h-11 items-center justify-center rounded-xl bg-indigo-600 px-5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700">
+                                    {{ __('Open Preview') }}
+                                </a>
+                            @endif
                         </div>
 
                         @if($employee->salns && $employee->salns->count() > 0)
@@ -496,8 +614,8 @@
                                                 <td class="px-3 py-4">
                                                     <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider {{ $salnStatusClass }}">{{ $salnStatusLabel }}</span>
                                                 </td>
-                                                <td class="px-3 py-4 text-right text-sm font-medium">
-                                                    <div class="grid grid-cols-2 gap-2">
+                                                <td class="px-3 py-4 text-center text-sm font-medium">
+                                                    <div class="flex items-center justify-center gap-1.5">
                                                     <a href="{{ route('salns.show', ['saln' => $saln, 'back' => route('employees.show', ['employee' => $employee, 'tab' => 'saln'])]) }}" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 transition-colors hover:bg-indigo-100 hover:text-indigo-900" title="View SALN Preview" aria-label="View SALN Preview">
                                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z" />
@@ -516,18 +634,18 @@
                                                                 </svg>
                                                             </button>
                                                         </form>
+                                                        <button
+                                                            type="button"
+                                                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                                            title="Return SALN"
+                                                            aria-label="Return SALN"
+                                                            @click="salnReturnAction = '{{ route('salns.review', $saln) }}'; salnReturnRemarks = ''; salnReturnOpen = true"
+                                                        >
+                                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                        </button>
                                                     @endif
-                                                    <button
-                                                        type="button"
-                                                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100"
-                                                        title="Return SALN"
-                                                        aria-label="Return SALN"
-                                                        @click="salnReturnAction = '{{ route('salns.review', $saln) }}'; salnReturnRemarks = ''; salnReturnOpen = true"
-                                                    >
-                                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
-                                                    </button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -536,16 +654,25 @@
                                 </table>
                             </div>
                             <div x-show="salnReturnOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-                                <form method="POST" :action="salnReturnAction" class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                                <form method="POST" :action="salnReturnAction" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl border border-slate-100 font-sans">
                                     @csrf
                                     @method('PATCH')
                                     <input type="hidden" name="review_status" value="returned">
-                                    <h4 class="text-lg font-black text-slate-900">Return SALN</h4>
-                                    <p class="mt-1 text-sm font-medium text-slate-500">Enter the remarks for the employee.</p>
-                                    <textarea name="review_remarks" x-model="salnReturnRemarks" rows="4" class="mt-4 w-full rounded-xl border-gray-200 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required></textarea>
-                                    <div class="mt-5 flex justify-end gap-3">
-                                        <button type="button" @click="salnReturnOpen = false" class="rounded-lg px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50">Cancel</button>
-                                        <button type="submit" class="rounded-lg bg-rose-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-rose-700">Return</button>
+                                    <div class="flex flex-col gap-1 border-b border-slate-100 pb-3">
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-blue-800">Current Review Stage</p>
+                                        <h4 class="text-lg font-black text-slate-900">Return SALN Submission</h4>
+                                    </div>
+                                    <div class="pt-4">
+                                        <label for="saln_modal_review_remarks" class="block text-[11px] font-black uppercase tracking-widest text-slate-600">Remarks / Notes</label>
+                                        <textarea id="saln_modal_review_remarks" name="review_remarks" x-model="salnReturnRemarks" rows="4" placeholder="Enter remarks or notes here..." class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required></textarea>
+                                        <p class="mt-1.5 text-xs font-medium text-slate-400">Remarks are required when rejecting or returning the SALN submission.</p>
+                                    </div>
+                                    <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                        <button type="button" @click="salnReturnOpen = false" class="inline-flex min-w-28 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">Cancel</button>
+                                        <button type="submit" class="inline-flex min-w-44 items-center justify-center rounded-xl border border-red-300 bg-white px-6 py-2.5 text-xs font-black uppercase tracking-widest text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2">
+                                            <i class="fa-solid fa-xmark mr-2"></i>
+                                            Reject Request
+                                        </button>
                                     </div>
                                 </form>
                             </div>

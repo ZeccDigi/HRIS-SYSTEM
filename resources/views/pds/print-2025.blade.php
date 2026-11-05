@@ -32,46 +32,54 @@
         ];
     })->values();
 
-    function pdsText(mixed $value, string $fallback = ''): string
-    {
-        $value = trim((string) ($value ?? ''));
-        return $value !== '' ? $value : $fallback;
-    }
-
-    function pdsDate(mixed $value): string
-    {
-        if (blank($value)) {
-            return '';
-        }
-        try {
-            return \Carbon\Carbon::parse($value)->format('d/m/Y');
-        } catch (Throwable) {
-            return (string) $value;
+    if (! function_exists('pdsText')) {
+        function pdsText(mixed $value, string $fallback = ''): string
+        {
+            $value = trim((string) ($value ?? ''));
+            return $value !== '' ? $value : $fallback;
         }
     }
 
-    function pdsYesNo(mixed $value): string
-    {
-        if ($value === null || $value === '') {
-            return '';
+    if (! function_exists('pdsDate')) {
+        function pdsDate(mixed $value): string
+        {
+            if (blank($value)) {
+                return '';
+            }
+            try {
+                return \Carbon\Carbon::parse($value)->format('d/m/Y');
+            } catch (Throwable) {
+                return (string) $value;
+            }
         }
-        return $value ? 'YES' : 'NO';
     }
 
-    function pdsChecked(mixed $value, string $expected): string
-    {
-        $value = strtolower(trim((string) ($value ?? '')));
-        $expected = strtolower($expected);
-
-        if ($expected === 'male') {
-            return $value === 'male' ? 'X' : '';
+    if (! function_exists('pdsYesNo')) {
+        function pdsYesNo(mixed $value): string
+        {
+            if ($value === null || $value === '') {
+                return '';
+            }
+            return $value ? 'YES' : 'NO';
         }
+    }
 
-        if ($expected === 'female') {
-            return $value === 'female' ? 'X' : '';
+    if (! function_exists('pdsChecked')) {
+        function pdsChecked(mixed $value, string $expected): string
+        {
+            $value = strtolower(trim((string) ($value ?? '')));
+            $expected = strtolower($expected);
+
+            if ($expected === 'male') {
+                return $value === 'male' ? 'X' : '';
+            }
+
+            if ($expected === 'female') {
+                return $value === 'female' ? 'X' : '';
+            }
+
+            return str_contains($value, $expected) ? 'X' : '';
         }
-
-        return str_contains($value, $expected) ? 'X' : '';
     }
 
     $signatureUrl = $employee->effective_signature_url ?? ($gov?->signature_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($gov->signature_path) : null);
@@ -170,16 +178,29 @@
     ];
 
     $photoMarkup = $photoUrl ? '<img src="'.e($photoUrl).'" alt="ID photo" class="pds-photo">' : '<span class="photo-placeholder">PHOTO</span>';
+    $isEmbeddedPreview = request()->boolean('embed');
+    $isHrPreview = $isHrPreview ?? false;
+    $backUrl = $backUrl ?? route('pds.index');
+    $pendingPdsReviewCount = $pendingPdsReviewCount ?? 0;
+    $selectedYear = $selectedYear ?? (int) now()->year;
+    $pdsYears = $pdsYears ?? collect([(int) now()->year]);
 @endphp
 
+@unless($isEmbeddedPreview)
 <x-app-layout>
 <x-slot name="title">{{ __('Personal Data Sheet Preview') }}</x-slot>
+@endunless
 <style>
 :root { --page-w: 215.9mm; --page-h: 330.2mm; --content-w: 202mm; --ink: #000; }
     * { box-sizing: border-box; }
     .pds-preview-page { margin: 0; background: #f8fafc; color: #000; font-family: Arial, Helvetica, sans-serif; }
+    .pds-preview-page.is-embedded { min-height: 0; background: transparent; padding: 0; }
+    .pds-preview-page.is-embedded .pds-toolbar { display: none; }
+    .pds-preview-page.is-embedded .pds-document { border-radius: 10px; box-shadow: none; }
     .pds-toolbar { display: flex; gap: 12px; justify-content: space-between; align-items: center; max-width: 900px; margin: 0 auto 1rem; padding: 0; font-family: Manrope, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     .pds-toolbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+    .pds-year-picker { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; color: #94a3b8; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .pds-year-picker select { height: 44px; min-width: 112px; border: 1px solid #f1f5f9; border-radius: 8px; background: #eef2ff; padding: 0 30px 0 12px; color: #334155; font-size: 13px; font-weight: 800; }
     .pds-toolbar button, .pds-toolbar a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 12px; padding: 0 20px; font-family: inherit; font-size: 13px; font-weight: 800; line-height: 1; text-decoration: none; cursor: pointer; transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; }
     .pds-toolbar svg { width: 16px; height: 16px; flex: 0 0 auto; }
     .pds-back { border: 1px solid #e5e7eb; background: #fff; color: #4b5563; box-shadow: 0 1px 4px rgba(15, 23, 42, .08); }
@@ -391,20 +412,30 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
     }
 </style>
 
-<div class="pds-preview-page min-h-screen py-8">
+<div class="pds-preview-page {{ $isEmbeddedPreview ? 'is-embedded' : 'min-h-screen py-8' }}">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="pds-toolbar">
-            <a href="{{ route('pds.index') }}" class="pds-back">
+            <a href="{{ $backUrl }}" class="pds-back">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
                 </svg>
                 Back
             </a>
             <div class="pds-toolbar-actions">
+                <form method="GET" action="{{ $isHrPreview ? route('employees.pds.print', $employee->getKey()) : route('pds.print') }}" class="pds-year-picker">
+                    <label for="pds_year">Year</label>
+                    <select id="pds_year" name="year" onchange="this.form.submit()">
+                        @foreach($pdsYears as $pdsYear)
+                            <option value="{{ $pdsYear }}" @selected((int) $selectedYear === (int) $pdsYear)>{{ $pdsYear }}</option>
+                        @endforeach
+                    </select>
+                </form>
                 <button type="button" onclick="window.print()" class="pds-primary">
                     Print PDF
                 </button>
-                <a href="{{ route('pds.download') }}" data-no-transition class="pds-secondary">Download PDF</a>
+                @unless($isHrPreview)
+                    <a href="{{ route('pds.download', ['year' => $selectedYear]) }}" data-no-transition class="pds-secondary">Download PDF</a>
+                @endunless
             </div>
         </div>
         <div class="pds-page-controls" data-pds-page-controls>
@@ -826,7 +857,7 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 <td rowspan="2" class="pds-item-number" style="border-left:0.55mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:center;vertical-align:middle;font-size:5.76pt;padding:0"><span class="pds-label">10.</span></td>
 <td rowspan="2" colspan="2" style="border-left:0;border-right:0.22mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt;padding-left:0.8mm"><span class="pds-label">UMID ID NO.</span></td>
 
-<td rowspan="2" colspan="3" style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-weight:700;font-size:7.20pt"><span class="pds-value">{{ pdsText($p?->umid_no ?? $p?->gsis_id_no) }}</span></td>
+<td rowspan="2" colspan="3" style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-weight:700;font-size:7.20pt"><span class="pds-value">{{ pdsText($p?->umid_no ? \App\Support\PdsFormatter::umidNo($p?->umid_no, '') : $p?->gsis_id_no) }}</span></td>
 
 
 <td style="border-left:0.55mm solid #000;border-right:0;border-top:0;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
@@ -858,7 +889,7 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 <td rowspan="2" class="pds-item-number" style="border-left:0.55mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:center;vertical-align:middle;font-size:5.76pt;padding:0"><span class="pds-label">11.</span></td>
 <td rowspan="2" colspan="2" style="border-left:0;border-right:0.22mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"><span class="pds-label">PAG-IBIG ID NO.</span></td>
 
-<td rowspan="2" colspan="3" style="border-left:0.22mm solid #000;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-weight:700;font-size:7.20pt"><span class="pds-value">{{ pdsText($p?->pagibig_id_no) }}</span></td>
+<td rowspan="2" colspan="3" style="border-left:0.22mm solid #000;border-right:0.55mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-weight:700;font-size:7.20pt"><span class="pds-value">{{ pdsText(\App\Support\PdsFormatter::pagibigIdNo($p?->pagibig_id_no, '')) }}</span></td>
 
 
 <td style="border-left:0.55mm solid #000;border-right:0;border-top:0;border-bottom:0;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"></td>
@@ -885,7 +916,7 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 <tr style="height:6.374mm; --rh:6.374mm">
 <td class="pds-item-number" style="border-left:0.55mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:center;vertical-align:middle;font-size:5.76pt;padding:0"><span class="pds-label">12.</span></td>
 <td colspan="2" style="border-left:0;border-right:0.22mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"><span class="pds-label">PHILHEALTH NO.</span></td>
-<td colspan="3" style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-weight:700;font-size:7.20pt"><span class="pds-value">{{ pdsText($p?->philhealth_no) }}</span></td>
+<td colspan="3" style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-weight:700;font-size:7.20pt"><span class="pds-value">{{ pdsText(\App\Support\PdsFormatter::philhealthNo($p?->philhealth_no, '')) }}</span></td>
 
 
 <td colspan="2" style="border-left:0.55mm solid #000;border-right:0.22mm solid #000;border-top:0;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:center;vertical-align:middle;white-space:pre-wrap;font-size:5.76pt"><span class="pds-label">ZIP CODE    </span></td>
@@ -897,7 +928,7 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 <tr style="height:6.374mm; --rh:6.374mm">
 <td class="pds-item-number" style="border-left:0.55mm solid #000;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:center;vertical-align:middle;font-size:5.76pt;padding:0"><span class="pds-label">13.</span></td>
 <td colspan="2" style="border-left:0;border-right:0.22mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"><span class="pds-label">PhilSys Number (PSN):</span></td>
-<td colspan="3" style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-weight:700;font-size:7.20pt"><span class="pds-value">{{ pdsText($p?->philsys_no) }}</span></td>
+<td colspan="3" style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-weight:700;font-size:7.20pt"><span class="pds-value">{{ pdsText(\App\Support\PdsFormatter::philsysNo($p?->philsys_no, '')) }}</span></td>
 
 
 <td colspan="2" style="border-left:0.55mm solid #000;border-right:0.22mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"><span class="pds-label">19. TELEPHONE NO.</span></td>
@@ -912,7 +943,7 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
 <td colspan="3" style="border-left:0.55mm solid #000;border-right:0.22mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#e6e6e6;text-align:left;vertical-align:middle;font-size:5.76pt"><span class="pds-label">14. TIN NO.</span></td>
 
 
-<td colspan="3" style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:7.20pt"><span class="pds-value">{{ pdsText($p?->tin_no) }}</span></td>
+<td colspan="3" style="border-left:0;border-right:0;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;text-align:center;vertical-align:middle;font-size:7.20pt"><span class="pds-value">{{ pdsText(\App\Support\PdsFormatter::tinNo($p?->tin_no, '')) }}</span></td>
 
 
 <td colspan="2" style="border-left:0.55mm solid #000;border-right:0.22mm solid #000;border-top:0.22mm solid #000;border-bottom:0.22mm solid #000;background:#EAEAEA;text-align:left;vertical-align:middle;font-size:5.76pt"><span class="pds-label">20. MOBILE NO.</span></td>
@@ -3727,6 +3758,28 @@ PLEASE INDICATE ID Number and Date of Issuance</span></td>
 @endforeach
 </div>
 <script>
+@if($isHrPreview)
+function submitPdsReview(action) {
+    const remarks = document.getElementById('pds_review_remarks');
+    const form = document.getElementById(action === 'reject' ? 'pds_reject_form' : 'pds_approve_form');
+    const hiddenRemarks = form?.querySelector('input[name="remarks"]');
+
+    if (!remarks || !form || !hiddenRemarks) {
+        return;
+    }
+
+    if (action === 'reject' && !remarks.value.trim()) {
+        remarks.setCustomValidity('Remarks are required when rejecting PDS updates.');
+        remarks.reportValidity();
+        return;
+    }
+
+    remarks.setCustomValidity('');
+    hiddenRemarks.value = remarks.value;
+    form.submit();
+}
+@endif
+
 const waitForPdsImages = () => Promise.all(Array.from(document.images).map((img) => {
     if (img.complete) return Promise.resolve();
 
@@ -3889,7 +3942,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 </script>
         </div>
+        @if($isHrPreview)
+            <div class="mx-auto mt-4 max-w-[780px] rounded-xl border border-slate-200 bg-white p-4 font-sans shadow-sm print:hidden">
+                <div class="flex flex-col gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-blue-800">Current Review Stage</p>
+                        <h2 class="mt-1 text-lg font-black tracking-tight text-slate-900">Verify Personal Data Sheet</h2>
+                    </div>
+                    <span class="inline-flex w-fit items-center rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700">
+                        {{ $pendingPdsReviewCount }} pending section{{ $pendingPdsReviewCount === 1 ? '' : 's' }}
+                    </span>
+                </div>
+
+                <div class="pt-3">
+                    <label for="pds_review_remarks" class="block text-[11px] font-black uppercase tracking-widest text-slate-600">Remarks / Notes</label>
+                    <textarea id="pds_review_remarks" rows="3" placeholder="Enter remarks or notes here..." class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                    <p class="mt-1.5 text-xs font-medium text-slate-400">Remarks are required when rejecting the PDS update.</p>
+
+                    <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button type="button" onclick="submitPdsReview('reject')" class="inline-flex min-w-44 items-center justify-center rounded-xl border border-red-300 bg-white px-6 py-3 text-xs font-black uppercase tracking-widest text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2">
+                            <i class="fa-solid fa-xmark mr-2"></i>
+                            Reject Request
+                        </button>
+                        <button type="button" onclick="submitPdsReview('approve')" class="inline-flex min-w-44 items-center justify-center rounded-xl bg-indigo-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                            <i class="fa-solid fa-check mr-2"></i>
+                            Verify Request
+                        </button>
+                    </div>
+                </div>
+
+                <form id="pds_approve_form" action="{{ route('pds-reviews.approve-all', $employee) }}" method="POST" class="hidden">
+                    @csrf
+                    <input type="hidden" name="remarks">
+                </form>
+                <form id="pds_reject_form" action="{{ route('pds-reviews.reject-all', $employee) }}" method="POST" class="hidden">
+                    @csrf
+                    <input type="hidden" name="remarks">
+                </form>
+            </div>
+        @endif
     </div>
 </div>
+@unless($isEmbeddedPreview)
 </x-app-layout>
+@endunless
 

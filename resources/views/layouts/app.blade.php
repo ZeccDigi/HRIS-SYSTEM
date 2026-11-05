@@ -133,17 +133,41 @@
                     </div>
                 </header>
 
-                <main class="flex-1 relative overflow-y-auto overflow-x-hidden focus:outline-none py-6">
-                    <div class="mx-auto w-full max-w-7xl min-w-0 px-4 sm:px-6 md:px-8">
+                @php
+                    $applicationListRoutes = [
+                        'locator-slips.index',
+                        'leaves.index',
+                        'travel-orders.index',
+                        'my-cto.index',
+                        'leave-applications.index',
+                        'leave-applications.all',
+                        'hr.travel-orders.index',
+                        'hr.locator-slips.index',
+                        'hr.locator-slips.all',
+                        'hr.locator-slips.pending',
+                        'hr.cto.index',
+                    ];
+                    $isDashboardPage = request()->routeIs('dashboard');
+                    $isFullWidthPage = $isDashboardPage || request()->routeIs($applicationListRoutes);
+                    $flatContentRoutes = [...$applicationListRoutes, 'announcements.show'];
+                    $isFlatContentPage = request()->routeIs($flatContentRoutes);
+                    $contentPanelClass = $isFlatContentPage
+                        ? 'overflow-visible bg-transparent shadow-none border-0'
+                        : ($isDashboardPage
+                            ? 'overflow-hidden bg-white rounded-xl shadow-sm border border-gray-100/10'
+                            : 'overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100/10');
+                @endphp
+                <main class="flex-1 relative overflow-x-hidden focus:outline-none {{ request()->routeIs('dashboard') ? 'overflow-hidden py-3' : 'overflow-y-auto py-6' }}">
+                    <div class="mx-auto w-full min-w-0 {{ $isFullWidthPage ? 'max-w-none px-1 sm:px-2 md:px-3' : 'max-w-7xl px-4 sm:px-6 md:px-8' }}">
                         <!-- Page Heading -->
                         @isset($header)
-                            <div class="mb-8">
+                            <div class="{{ request()->routeIs('dashboard') ? 'mb-3' : 'mb-8' }}">
                                 {{ $header }}
                             </div>
                         @endisset
 
                         <!-- Page Content -->
-                        <div class="w-full max-w-full min-w-0 overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100/10 transition-all duration-300">
+                        <div class="w-full max-w-full min-w-0 transition-all duration-300 {{ $contentPanelClass }}">
                              {{ $slot }}
                         </div>
                     </div>

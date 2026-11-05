@@ -14,6 +14,8 @@ class LeaveRequest extends Model
         'end_date',
         'date_filed',
         'reason',
+        'leave_detail_type',
+        'leave_detail',
         'attachment_path',
         'status',
         'approved_by_chief',
@@ -27,6 +29,7 @@ class LeaveRequest extends Model
         'rd_remarks',
         'remarks',
         'is_paid',
+        'commutation_requested',
     ];
 
     public function employee()
@@ -107,6 +110,7 @@ class LeaveRequest extends Model
             'end_date' => 'date',
             'date_filed' => 'datetime',
             'is_paid' => 'boolean',
+            'commutation_requested' => 'boolean',
         ];
     }
 }

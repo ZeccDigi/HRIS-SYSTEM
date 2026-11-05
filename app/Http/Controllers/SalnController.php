@@ -143,9 +143,10 @@ class SalnController extends Controller
         }
 
         $canExportSaln = $this->isSalnOwner($saln);
+        $canReviewSaln = $this->canReviewSaln($saln);
         $backUrl = $this->safeBackUrl((string) request('back', ''));
 
-        return view('saln.show', compact('saln', 'canExportSaln', 'backUrl'));
+        return view('saln.show', compact('saln', 'canExportSaln', 'canReviewSaln', 'backUrl'));
     }
 
     public function review(Request $request, Saln $saln): RedirectResponse
@@ -227,6 +228,22 @@ class SalnController extends Controller
     {
         if ($this->isSalnOwner($saln)) {
             return true;
+        }
+
+        $user = Auth::user();
+        $employee = $user?->employee;
+        $roles = [
+            strtolower(trim((string) ($user?->role ?? ''))),
+            strtolower(trim((string) ($employee?->account_role ?? ''))),
+        ];
+
+        return (bool) array_intersect($roles, ['admin', 'hrstaff', 'hr staff']);
+    }
+
+    private function canReviewSaln(Saln $saln): bool
+    {
+        if ($this->isSalnOwner($saln)) {
+            return false;
         }
 
         $user = Auth::user();

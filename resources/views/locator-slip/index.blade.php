@@ -2,11 +2,11 @@
     <x-slot name="title">{{ __('My Locator Slips') }}</x-slot>
 
     <div
-        class="p-4 sm:p-6 lg:p-8"
+        class="p-3 sm:p-4 lg:p-5"
         x-data="myLocatorSlipTable()"
         x-init="init()"
     >
-        <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-end">
+        <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
             <div class="flex items-center gap-2">
                 <label for="locator_year" class="text-sm font-semibold text-gray-700">Year</label>
                 @php
@@ -33,7 +33,7 @@
             </div>
         </div>
 
-        <div class="mb-4 flex w-full flex-nowrap items-center gap-2 overflow-x-auto rounded-xl border border-gray-100 bg-gray-50/70 p-2">
+        <div class="mb-4 flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
             <div class="relative min-w-[260px] flex-1">
                 <label for="my_locator_search" class="sr-only">{{ __('Search locator slip') }}</label>
                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -63,17 +63,17 @@
             </button>
         </div>
 
-        <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white/80 shadow-lg backdrop-blur-xl">
-            <div class="overflow-x-auto">
-                <table class="w-full border-collapse text-left">
-                     <thead class="bg-gray-50">
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
+            <div class="overflow-x-auto lg:overflow-x-visible">
+                <table class="w-full table-fixed border-collapse text-left">
+                     <thead class="bg-slate-50">
                         <tr>
-                            <th scope="col" class="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Date Covered</th>
-                            <th scope="col" class="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Type</th>
-                            <th scope="col" class="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Destination</th>
-                            <th scope="col" class="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Approval</th>
-                            <th scope="col" class="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                            <th scope="col" class="whitespace-nowrap px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
+                            <th scope="col" class="w-[13%] whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Date Covered</th>
+                            <th scope="col" class="w-[14%] whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Type</th>
+                            <th scope="col" class="w-[27%] whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Destination</th>
+                            <th scope="col" class="w-[19%] whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Approval</th>
+                            <th scope="col" class="w-[14%] whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
+                            <th scope="col" class="w-[13%] whitespace-nowrap px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="myLocatorSlipTableBody" class="divide-y divide-gray-100 bg-white">
@@ -122,29 +122,29 @@
                                 data-status="{{ $displayStatus }}"
                                 data-year="{{ \Carbon\Carbon::parse($slip->date_covered)->year }}"
                             >
-                                <td class="whitespace-nowrap px-6 py-4 text-sm font-bold text-gray-900">
+                                <td class="whitespace-nowrap px-4 py-2.5 text-sm font-bold text-gray-900">
                                     {{ \Carbon\Carbon::parse($slip->date_covered)->format('M d, Y') }}
                                 </td>
-                                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                                <td class="whitespace-nowrap px-4 py-2.5 text-sm text-gray-700">
                                     {{ $displayType ?: 'N/A' }}
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-700">
-                                    <div class="max-w-xs truncate" title="{{ $slip->destination }}">
+                                <td class="px-4 py-2.5 text-sm text-gray-700">
+                                    <div class="truncate" title="{{ $slip->destination }}">
                                         {{ $slip->destination ?: 'N/A' }}
                                     </div>
                                 </td>
-                                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                                    <div class="flex items-center gap-2">
+                                <td class="whitespace-nowrap px-4 py-2.5 text-sm text-gray-700">
+                                    <div class="flex min-w-0 items-center gap-2">
                                         <span class="h-2.5 w-2.5 rounded-full {{ $approvalDotClass }}" title="Chief"></span>
-                                        <span class="text-xs font-semibold text-gray-700">{{ $approverName }}</span>
+                                        <span class="truncate text-xs font-semibold text-gray-700">{{ $approverName }}</span>
                                     </div>
                                 </td>
-                                <td class="whitespace-nowrap px-6 py-4 text-sm">
-                                    <span class="inline-flex rounded-full px-4 py-1 text-xs font-semibold leading-5 shadow-sm {{ $statusClass }}">
+                                <td class="whitespace-nowrap px-4 py-2.5 text-sm">
+                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold leading-5 shadow-sm {{ $statusClass }}">
                                         {{ ucfirst($displayStatus) }}
                                     </span>
                                 </td>
-                                <td class="whitespace-nowrap px-6 py-4 text-right">
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right">
                                     <div class="inline-flex items-center gap-1">
                                         @if($slip->qr_svg)
                                             <button
@@ -177,7 +177,7 @@
                             </tr>
                         @endforelse
 
-                        @if($locatorSlips->isNotEmpty())
+                        @if($locatorSlips->count() > 0)
                             <tr x-show="noResults" style="display: none;">
                                 <td colspan="6" class="py-8 text-center text-gray-500">
                                     {{ __('No locator slips match your search or filter.') }}
@@ -188,7 +188,7 @@
                 </table>
             </div>
 
-            {{-- Pagination temporarily disabled until the locator slip pagination flow is revisited. --}}
+            @include('partials.table-pagination', ['paginator' => $locatorSlips, 'label' => __('locator slips')])
         </div>
 
         <template x-teleport="body">

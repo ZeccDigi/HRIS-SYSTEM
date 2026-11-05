@@ -68,20 +68,26 @@
                 <div class="reports-main-filters">
                     <label>
                         <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('Report Type') }}</span>
-                        <select x-model="selectedType" @change="changeReportType()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
-                            <template x-for="type in reportTypes" :key="type.value">
-                                <option :value="type.value" x-text="type.label"></option>
-                            </template>
+                        <select @change="changeReportCategory($event.target.value)" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
+                            @foreach($reportData['reportGroups'] as $group)
+                                <option value="{{ $group['value'] }}" @selected($reportData['selectedCategory'] === $group['value'])>
+                                    {{ $group['label'] }}
+                                </option>
+                            @endforeach
                         </select>
                     </label>
 
-                    <label x-show="visibleFilters().includes('division')" x-cloak>
-                        <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('Division') }}</span>
-                        <select x-model="filters.division" @change="applyFilters()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
-                            <option>All Divisions</option>
-                            <template x-for="division in divisions" :key="division">
-                                <option :value="division" x-text="division"></option>
-                            </template>
+                    <label>
+                        <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('Sub Report') }}</span>
+                        <select @change="changeSubReport($event.target.value)" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
+                            @php
+                                $selectedReportGroup = collect($reportData['reportGroups'])->firstWhere('value', $reportData['selectedCategory']);
+                            @endphp
+                            @foreach($selectedReportGroup['reports'] ?? [] as $report)
+                                <option value="{{ $report['value'] }}" @selected($reportData['selectedType'] === $report['value'])>
+                                    {{ $report['label'] }}
+                                </option>
+                            @endforeach
                         </select>
                     </label>
 
@@ -99,12 +105,7 @@
 
             <div class="mt-5 rounded-xl border border-blue-100 bg-white shadow-sm">
                 <div class="flex flex-col gap-4 border-b border-blue-50 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div class="flex items-start gap-3">
-                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[#0038a8]">
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="active.icon"></path>
-                            </svg>
-                        </div>
+                    <div class="flex items-start">
                         <div>
                             <h2 class="text-lg font-black text-slate-900" x-text="active.title"></h2>
                             <p class="mt-1 text-xs font-semibold text-slate-500">
@@ -127,12 +128,7 @@
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <template x-for="metric in active.metrics" :key="metric.label">
                             <div class="rounded-lg border border-blue-100 bg-white p-3 shadow-sm">
-                                <div class="flex items-center gap-2.5">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" :class="metric.badge">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="metric.icon"></path>
-                                        </svg>
-                                    </div>
+                                <div class="flex items-center">
                                     <div>
                                         <p class="text-xs font-bold text-slate-500" x-text="metric.label"></p>
                                         <p class="text-xl font-black" :class="metric.text" x-text="metric.value"></p>
@@ -228,7 +224,7 @@
                                 </div>
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
-                                <button type="button" onclick="window.print()" style="background-color: #0038a8; border-color: #002f8f; color: #ffffff;" class="inline-flex h-10 min-w-[8.5rem] items-center justify-center rounded-lg border px-4 text-xs font-black uppercase tracking-wider shadow-sm hover:opacity-90">{{ __('Export PDF') }}</button>
+                                <button type="button" @click="exportPdf()" style="background-color: #0038a8; border-color: #002f8f; color: #ffffff;" class="inline-flex h-10 min-w-[8.5rem] items-center justify-center rounded-lg border px-4 text-xs font-black uppercase tracking-wider shadow-sm hover:opacity-90">{{ __('Export PDF') }}</button>
                                 <button type="button" @click="exportExcel()" style="background-color: #059669; border-color: #047857; color: #ffffff;" class="inline-flex h-10 min-w-[8.5rem] items-center justify-center rounded-lg border px-4 text-xs font-black uppercase tracking-wider shadow-sm hover:opacity-90">{{ __('Export Excel') }}</button>
                                 <button type="button" onclick="window.print()" style="background-color: #ffffff; border-color: #dbeafe; color: #475569;" class="inline-flex h-10 min-w-[8.5rem] items-center justify-center rounded-lg border px-4 text-xs font-black uppercase tracking-wider shadow-sm hover:bg-blue-50">{{ __('Print') }}</button>
                             </div>
@@ -533,8 +529,10 @@
             return {
                 selectedType: serverReportData.selectedType,
                 generatedType: serverReportData.selectedType,
+                selectedCategory: serverReportData.selectedCategory,
                 ctoTab: 'overtime',
                 reportTypes: serverReportData.reportTypes,
+                reportGroups: serverReportData.reportGroups,
                 divisions: serverReportData.divisions,
                 employmentStatuses: serverReportData.employmentStatuses,
                 search: '',
@@ -548,7 +546,7 @@
                 get active() {
                     const report = this.generatedType === 'overtime_cto'
                         ? serverReportData.reports[this.ctoTab]
-                        : (serverReportData.reports[this.generatedType] || serverReportData.reports.employee_report);
+                        : (serverReportData.reports[this.generatedType] || serverReportData.reports.employee_compliance);
 
                     return {
                         ...report,
@@ -561,7 +559,16 @@
                 visibleFilters() {
                     return this.reportTypes.find((type) => type.value === this.selectedType)?.filters || [];
                 },
-                changeReportType() {
+                subReports() {
+                    return this.reportGroups.find((group) => group.value === this.selectedCategory)?.reports || [];
+                },
+                changeReportCategory(category) {
+                    this.selectedCategory = category;
+                    this.selectedType = this.subReports()[0]?.value || 'employee_compliance';
+                    this.changeSubReport(this.selectedType);
+                },
+                changeSubReport(reportType) {
+                    this.selectedType = reportType;
                     this.generatedType = this.selectedType;
                     this.ctoTab = 'overtime';
                     this.search = '';
@@ -576,9 +583,18 @@
                         employment_status: this.filters.employmentStatus,
                     });
 
-                    window.history.replaceState({}, '', `{{ route('reports.index') }}?${params.toString()}`);
-                    this.generatedAt = new Date().toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                    this.renderCharts();
+                    window.location.assign(`{{ route('reports.index') }}?${params.toString()}`);
+                },
+                exportPdf() {
+                    const params = new URLSearchParams({
+                        type: this.selectedType,
+                        from: this.filters.from,
+                        to: this.filters.to,
+                        division: this.filters.division,
+                        employment_status: this.filters.employmentStatus,
+                    });
+
+                    window.open(`{{ route('reports.print') }}?${params.toString()}`, '_blank', 'noopener');
                 },
                 initCharts() {
                     this.$watch('filters.division', () => this.renderCharts());

@@ -23,6 +23,17 @@
             $authorDivision =
                 $announcement->author?->employee?->division;
 
+            $authorDivisionAbbreviation =
+                $announcement->author?->employee?->division_abbreviation;
+
+            $authorContext = collect([$authorDivisionAbbreviation, Str::headline($authorPosition)])
+                ->filter()
+                ->implode(' - ');
+
+            $viewerRole = strtolower(auth()->user()->role ?? '');
+            $canManageThisAnnouncement = in_array($viewerRole, ['admin', 'hrstaff', 'regionaldirector'], true)
+                || ($viewerRole === 'chief' && $announcement->author_id === auth()->id());
+
             $categoryStyle = match(strtolower($primaryTag)) {
                 'meeting' =>
                     'bg-blue-50 text-blue-700 ring-blue-200',
@@ -95,20 +106,7 @@
                             aria-hidden="true"
                         ></span>
 
-                        <span class="font-medium text-gray-500">
-                            {{ Str::headline($authorPosition) }}
-                        </span>
-
-                        @if($authorDivision)
-                            <span
-                                class="h-1 w-1 rounded-full bg-gray-300"
-                                aria-hidden="true"
-                            ></span>
-
-                            <span class="font-medium text-gray-500">
-                                {{ $authorDivision }}
-                            </span>
-                        @endif
+                        <span class="font-medium text-gray-500">{{ $authorContext }}</span>
                     </div>
                 </div>
 
@@ -169,6 +167,7 @@
                         </svg>
                     </a>
 
+                    @if($canManageThisAnnouncement)
                     <a
                         href="{{ route('announcements.edit', $announcement) }}"
                         class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-gray-400 transition hover:border-blue-100 hover:bg-blue-50 hover:text-blue-600"
@@ -228,6 +227,7 @@
                             </svg>
                         </button>
                     </form>
+                    @endif
                 </div>
             </div>
         </article>

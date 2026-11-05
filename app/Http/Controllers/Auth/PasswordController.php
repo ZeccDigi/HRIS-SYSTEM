@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -12,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 class PasswordController extends Controller
 {
-    public function sendOtp(Request $request): RedirectResponse
+    private function sendPasswordOtp(Request $request): void
     {
         $user = $request->user()->load('employee');
         $recoveryEmail = $user->employee?->notification_email;
@@ -38,6 +39,17 @@ class PasswordController extends Controller
                     ->subject('DMW-HRIS Password Update OTP');
             }
         );
+    }
+
+    public function sendOtp(Request $request): RedirectResponse|JsonResponse
+    {
+        $this->sendPasswordOtp($request);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'A password update OTP has been sent to your Recovery / OTP Email.',
+            ]);
+        }
 
         return back()->with('status', 'password-otp-sent');
     }
@@ -45,15 +57,37 @@ class PasswordController extends Controller
     /**
      * Update the user's password.
      */
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request): RedirectResponse|JsonResponse
     {
+        $user = $request->user();
+        $currentPasswordRules = $user->must_change_password
+            ? ['nullable']
+            : ['required', 'current_password'];
+
         $validated = $request->validateWithBag('updatePassword', [
-            'current_password' => ['required', 'current_password'],
-            'otp' => ['required', 'digits:6'],
+            'current_password' => $currentPasswordRules,
             'password' => ['required', Password::defaults(), 'confirmed'],
         ]);
 
+        $this->sendPasswordOtp($request);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'A password update OTP has been sent to your Recovery / OTP Email.',
+            ]);
+        }
+
+        return back()->with('status', 'password-otp-sent');
+    }
+
+    public function confirm(Request $request): RedirectResponse|JsonResponse
+    {
         $user = $request->user();
+
+        $validated = $request->validateWithBag('updatePassword', [
+            'otp' => ['required', 'digits:6'],
+            'password' => ['required', Password::defaults(), 'confirmed'],
+        ]);
 
         if (! $user->otp || ! hash_equals((string) $user->otp, (string) $validated['otp'])) {
             throw ValidationException::withMessages([
@@ -73,6 +107,13 @@ class PasswordController extends Controller
             'otp_expires_at' => null,
             'must_change_password' => false,
         ]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Password updated successfully.',
+                'redirect' => route('dashboard'),
+            ]);
+        }
 
         return back()->with('status', 'password-updated');
     }

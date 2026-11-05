@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Support\PdsFormatter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -100,11 +101,11 @@ class PdsExcelExporter
         $this->set($sheet, 'D22:F23', $p?->height_m);
         $this->set($sheet, 'D24:F24', $p?->weight_kg);
         $this->set($sheet, 'D25:F26', $p?->blood_type);
-        $this->set($sheet, 'D27:F28', $p?->umid_no);
-        $this->set($sheet, 'D29:F30', $p?->pagibig_id_no);
-        $this->set($sheet, 'D31:F31', $p?->philhealth_no);
-        $this->set($sheet, 'D32:F32', $p?->philsys_no);
-        $this->set($sheet, 'D33:F33', $p?->tin_no);
+        $this->set($sheet, 'D27:F28', $p?->umid_no ? PdsFormatter::umidNo($p?->umid_no, '') : $p?->gsis_id_no);
+        $this->set($sheet, 'D29:F30', PdsFormatter::pagibigIdNo($p?->pagibig_id_no, ''));
+        $this->set($sheet, 'D31:F31', PdsFormatter::philhealthNo($p?->philhealth_no, ''));
+        $this->set($sheet, 'D32:F32', PdsFormatter::philsysNo($p?->philsys_no, ''));
+        $this->set($sheet, 'D33:F33', PdsFormatter::tinNo($p?->tin_no, ''));
         $this->set($sheet, 'D34:F34', $p?->agency_employee_no);
 
         $this->set($sheet, 'L15:N15', $p?->citizenship_country);

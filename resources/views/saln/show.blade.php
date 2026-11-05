@@ -6,6 +6,7 @@
     @php
         $selectedYear = $selectedYear ?? (int) $saln->as_of_date->format('Y');
         $canManageSaln = $canManageSaln ?? ($canExportSaln ?? true);
+        $canReviewSaln = $canReviewSaln ?? false;
         $hasSavedSaln = $hasSavedSaln ?? $saln->exists;
         $reviewStatus = strtolower((string) ($saln->review_status ?? ($hasSavedSaln ? 'pending' : 'draft')));
         $reviewBadgeClass = match ($reviewStatus) {
@@ -17,7 +18,7 @@
         $reviewLabel = match ($reviewStatus) {
             'approved' => 'Approved',
             'returned' => 'Returned for Update',
-            'pending' => 'Pending HR Review',
+            'pending' => 'Pending Review',
             default => 'Not Submitted',
         };
     @endphp
@@ -75,6 +76,25 @@
                 </div>
 
             </div>
+
+            @if($canReviewSaln && $reviewStatus !== 'approved')
+                <div class="mt-6 print:hidden">
+                    @include('saln.partials.review-card', ['cardId' => 'bottom'])
+                </div>
+
+                <form id="saln_approve_form" action="{{ route('salns.review', $saln) }}" method="POST" class="hidden">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="review_status" value="approved">
+                    <input type="hidden" name="review_remarks" id="saln_approve_remarks">
+                </form>
+                <form id="saln_reject_form" action="{{ route('salns.review', $saln) }}" method="POST" class="hidden">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="review_status" value="returned">
+                    <input type="hidden" name="review_remarks" id="saln_reject_remarks">
+                </form>
+            @endif
         </div>
     </div>
     <script>
@@ -90,6 +110,36 @@
                     }
                 });
             });
+        }
+
+        function syncSalnRemarks(sourceEl) {
+            document.querySelectorAll('.saln-review-remarks-input').forEach((el) => {
+                if (el !== sourceEl) {
+                    el.value = sourceEl.value;
+                }
+                el.setCustomValidity('');
+            });
+        }
+
+        function submitSalnReview(action, triggerBtn) {
+            const card = triggerBtn ? triggerBtn.closest('.saln-review-stage-card') : document;
+            const remarks = card ? card.querySelector('.saln-review-remarks-input') : document.querySelector('.saln-review-remarks-input');
+            const form = document.getElementById(action === 'returned' ? 'saln_reject_form' : 'saln_approve_form');
+            const hiddenRemarks = document.getElementById(action === 'returned' ? 'saln_reject_remarks' : 'saln_approve_remarks');
+
+            if (!remarks || !form || !hiddenRemarks) {
+                return;
+            }
+
+            if (action === 'returned' && !remarks.value.trim()) {
+                remarks.setCustomValidity('Remarks are required when rejecting the SALN submission.');
+                remarks.reportValidity();
+                return;
+            }
+
+            remarks.setCustomValidity('');
+            hiddenRemarks.value = remarks.value.trim();
+            form.submit();
         }
 
         window.addEventListener('load', updateSalnPageFooters);

@@ -6,7 +6,7 @@
     @endphp
 
     <div
-        class="p-4 sm:p-5 lg:p-6"
+        class="px-1 py-3 sm:px-2 lg:px-3"
         x-data='manageLocatorSlips(@json($tab), @json((string) $currentYear))'
         x-init="init()"
     >
@@ -78,7 +78,7 @@
         </div>
 
         {{-- Search and filters --}}
-        <div class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/70 p-2 sm:flex-row sm:items-center">
+        <div class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:flex-row sm:items-center">
 
             {{-- Search --}}
             <div class="relative min-w-0 sm:flex-1">
@@ -198,9 +198,9 @@
             x-show="tab === 'pending'"
             x-cloak
         >
-            <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
                 <div class="w-full overflow-x-auto">
-                    <table class="w-full table-fixed divide-y divide-gray-100">
+                    <table class="w-full table-fixed divide-y divide-slate-200">
                         <colgroup>
                             <col class="w-[17%]">
                             <col class="w-[14%]">
@@ -211,7 +211,7 @@
                             <col class="w-[9%]">
                         </colgroup>
 
-                        <thead class="bg-gray-50">
+                        <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                             <tr>
                                 <th
                                     scope="col"
@@ -266,7 +266,7 @@
 
                         <tbody
                             id="pendingLocatorSlipRows"
-                            class="divide-y divide-gray-100 bg-white"
+                            class="divide-y divide-slate-200 bg-white"
                         >
                             @forelse($pendingLocatorSlips as $slip)
                                 @php
@@ -463,55 +463,6 @@
                                                 <i class="fa-solid fa-print text-sm"></i>
                                             </a>
 
-                                            @if(strtolower(Auth::user()->role) === 'chief')
-                                                {{-- Approve --}}
-                                                <form
-                                                    action="{{ route('locator-slips.approve', $slip->id) }}"
-                                                    method="POST"
-                                                >
-                                                    @csrf
-                                                    @method('PATCH')
-
-                                                    <button
-                                                        type="submit"
-                                                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 transition-colors hover:bg-green-50 hover:text-green-900"
-                                                        title="{{ __('Approve') }}"
-                                                        aria-label="{{ __('Approve') }}"
-                                                    >
-                                                        <i class="fa-solid fa-check text-sm"></i>
-                                                    </button>
-                                                </form>
-                                            @endif
-
-                                            @if(strtolower(Auth::user()->role) === 'chief')
-                                                <button
-                                                    type="button"
-                                                    onclick="submitManageLocatorReject({{ $slip->id }})"
-                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
-                                                    title="{{ __('Reject') }}"
-                                                    aria-label="{{ __('Reject') }}"
-                                                >
-                                                    <i class="fa-solid fa-xmark text-sm"></i>
-                                                </button>
-
-                                                {{-- Reject --}}
-                                                <form
-                                                    action="{{ route('locator-slips.reject', $slip->id) }}"
-                                                    method="POST"
-                                                    id="locatorRejectForm_{{ $slip->id }}"
-                                                >
-                                                    @csrf
-                                                    @method('PATCH')
-
-                                                    <input
-                                                        type="hidden"
-                                                        name="remarks"
-                                                        id="locatorRejectRemarks_{{ $slip->id }}"
-                                                        value=""
-                                                    >
-
-                                                </form>
-                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -553,9 +504,9 @@
             x-show="tab === 'all'"
             x-cloak
         >
-            <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
                 <div class="w-full overflow-x-auto">
-                    <table class="w-full table-fixed divide-y divide-gray-100">
+                    <table class="w-full table-fixed divide-y divide-slate-200">
                         <colgroup>
                             <col class="w-[17%]">
                             <col class="w-[14%]">
@@ -566,7 +517,7 @@
                             <col class="w-[9%]">
                         </colgroup>
 
-                        <thead class="bg-gray-50">
+                        <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                             <tr>
                                 <th
                                     scope="col"
@@ -621,7 +572,7 @@
 
                         <tbody
                             id="allLocatorSlipRows"
-                            class="divide-y divide-gray-100 bg-white"
+                            class="divide-y divide-slate-200 bg-white"
                         >
                             @forelse($allLocatorSlips as $slip)
                                 @php

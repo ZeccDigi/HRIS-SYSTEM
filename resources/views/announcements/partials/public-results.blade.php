@@ -23,6 +23,11 @@
                 ?: $announcement->author?->role
                 ?: __('Staff');
 
+            $authorContext = collect([
+                $announcement->author?->employee?->division_abbreviation,
+                Str::headline($authorPosition),
+            ])->filter()->implode(' - ');
+
             $categoryStyle = match(strtolower($primaryTag)) {
                 'meeting' =>
                     'border-blue-200 bg-blue-50 text-blue-700',
@@ -97,9 +102,7 @@
                             aria-hidden="true"
                         ></span>
 
-                        <span class="font-medium text-gray-500">
-                            {{ Str::headline($authorPosition) }}
-                        </span>
+                        <span class="font-medium text-gray-500">{{ $authorContext }}</span>
                     </div>
                 </div>
 

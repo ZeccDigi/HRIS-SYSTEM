@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use App\Services\LeaveCreditService;
 
 class Employee extends Model
@@ -110,6 +111,11 @@ class Employee extends Model
         return $this->hasOne(PdsGovernmentId::class);
     }
 
+    public function pdsSnapshots(): HasMany
+    {
+        return $this->hasMany(PdsSnapshot::class);
+    }
+
     public function leaveRequests()
     {
         return $this->hasMany(LeaveRequest::class);
@@ -133,6 +139,27 @@ class Employee extends Model
     public function travelOrders(): HasMany
     {
         return $this->hasMany(TravelOrder::class);
+    }
+
+    public function getDivisionAbbreviationAttribute(): ?string
+    {
+        $division = trim((string) $this->division);
+        if ($division === '') {
+            return null;
+        }
+
+        return match ($division) {
+            'Welfare and Reintegration Services Division' => 'WRSD',
+            'Migrant Workers Protection Division' => 'MWProtD',
+            'Migrant Workers Processing Division' => 'MWProcD',
+            'Finance and Administrative Division' => 'FAD',
+            default => Str::of($division)
+                ->replaceMatches('/\b(and|of|the)\b/i', '')
+                ->split('/\s+/')
+                ->filter()
+                ->map(fn ($word) => Str::upper(Str::substr($word, 0, 1)))
+                ->implode(''),
+        };
     }
 
     public function ctoRequests(): HasMany

@@ -54,6 +54,7 @@
     @php($isApproved = auth()->user()?->is_approved)
     @php($sidebarRole = strtolower(auth()->user()->role ?? ''))
     @php($isCtoManagedDetail = request()->routeIs('my-cto.show') && in_array($sidebarRole, ['admin', 'hrstaff', 'hr staff', 'chief', 'regionaldirector']))
+    @php($isTarManagementView = request()->routeIs('travel-orders.ar.*') && in_array($sidebarRole, ['admin', 'hrstaff', 'hr staff', 'chief', 'regionaldirector', 'regional director', 'recordofficer', 'record officer'], true))
     <nav class="flex-1 px-4 space-y-1 overflow-y-auto mt-2">
         <div class="pb-3 mb-3 border-b border-gray-50">
             <h3 x-show="!sidebarCollapsed" x-transition class="px-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
@@ -73,7 +74,7 @@
             </x-sidebar-link>
 
             @if($isApproved)
-                @php($canManageAnnouncements = in_array(auth()->user()->role, ['admin', 'hrstaff', 'regionaldirector']))
+                @php($canManageAnnouncements = in_array(auth()->user()->role, ['admin', 'hrstaff', 'chief', 'regionaldirector']))
                 <x-sidebar-link :href="$canManageAnnouncements ? route('announcements.index') : route('announcements.view')" :active="request()->routeIs(['announcements.*'])">
                     <x-slot name="icon">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -89,7 +90,7 @@
 
             @if($isApproved)
                 @if(in_array(strtolower($sidebarRole), ['employee', 'chief', 'regionaldirector', 'regional director', 'recordofficer', 'record officer'], true))
-                    <x-sidebar-dropdown label="{{ __('My Account') }}" :active="request()->routeIs(['pds.*', 'salns.*', 'ildp.*', 'leaves.*', 'my-dtr.*', 'locator-slips.*', 'travel-orders.*']) || (request()->routeIs('my-cto.*') && ! $isCtoManagedDetail)">
+                    <x-sidebar-dropdown label="{{ __('My Account') }}" :active="request()->routeIs(['pds.*', 'salns.*', 'ildp.*', 'leaves.*', 'my-dtr.*', 'locator-slips.*']) || (request()->routeIs('travel-orders.*') && ! $isTarManagementView) || (request()->routeIs('my-cto.*') && ! $isCtoManagedDetail)">
                         <x-slot name="icon">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg">
@@ -118,7 +119,7 @@
                             {{ __('Attendance / DTR') }}
                         </x-sidebar-link>
 
-                        <x-sidebar-link :href="route('travel-orders.index')" :active="request()->routeIs('travel-orders.*')" class="text-xs">
+                        <x-sidebar-link :href="route('travel-orders.index')" :active="request()->routeIs('travel-orders.*') && ! $isTarManagementView" class="text-xs">
                             {{ __('Travel Authority') }}
                         </x-sidebar-link>
 
@@ -137,7 +138,7 @@
                 </h3>
 
                 @if(! in_array(strtolower(auth()->user()->role ?? ''), ['chief', 'regionaldirector', 'regional director', 'recordofficer', 'record officer'], true))
-                    <x-sidebar-link :href="route('employees.index')" :active="request()->routeIs('employees.*') || request()->routeIs('employee-accounts.*')">
+                    <x-sidebar-link :href="route('employees.index')" :active="request()->routeIs('employees.*')">
                         <x-slot name="icon">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg">
@@ -165,7 +166,7 @@
                 @endif
 
                 @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff', 'regionaldirector', 'regional director', 'recordofficer', 'record officer'], true))
-                    <x-sidebar-link :href="route('hr.travel-orders.index')" :active="request()->routeIs('hr.travel-orders.*')">
+                    <x-sidebar-link :href="route('hr.travel-orders.index')" :active="request()->routeIs('hr.travel-orders.*') || request()->routeIs('travel-orders.ar.*')">
                         <x-slot name="icon">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg">
@@ -174,6 +175,17 @@
                             </svg>
                         </x-slot>
                         {{ __('Manage Travel Authority') }}
+                    </x-sidebar-link>
+                @endif
+
+                @if(strtolower(auth()->user()->role ?? '') === 'chief')
+                    <x-sidebar-link :href="route('hr.travel-orders.index', ['tab' => 'reports'])" :active="request()->routeIs('hr.travel-orders.*') || request()->routeIs('travel-orders.ar.*')">
+                        <x-slot name="icon">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5l5 5v11a2 2 0 01-2 2z" />
+                            </svg>
+                        </x-slot>
+                        {{ __('Manage TAR') }}
                     </x-sidebar-link>
                 @endif
 

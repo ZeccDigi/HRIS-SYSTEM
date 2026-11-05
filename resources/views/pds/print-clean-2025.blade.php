@@ -101,15 +101,15 @@
             <td class="label">10. GSIS ID NO.</td>
             <td>{{ PdsFormatter::val($p?->gsis_id_no) }}</td>
             <td class="label">11. PAG-IBIG ID NO.</td>
-            <td>{{ PdsFormatter::val($p?->pagibig_id_no) }}</td>
+            <td>{{ PdsFormatter::pagibigIdNo($p?->pagibig_id_no) }}</td>
             <td class="label">12. PHILHEALTH NO.</td>
-            <td>{{ PdsFormatter::val($p?->philhealth_no) }}</td>
+            <td>{{ PdsFormatter::philhealthNo($p?->philhealth_no) }}</td>
         </tr>
         <tr>
             <td class="label">13. SSS NO.</td>
-            <td>{{ PdsFormatter::val($p?->sss_no) }}</td>
+            <td>{{ PdsFormatter::sssNo($p?->sss_no) }}</td>
             <td class="label">14. TIN NO.</td>
-            <td>{{ PdsFormatter::val($p?->tin_no) }}</td>
+            <td>{{ PdsFormatter::tinNo($p?->tin_no) }}</td>
             <td class="label">15. AGENCY EMP. NO.</td>
             <td>{{ PdsFormatter::val($p?->agency_employee_no) }}</td>
         </tr>

@@ -7,11 +7,11 @@
     @endphp
 
     <div
-        class="py-8"
+        class="px-1 py-3 sm:px-2 lg:px-3"
         x-data='manageTravelAuthorities(@json($tab), @json($currentYear), @json($approvalRole))'
         x-init="init()"
     >
-        <div class="mx-auto w-full max-w-[95rem] px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto w-full min-w-0">
 
             @if(session('success'))
                 <div class="mb-4 rounded-xl border-l-4 border-green-500 bg-green-100 px-4 py-3 text-sm text-green-700">
@@ -69,11 +69,22 @@
                     >
                         {{ __('All TA') }}
                     </button>
+
+                    <button
+                        type="button"
+                        @click="changeTab('reports')"
+                        class="shrink-0 border-b-2 px-1 pb-3 pt-1 text-sm font-bold transition"
+                        :class="tab === 'reports'
+                            ? 'border-indigo-600 text-indigo-700'
+                            : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+                    >
+                        {{ __('TAR') }}
+                    </button>
                 </nav>
             </div>
 
             {{-- Filters --}}
-            <div class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/70 p-2 lg:flex-row lg:items-center">
+            <div class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 lg:flex-row lg:items-center">
 
                 {{-- Search --}}
                 <div class="relative min-w-0 lg:flex-1">
@@ -175,7 +186,7 @@
             </div>
 
             {{-- Travel authorities table --}}
-            <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
                 @foreach([
                     'pending' => $pendingTravelOrders,
                     'all' => $allTravelOrders
@@ -187,7 +198,7 @@
                         class="overflow-x-auto"
                     >
                         <table class="min-w-full table-fixed border-collapse text-left">
-                            <thead class="bg-gray-50">
+                            <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                                 <tr>
                                     <th class="w-[9%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
                                         {{ __('Date Filed') }}
@@ -237,7 +248,7 @@
 
                             <tbody
                                 id="{{ $section }}TravelOrderRows"
-                                class="divide-y divide-gray-100 bg-white"
+                                class="divide-y divide-slate-200 bg-white"
                             >
                                 @include('travel-orders._admin-rows', [
                                     'orders' => $orders,
@@ -288,6 +299,30 @@
                         </table>
                     </div>
                 @endforeach
+
+                <div x-show="tab === 'reports'" x-cloak class="overflow-x-auto">
+                    <table class="min-w-[980px] w-full table-fixed border-collapse text-left">
+                        <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
+                            <tr>
+                                <th class="w-[13%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Submitted') }}</th>
+                                <th class="w-[16%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('TA Stamp') }}</th>
+                                <th class="w-[19%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Employee') }}</th>
+                                <th class="w-[18%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Division') }}</th>
+                                <th class="w-[13%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Deadline') }}</th>
+                                <th class="w-[16%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Review Stage') }}</th>
+                                <th class="w-[5%] px-3 py-3 text-center text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Action') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportsTravelOrderRows" class="divide-y divide-slate-200 bg-white">
+                            @include('travel-orders._report-rows', ['orders' => $postActivityReports])
+                            @if($postActivityReports->isNotEmpty())
+                                <tr x-show="reportsNoResults" x-cloak>
+                                    <td colspan="7" class="px-6 py-10 text-center text-sm font-semibold text-gray-500">{{ __('No matching TAR records found.') }}</td>
+                                </tr>
+                            @endif
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -541,9 +576,11 @@
 
                 pendingRows: [],
                 allRows: [],
+                reportsRows: [],
 
                 pendingNoResults: false,
                 allNoResults: false,
+                reportsNoResults: false,
 
                 previewOpen: false,
                 showRemarks: false,
@@ -576,6 +613,10 @@
                         document.querySelectorAll(
                             '[data-manage-travel-row="all"]'
                         )
+                    );
+
+                    this.reportsRows = Array.from(
+                        document.querySelectorAll('[data-manage-travel-row="reports"]')
                     );
 
                     this.applyFilters();
@@ -614,6 +655,11 @@
                         )
                     );
 
+                    const reportsVisibleCount = this.filterRows(
+                        this.reportsRows,
+                        document.getElementById('reportsTravelOrderRows')
+                    );
+
                     this.pendingNoResults =
                         pendingVisibleCount === 0 &&
                         this.pendingRows.length > 0;
@@ -621,6 +667,10 @@
                     this.allNoResults =
                         allVisibleCount === 0 &&
                         this.allRows.length > 0;
+
+                    this.reportsNoResults =
+                        reportsVisibleCount === 0 &&
+                        this.reportsRows.length > 0;
                 },
 
                 filterRows(rows, tbody) {

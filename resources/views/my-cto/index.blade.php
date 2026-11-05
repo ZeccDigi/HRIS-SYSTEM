@@ -1,15 +1,15 @@
 <x-app-layout>
     <x-slot name="title">{{ __('My Compensatory Time-Off') }}</x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+    <div class="p-3 sm:p-4 lg:p-5">
+        <div class="w-full">
             @if(session('success'))
                 <div class="mb-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-lg">
                     {{ session('success') }}
                 </div>
             @endif
             <div x-data="myCtoRequestsTable()" x-init="init()">
-                <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-end">
+                <div class="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
                     <div class="flex items-center gap-2">
                         <label for="my_cto_year" class="text-sm font-semibold text-gray-700">
                             {{ __('Year') }}
@@ -45,7 +45,7 @@
                     </div>
                 </div>
 
-                <div class="mb-6 border-b border-gray-200">
+                <div class="mb-4 border-b border-gray-200">
                     <nav class="-mb-px flex space-x-8 overflow-x-auto" aria-label="{{ __('CTO tabs') }}">
                         <button
                             type="button"
@@ -113,9 +113,7 @@
                     x-transition:enter-start="opacity-0 transform scale-95"
                     x-transition:enter-end="opacity-100 transform scale-100"
                 >
-                <div class="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                <div class="border-b border-gray-100 bg-gray-50/70 p-2">
-                    <div class="flex min-w-max items-center gap-2 overflow-x-auto">
+                <div class="mb-4 flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
                         <div class="relative min-w-[260px] flex-1">
                             <label for="my_cto_search" class="sr-only">{{ __('Search CTO request') }}</label>
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -128,7 +126,7 @@
 
                         <select x-model="type" @change="applyFilters()" class="block h-9 w-44 shrink-0 rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             <option value="">{{ __('All Types') }}</option>
-                            @foreach($ctoRequests->pluck('type_label')->filter()->unique()->sort() as $typeOption)
+                            @foreach($typeOptions as $typeOption)
                                 <option value="{{ Str::lower($typeOption) }}">{{ $typeOption }}</option>
                             @endforeach
                         </select>
@@ -144,19 +142,27 @@
                         <button type="button" @click="reset()" class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-xs font-bold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50">
                             {{ __('Reset') }}
                         </button>
-                    </div>
                 </div>
 
+                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-gray-50">
+                    <table class="min-w-[980px] w-full table-fixed text-left border-collapse">
+                        <colgroup>
+                            <col class="w-[15%]">
+                            <col class="w-[22%]">
+                            <col class="w-[18%]">
+                            <col class="w-[18%]">
+                            <col class="w-[20%]">
+                            <col class="w-[7%]">
+                        </colgroup>
+                        <thead class="bg-slate-50">
                             <tr>
-                                <th scope="col" class="w-[15%] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Date Filed') }}</th>
-                                <th scope="col" class="w-[25%] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Type') }}</th>
-                                <th scope="col" class="w-[17%] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Human Resource') }}</th>
-                                <th scope="col" class="w-[18%] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Chief') }}</th>
-                                <th scope="col" class="w-[20%] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Regional Director') }}</th>
-                                <th scope="col" class="w-[5%] px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Actions') }}</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Date Filed') }}</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Type') }}</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Human Resource') }}</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Chief') }}</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Regional Director') }}</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody id="myCtoRequestsTableBody" class="divide-y divide-gray-100 bg-white">
@@ -195,13 +201,13 @@
                                     <td class="px-6 py-3 align-middle">
                                         <div class="flex items-center gap-2">
                                             <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($request->hrstaff_status ?: 'pending') }}" title="{{ ucfirst($request->hrstaff_status ?: 'pending') }}"></span>
-                                            <span class="truncate text-xs font-semibold text-gray-700">HR Admin</span>
+                                            <span class="min-w-0 truncate text-xs font-semibold text-gray-700">HR Admin</span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-3 align-middle">
                                         <div class="flex items-center gap-2">
                                             <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($request->chief_status ?: 'pending') }}" title="{{ ucfirst($request->chief_status ?: 'pending') }}"></span>
-                                            <span class="truncate text-xs font-semibold text-gray-700" title="{{ $request->chief ? trim($request->chief->firstname . ' ' . $request->chief->lastname) : 'Chief' }}">
+                                            <span class="min-w-0 truncate text-xs font-semibold text-gray-700" title="{{ $request->chief ? trim($request->chief->firstname . ' ' . $request->chief->lastname) : 'Chief' }}">
                                                 {{ $request->chief ? trim($request->chief->firstname . ' ' . $request->chief->lastname) : 'Chief' }}
                                             </span>
                                         </div>
@@ -209,7 +215,7 @@
                                     <td class="px-6 py-3 align-middle">
                                         <div class="flex items-center gap-2">
                                             <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($request->rd_status ?: 'pending') }}" title="{{ ucfirst($request->rd_status ?: 'pending') }}"></span>
-                                            <span class="truncate text-xs font-semibold text-gray-700" title="{{ $request->regionalDirector ? trim($request->regionalDirector->firstname . ' ' . $request->regionalDirector->lastname) : 'Regional Director' }}">
+                                            <span class="min-w-0 truncate text-xs font-semibold text-gray-700" title="{{ $request->regionalDirector ? trim($request->regionalDirector->firstname . ' ' . $request->regionalDirector->lastname) : 'Regional Director' }}">
                                                 {{ $request->regionalDirector ? trim($request->regionalDirector->firstname . ' ' . $request->regionalDirector->lastname) : 'Regional Director' }}
                                             </span>
                                         </div>
@@ -227,7 +233,7 @@
                                     </td>
                                 </tr>
                             @endforelse
-                            @if($ctoRequests->isNotEmpty())
+                            @if($ctoRequests->count() > 0)
                                 <tr x-show="noResults" style="display: none;">
                                     <td colspan="6" class="py-8 text-center text-gray-500">
                                         {{ __('No CTO requests match your search or filter.') }}
@@ -237,6 +243,7 @@
                         </tbody>
                     </table>
                 </div>
+                @include('partials.table-pagination', ['paginator' => $ctoRequests, 'label' => __('CTO requests')])
             </div>
             </div>
             </div>
@@ -373,39 +380,38 @@
         function myCtoRequestsTable() {
             return {
                 tab: 'applications',
-                search: '',
-                type: '',
-                status: '',
-                year: '{{ now()->year }}',
+                search: @js($search),
+                type: @js($type),
+                status: @js($status),
+                year: @js((string) $year),
                 rows: [],
                 noResults: false,
                 init() {
                     this.rows = Array.from(document.querySelectorAll('[data-cto-row]'));
-                    this.applyFilters();
                 },
                 applyFilters() {
-                    const search = this.search.trim().toLowerCase();
-                    let visibleCount = 0;
+                    const url = new URL(@js(route('my-cto.index')));
 
-                    this.rows.forEach((row) => {
-                        const matchesSearch = !search || row.dataset.search.includes(search);
-                        const matchesType = !this.type || row.dataset.type === this.type;
-                        const matchesStatus = !this.status || row.dataset.status === this.status;
-                        const matchesYear = !this.year || row.dataset.year === this.year;
-                        const visible = matchesSearch && matchesType && matchesStatus && matchesYear;
+                    if (this.search.trim()) {
+                        url.searchParams.set('search', this.search.trim());
+                    }
 
-                        row.classList.toggle('hidden', !visible);
-                        if (visible) visibleCount++;
-                    });
+                    if (this.type) {
+                        url.searchParams.set('type', this.type);
+                    }
 
-                    this.noResults = this.rows.length > 0 && visibleCount === 0;
+                    if (this.status) {
+                        url.searchParams.set('status', this.status);
+                    }
+
+                    if (this.year) {
+                        url.searchParams.set('year', this.year);
+                    }
+
+                    window.location.href = url.toString();
                 },
                 reset() {
-                    this.search = '';
-                    this.type = '';
-                    this.status = '';
-                    this.year = '{{ now()->year }}';
-                    this.applyFilters();
+                    window.location.href = @js(route('my-cto.index'));
                 },
             };
         }

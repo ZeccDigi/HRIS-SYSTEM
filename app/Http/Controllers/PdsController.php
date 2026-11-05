@@ -9,6 +9,7 @@ use App\Models\UtilityOption;
 use App\Notifications\PdsUpdatedNotification;
 use App\Services\PdsExcelExporter;
 use App\Services\PdsPdfExporter;
+use App\Services\PdsSnapshotService;
 use App\Support\PdsFormatter;
 use App\Support\UtilityOptionRegistry;
 use Illuminate\Http\RedirectResponse;
@@ -40,13 +41,17 @@ class PdsController extends Controller
         return view('pds.index', compact('employee'));
     }
 
-    public function download(Request $request, PdsPdfExporter $exporter): Response|RedirectResponse
+    public function download(Request $request, PdsPdfExporter $exporter, PdsSnapshotService $snapshots): Response|RedirectResponse
     {
         $employee = Auth::user()->employee;
 
         if (! $employee) {
             abort(404);
         }
+
+        $selectedYear = (int) $request->query('year', now()->year);
+        abort_unless($snapshots->hasYear($employee, $selectedYear), 404);
+        $employee = $snapshots->employeeForYear($employee, $selectedYear);
 
         try {
             return $exporter->download($employee, $request->boolean('print') ? 'inline' : 'attachment');
@@ -57,13 +62,17 @@ class PdsController extends Controller
         }
     }
 
-    public function downloadExcel(PdsExcelExporter $exporter): BinaryFileResponse|RedirectResponse
+    public function downloadExcel(Request $request, PdsExcelExporter $exporter, PdsSnapshotService $snapshots): BinaryFileResponse|RedirectResponse
     {
         $employee = Auth::user()->employee;
 
         if (! $employee) {
             abort(404);
         }
+
+        $selectedYear = (int) $request->query('year', now()->year);
+        abort_unless($snapshots->hasYear($employee, $selectedYear), 404);
+        $employee = $snapshots->employeeForYear($employee, $selectedYear);
 
         try {
             return $exporter->download($employee);
@@ -74,7 +83,7 @@ class PdsController extends Controller
         }
     }
 
-    public function print(Request $request): View|RedirectResponse
+    public function print(Request $request, PdsSnapshotService $snapshots): View|RedirectResponse
     {
         $employee = Auth::user()->employee;
 
@@ -82,17 +91,15 @@ class PdsController extends Controller
             abort(404);
         }
 
-        $employee->load([
-            'user',
-            'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation',
-            'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks',
-            'pdsTrainings', 'pdsOthers', 'pdsQuestionnaire', 'pdsReferences', 'pdsGovId',
-        ]);
+        $selectedYear = (int) $request->query('year', now()->year);
+        abort_unless($snapshots->hasYear($employee, $selectedYear), 404);
+        $pdsYears = $snapshots->yearsFor($employee);
+        $employee = $snapshots->employeeForYear($employee, $selectedYear);
 
-        return view('pds.print-2025', compact('employee'));
+        return view('pds.print-2025', compact('employee', 'selectedYear', 'pdsYears'));
     }
 
-    public function printClean(Request $request): View|RedirectResponse
+    public function printClean(Request $request, PdsSnapshotService $snapshots): View|RedirectResponse
     {
         $employee = Auth::user()->employee;
 
@@ -100,17 +107,35 @@ class PdsController extends Controller
             abort(404);
         }
 
-        $employee->load([
-            'user',
-            'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation',
-            'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks',
-            'pdsTrainings', 'pdsOthers', 'pdsQuestionnaire', 'pdsReferences', 'pdsGovId',
-        ]);
+        $selectedYear = (int) $request->query('year', now()->year);
+        abort_unless($snapshots->hasYear($employee, $selectedYear), 404);
+        $pdsYears = $snapshots->yearsFor($employee);
+        $employee = $snapshots->employeeForYear($employee, $selectedYear);
 
-        return view('pds.print-clean-2025', compact('employee'));
+        return view('pds.print-clean-2025', compact('employee', 'selectedYear', 'pdsYears'));
     }
 
-    public function edit(): View
+    public function printForHr(Request $request, Employee $employee, PdsSnapshotService $snapshots): View
+    {
+        $selectedYear = (int) $request->query('year', now()->year);
+        abort_unless($snapshots->hasYear($employee, $selectedYear), 404);
+        $pdsYears = $snapshots->yearsFor($employee);
+        $liveEmployee = $employee;
+        $employee = $snapshots->employeeForYear($employee, $selectedYear);
+        $employee->setRelation('pdsSectionReviews', $selectedYear === (int) now()->year
+            ? $liveEmployee->pdsSectionReviews()->get()
+            : collect());
+
+        $isHrPreview = true;
+        $backUrl = route('employees.show', ['employee' => $employee, 'tab' => 'pds']);
+        $pendingPdsReviewCount = $selectedYear === (int) now()->year
+            ? $employee->pdsSectionReviews->where('status', 'pending')->count()
+            : 0;
+
+        return view('pds.print-2025', compact('employee', 'isHrPreview', 'backUrl', 'pendingPdsReviewCount', 'selectedYear', 'pdsYears'));
+    }
+
+    public function edit(PdsSnapshotService $snapshots): View
     {
         $employee = Auth::user()->employee;
 
@@ -152,8 +177,10 @@ class PdsController extends Controller
         ];
 
         $cityZipCodes = $this->cityZipCodes();
+        $selectedYear = (int) now()->year;
+        $pdsYears = $snapshots->yearsFor($employee);
 
-        return view('pds.edit', compact('employee', 'utilityOptionSets', 'locationOptionSets', 'cityZipCodes'));
+        return view('pds.edit', compact('employee', 'utilityOptionSets', 'locationOptionSets', 'cityZipCodes', 'selectedYear', 'pdsYears'));
     }
 
     public function showForHr(Employee $employee): View
@@ -200,7 +227,7 @@ class PdsController extends Controller
         return view('pds.edit', compact('employee', 'utilityOptionSets', 'locationOptionSets', 'cityZipCodes', 'isReadOnly', 'pdsReviewUpdates', 'pdsReviewChangedInputNames'));
     }
 
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request, PdsSnapshotService $snapshots): RedirectResponse
     {
         $employee = Auth::user()->employee;
 
@@ -222,6 +249,54 @@ class PdsController extends Controller
             $request->merge(['personal' => $personal]);
         }
 
+        if (! empty($personal['philhealth_no'])) {
+            $digits = preg_replace('/\D/', '', (string) $personal['philhealth_no']);
+            $personal['philhealth_no'] = strlen($digits) === 12
+                ? substr($digits, 0, 2).'-'.substr($digits, 2, 9).'-'.substr($digits, 11, 1)
+                : $personal['philhealth_no'];
+            $request->merge(['personal' => $personal]);
+        }
+
+        if (! empty($personal['pagibig_id_no'])) {
+            $digits = preg_replace('/\D/', '', (string) $personal['pagibig_id_no']);
+            $personal['pagibig_id_no'] = strlen($digits) === 12
+                ? substr($digits, 0, 4).'-'.substr($digits, 4, 4).'-'.substr($digits, 8, 4)
+                : $personal['pagibig_id_no'];
+            $request->merge(['personal' => $personal]);
+        }
+
+        if (! empty($personal['umid_no'])) {
+            $digits = preg_replace('/\D/', '', (string) $personal['umid_no']);
+            $personal['umid_no'] = strlen($digits) === 12
+                ? substr($digits, 0, 4).'-'.substr($digits, 4, 7).'-'.substr($digits, 11, 1)
+                : $personal['umid_no'];
+            $request->merge(['personal' => $personal]);
+        }
+
+        if (! empty($personal['sss_no'])) {
+            $digits = preg_replace('/\D/', '', (string) $personal['sss_no']);
+            $personal['sss_no'] = strlen($digits) === 10
+                ? substr($digits, 0, 2).'-'.substr($digits, 2, 7).'-'.substr($digits, 9, 1)
+                : $personal['sss_no'];
+            $request->merge(['personal' => $personal]);
+        }
+
+        if (! empty($personal['philsys_no'])) {
+            $digits = preg_replace('/\D/', '', (string) $personal['philsys_no']);
+            $personal['philsys_no'] = strlen($digits) === 16
+                ? substr($digits, 0, 4).'-'.substr($digits, 4, 4).'-'.substr($digits, 8, 4).'-'.substr($digits, 12, 4)
+                : $personal['philsys_no'];
+            $request->merge(['personal' => $personal]);
+        }
+
+        if (! empty($personal['tin_no'])) {
+            $digits = preg_replace('/\D/', '', (string) $personal['tin_no']);
+            $personal['tin_no'] = strlen($digits) === 12
+                ? substr($digits, 0, 3).'-'.substr($digits, 3, 3).'-'.substr($digits, 6, 3).'-'.substr($digits, 9, 3)
+                : $personal['tin_no'];
+            $request->merge(['personal' => $personal]);
+        }
+
         $request->validate([
             'personal.surname' => 'nullable|string',
             'personal.firstname' => 'nullable|string',
@@ -235,13 +310,13 @@ class PdsController extends Controller
             'personal.weight_kg' => 'nullable|string',
             'personal.blood_type' => 'nullable|string',
             'personal.gsis_id_no' => 'nullable|string',
-            'personal.pagibig_id_no' => 'nullable|string',
-            'personal.philhealth_no' => 'nullable|string',
-            'personal.sss_no' => 'nullable|string',
-            'personal.tin_no' => 'nullable|string',
+            'personal.pagibig_id_no' => ['nullable', 'regex:/^\d{4}-\d{4}-\d{4}$/'],
+            'personal.philhealth_no' => ['nullable', 'regex:/^\d{2}-\d{9}-\d$/'],
+            'personal.sss_no' => ['nullable', 'regex:/^\d{2}-\d{7}-\d$/'],
+            'personal.tin_no' => ['nullable', 'regex:/^\d{3}-\d{3}-\d{3}-\d{3}$/'],
             'personal.agency_employee_no' => 'nullable|string',
-            'personal.umid_no' => 'nullable|string',
-            'personal.philsys_no' => 'nullable|string',
+            'personal.umid_no' => ['nullable', 'regex:/^\d{4}-\d{7}-\d$/'],
+            'personal.philsys_no' => ['nullable', 'regex:/^\d{4}-\d{4}-\d{4}-\d{4}$/'],
             'personal.citizenship' => 'nullable|string',
             'personal.citizenship_type' => 'nullable|string',
             'personal.citizenship_country' => 'nullable|string',
@@ -290,6 +365,12 @@ class PdsController extends Controller
             'pds_signature' => 'nullable|image|mimes:png|max:2048',
         ], [
             'education.*.level.required_with' => 'The Level field (e.g., Elementary, Secondary, College) is required when a School Name is provided in Educational Background.',
+            'personal.pagibig_id_no.regex' => 'The PAG-IBIG ID number must be 12 digits in this format: 0000-0000-0000.',
+            'personal.philhealth_no.regex' => 'The PhilHealth number must be 12 digits in this format: 01-234567890-1.',
+            'personal.umid_no.regex' => 'The UMID ID number must be 12 digits in this format: 0000-0000000-0.',
+            'personal.sss_no.regex' => 'The SSS number must be 10 digits in this format: 00-0000000-0.',
+            'personal.philsys_no.regex' => 'The PhilSys Card Number must be 16 digits in this format: 0000-0000-0000-0000.',
+            'personal.tin_no.regex' => 'The TIN must be 12 digits in this format: 000-000-000-000.',
         ]);
 
         $employee->load([
@@ -406,6 +487,9 @@ class PdsController extends Controller
                 $this->markPdsSectionChanged($employee, $sectionName, $changedFields);
             }
         });
+
+        $employee->unsetRelations();
+        $snapshots->capture($employee, (int) now()->year);
 
         AuditLogListener::logActivity(
             'Update PDS',

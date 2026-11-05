@@ -62,12 +62,16 @@ class PdsSectionReviewController extends Controller
 
     public function approveAll(Employee $employee)
     {
+        $remarks = request()->validate([
+            'remarks' => ['nullable', 'string'],
+        ])['remarks'] ?? null;
+
         foreach (self::SECTION_NAMES as $sectionName) {
             $employee->pdsSectionReviews()->updateOrCreate(
                 ['section_name' => $sectionName],
                 [
                     'status' => 'approved',
-                    'remarks' => null,
+                    'remarks' => $remarks,
                     'changed_fields' => [],
                     'reviewed_by_id' => auth()->id(),
                 ]
@@ -82,5 +86,32 @@ class PdsSectionReviewController extends Controller
         );
 
         return back()->with('success', 'All PDS sections have been approved successfully.');
+    }
+
+    public function rejectAll(Request $request, Employee $employee)
+    {
+        $validated = $request->validate([
+            'remarks' => ['required', 'string'],
+        ]);
+
+        foreach (self::SECTION_NAMES as $sectionName) {
+            $employee->pdsSectionReviews()->updateOrCreate(
+                ['section_name' => $sectionName],
+                [
+                    'status' => 'rejected',
+                    'remarks' => $validated['remarks'],
+                    'reviewed_by_id' => auth()->id(),
+                ]
+            );
+        }
+
+        AuditLogListener::logActivity(
+            'Reject All PDS Sections',
+            'Employees',
+            'Rejected all PDS sections for employee ' . trim(($employee->firstname ?? '') . ' ' . ($employee->lastname ?? '')),
+            auth()->user()
+        );
+
+        return back()->with('success', 'PDS sections have been rejected successfully.');
     }
 }

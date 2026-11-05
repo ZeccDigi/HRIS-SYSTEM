@@ -24,12 +24,12 @@
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <x-input-label for="lastname" :value="__('Last Name')" />
+                                    <x-input-label for="lastname" :value="__('Last Name')" required />
                                     <x-text-input id="lastname" name="lastname" type="text" class="mt-1 block w-full" :value="old('lastname')" required />
                                     <x-input-error class="mt-2" :messages="$errors->get('lastname')" />
                                 </div>
                                 <div>
-                                    <x-input-label for="firstname" :value="__('First Name')" />
+                                    <x-input-label for="firstname" :value="__('First Name')" required />
                                     <x-text-input id="firstname" name="firstname" type="text" class="mt-1 block w-full" :value="old('firstname')" required />
                                     <x-input-error class="mt-2" :messages="$errors->get('firstname')" />
                                 </div>
@@ -39,12 +39,12 @@
                                     <x-input-error class="mt-2" :messages="$errors->get('middlename')" />
                                 </div>
                                 <div>
-                                    <x-input-label for="contact_number" :value="__('Contact Number')" />
-                                    <x-text-input id="contact_number" name="contact_number" type="text" class="mt-1 block w-full" :value="old('contact_number')" placeholder="e.g., 09123456789" />
+                                    <x-input-label for="contact_number" :value="__('Contact Number')" required />
+                                    <x-text-input id="contact_number" name="contact_number" type="text" class="mt-1 block w-full" :value="old('contact_number')" placeholder="e.g., 09123456789" required />
                                     <x-input-error class="mt-2" :messages="$errors->get('contact_number')" />
                                 </div>
                                 <div>
-                                    <x-input-label for="notification_email" :value="__('Recovery / OTP Email')" />
+                                    <x-input-label for="notification_email" :value="__('Recovery / OTP Email')" required />
                                     <x-text-input id="notification_email" name="notification_email" type="email" class="mt-1 block w-full" :value="old('notification_email')" placeholder="juandelacruz@gmail.com" required />
                                     <p class="mt-1 text-xs text-gray-500">{{ __('Enter an active email address where the employee can receive account details, OTP verification codes, and security notifications.') }}</p>
                                     <x-input-error class="mt-2" :messages="$errors->get('notification_email')" />
@@ -64,7 +64,7 @@
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <x-input-label for="division" :value="__('Division')" />
+                                    <x-input-label for="division" :value="__('Division')" required />
                                     <select id="division" name="division" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required>
                                         <option value="" disabled selected>{{ __('Select division') }}</option>
                                         @foreach($divisionOptions as $division)
@@ -74,12 +74,12 @@
                                     <x-input-error class="mt-2" :messages="$errors->get('division')" />
                                 </div>
                                 <div>
-                                    <x-input-label for="position" :value="__('Job Position / Designation')" />
+                                    <x-input-label for="position" :value="__('Job Position / Designation')" required />
                                     <x-text-input id="position" name="position" type="text" class="mt-1 block w-full" :value="old('position')" placeholder="e.g., Secretary, Administrative Aide" required />
                                     <x-input-error class="mt-2" :messages="$errors->get('position')" />
                                 </div>
                                 <div>
-                                    <x-input-label for="account_role" :value="__('Role')" />
+                                    <x-input-label for="account_role" :value="__('Role')" required />
                                     <select id="account_role" name="account_role" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required>
                                         <option value="" disabled selected>{{ __('Select a role') }}</option>
                                         @php
@@ -100,9 +100,9 @@
                                     <x-input-error class="mt-2" :messages="$errors->get('account_role')" />
                                 </div>
                                 <div>
-                                    <x-input-label for="employment_status" :value="__('Employment Status')" />
-                                    <select id="employment_status" name="employment_status" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
-                                        <option value="">{{ __('Select employment status') }}</option>
+                                    <x-input-label for="employment_status" :value="__('Employment Status')" required />
+                                    <select id="employment_status" name="employment_status" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required>
+                                        <option value="" disabled selected>{{ __('Select employment status') }}</option>
                                         @foreach($employmentStatuses as $status)
                                             <option value="{{ $status }}" {{ old('employment_status') == $status ? 'selected' : '' }}>{{ $status }}</option>
                                         @endforeach
@@ -110,9 +110,8 @@
                                     <x-input-error class="mt-2" :messages="$errors->get('employment_status')" />
                                 </div>
                                 <div>
-                                    <x-input-label for="service_start_date" :value="__('Service Start Date')" />
-                                    <x-text-input id="service_start_date" name="service_start_date" type="date" class="mt-1 block w-full" :value="old('service_start_date')" />
-                                    <p class="mt-1 text-xs text-gray-500">{{ __('Used as the starting point for organization leave-credit accrual. If blank, the employee record creation date is used.') }}</p>
+                                    <x-input-label for="service_start_date" :value="__('Service Start Date')" required />
+                                    <x-text-input id="service_start_date" name="service_start_date" type="date" class="mt-1 block w-full" :value="old('service_start_date')" required />
                                     <x-input-error class="mt-2" :messages="$errors->get('service_start_date')" />
                                 </div>
                             </div>
@@ -121,16 +120,14 @@
                         <div class="pt-4">
                             <div class="mb-5">
                                 <h3 class="text-lg font-medium text-gray-900 mb-1">{{ __('Account Access') }}</h3>
-                                <p class="text-sm text-gray-500">{{ __('Create the employee HRIS username. Account details will be sent only to the Recovery / OTP Email above.') }}</p>
                             </div>
                             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div class="md:col-span-2">
-                                    <x-input-label for="hris_username" :value="__('HRIS Username')" />
+                                    <x-input-label for="hris_username" :value="__('HRIS Username')" required />
                                     <div class="mt-1 flex rounded-md shadow-sm">
                                         <input id="hris_username" name="hris_username" type="text" value="{{ old('hris_username') }}" placeholder="juan.delacruz" required class="block w-full min-w-0 flex-1 rounded-none rounded-l-md border-gray-300 lowercase focus:border-indigo-500 focus:ring-indigo-500">
                                         <span class="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-gray-50 px-4 text-sm font-semibold text-gray-600">@dmw.gov.ph</span>
                                     </div>
-                                    <p class="mt-1 text-xs text-gray-500">{{ __("This is the employee's username for signing in to the HRIS. The @dmw.gov.ph suffix is part of the login username and is not an email inbox.") }}</p>
                                     <x-input-error class="mt-2" :messages="$errors->get('hris_username')" />
                                 </div>
                             </div>

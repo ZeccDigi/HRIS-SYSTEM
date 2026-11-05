@@ -64,7 +64,7 @@
                 <h2 class="text-2xl font-black text-gray-900 mb-8 modal-form-title">{{ __('Create Travel Authority') }}</h2>
 
                 <form
-                    action="{{ route('travel-orders.store') }}"
+                    action="{{ request()->boolean('modal') ? route('travel-orders.store', ['modal' => 1]) : route('travel-orders.store') }}"
                     method="POST"
                     enctype="multipart/form-data"
                     class="space-y-6"

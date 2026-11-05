@@ -131,6 +131,8 @@
                     ></iframe>
                 </div>
             </section>
+
+            @include('leaves._attachment-preview', ['leaveRequest' => $leaf])
         </div>
     </div>
 

@@ -27,7 +27,10 @@ class CtoController extends Controller
         $sort = $request->query('sort', 'latest');
 
         $allCtoRequests = $this->sortCtoRequests($this->filterCtoRequests(
-            CtoRequest::with(['employee', 'chief', 'hrstaff', 'regionalDirector'])->whereIn('status', ['approved', 'rejected']),
+            tap(
+                CtoRequest::with(['employee', 'chief', 'hrstaff', 'regionalDirector'])->whereIn('status', ['approved', 'rejected']),
+                fn ($query) => $isChief ? $this->scopeToChiefDivision($query) : null
+            ),
             $search,
             $type
         ), $sort)
@@ -37,9 +40,12 @@ class CtoController extends Controller
             CtoRequest::with(['employee', 'chief', 'hrstaff', 'regionalDirector'])
                 ->where('status', 'pending')
                 ->when($isHR && !$isAdmin, fn ($query) => $query->where('hrstaff_status', 'pending'))
-                ->when($isChief, fn ($query) => $query
-                    ->whereIn('hrstaff_status', ['approved', 'rejected'])
-                    ->where('chief_status', 'pending'))
+                ->when($isChief, function ($query) {
+                    $query
+                        ->whereIn('hrstaff_status', ['approved', 'rejected'])
+                        ->where('chief_status', 'pending');
+                    $this->scopeToChiefDivision($query);
+                })
                 ->when($isRegionalDirector, fn ($query) => $query
                     ->whereIn('hrstaff_status', ['approved', 'rejected'])
                     ->where('chief_status', 'approved')
@@ -97,6 +103,12 @@ class CtoController extends Controller
             return redirect()->back()->with('error', __('Admin role has read-only viewing access for CTO applications. Approvals must be performed by HR, Chief, or Regional Director.'));
         }
 
+        $ctoRequest->loadMissing('employee');
+
+        if ($role === 'chief' && ! $this->chiefCanReviewEmployee($ctoRequest->employee)) {
+            return redirect()->route('hr.cto.index', ['tab' => 'pending'])->with('error', __('You can only review CTO requests from your division.'));
+        }
+
         $employeeId = auth()->user()->employee?->id;
         $isHR = in_array($role, ['hrstaff', 'hr staff'], true);
 
@@ -115,10 +127,8 @@ class CtoController extends Controller
                     $ctoRequest->approved_by_hrstaff = $employeeId;
                     $ctoRequest->hrstaff_remarks = $remarks;
                     
-                    // Notify Chief
-                    $nextLevelUsers = User::whereHas('employee', function ($query) {
-                        $query->where('account_role', 'chief');
-                    })->get();
+                    // Notify only the chief assigned to the employee's division.
+                    $nextLevelUsers = $this->chiefUsersForEmployee($ctoRequest->employee);
                     Notification::send($nextLevelUsers, new CtoRequestNotification($ctoRequest, 'cto_rejected', 'CTO request rejected by HR.'));
                 } else {
                     $ctoRequest->status = 'rejected';
@@ -142,10 +152,8 @@ class CtoController extends Controller
                     $ctoRequest->approved_by_hrstaff = $employeeId;
                     $ctoRequest->hrstaff_remarks = $remarks;
 
-                    // Notify Chief
-                    $nextLevelUsers = User::whereHas('employee', function ($query) {
-                        $query->where('account_role', 'chief');
-                    })->get();
+                    // Notify only the chief assigned to the employee's division.
+                    $nextLevelUsers = $this->chiefUsersForEmployee($ctoRequest->employee);
                     Notification::send($nextLevelUsers, new CtoRequestNotification($ctoRequest, 'cto_hr_approved', 'New CTO request ready for Chief approval.'));
                 } elseif ($role === 'chief') {
                     $ctoRequest->chief_status = 'approved';
@@ -196,5 +204,46 @@ class CtoController extends Controller
         );
 
         return redirect()->back()->with('success', __('CTO request updated successfully.'));
+    }
+
+    private function scopeToChiefDivision($query): void
+    {
+        $division = $this->currentChiefDivision();
+
+        if ($division === '') {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereHas('employee', fn ($employeeQuery) => $employeeQuery->where('division', $division));
+    }
+
+    private function chiefUsersForEmployee(?Employee $employee)
+    {
+        $division = trim((string) $employee?->division);
+
+        if ($division === '') {
+            return collect();
+        }
+
+        return User::whereHas('employee', function ($query) use ($division) {
+            $query
+                ->whereIn('account_role', ['chief', 'CHIEF'])
+                ->where('division', $division);
+        })->get();
+    }
+
+    private function chiefCanReviewEmployee(?Employee $employee): bool
+    {
+        $chiefDivision = $this->currentChiefDivision();
+        $employeeDivision = trim((string) $employee?->division);
+
+        return $chiefDivision !== '' && $employeeDivision !== '' && strcasecmp($chiefDivision, $employeeDivision) === 0;
+    }
+
+    private function currentChiefDivision(): string
+    {
+        return trim((string) auth()->user()?->employee?->division);
     }
 }
