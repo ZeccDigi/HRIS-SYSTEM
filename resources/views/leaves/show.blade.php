@@ -6,27 +6,11 @@
 
             {{-- Back and Print buttons --}}
             <div class="mb-5 flex items-center justify-between gap-3">
-                <a
-                    href="{{ route('leaves.index') }}"
-                    class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-indigo-600"
-                >
-                    <svg
-                        class="mr-2 h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M11 17l-5-5m0 0l5-5m-5 5h12"
-                        ></path>
-                    </svg>
+                <x-page-action href="{{ route('leaves.index') }}" />
 
-                    {{ __('Back') }}
-                </a>
-
+                @if($leaf->canBeEditedBy(auth()->user()->employee))
+                    <x-page-action href="{{ route('leaves.edit', $leaf) }}" kind="edit" class="ml-auto" />
+                @endif
                 {{-- Prints only the form inside the iframe --}}
                 <button
                     type="button"
@@ -83,6 +67,7 @@
                 :payload="$trackedLeavePayload"
                 event="leave-selected"
                 empty="No leave approval process to track yet."
+                compact
             />
 
             @if($leaf->hrstaff_remarks || $leaf->chief_remarks || $leaf->rd_remarks)

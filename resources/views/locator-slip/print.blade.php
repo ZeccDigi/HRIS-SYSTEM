@@ -7,7 +7,7 @@
     <style>
         @page {
             size: A4 portrait;
-            margin: 8mm;
+            margin: 5mm;
         }
 
         * {
@@ -24,8 +24,8 @@
         }
 
         .sheet {
-            width: 194mm;
-            height: 281mm;
+            width: 200mm;
+            height: 287mm;
             margin: 0 auto;
             background: #fff;
         }
@@ -34,7 +34,9 @@
             width: 100%;
             height: 100%;
             border-collapse: separate;
-            border-spacing: 7.5mm 7mm;
+            /* Narrower side gutters give each printed copy the reference width. */
+            /* Equal vertical insets keep the forms balanced within the paper. */
+            border-spacing: 4mm 9mm;
             table-layout: fixed;
         }
 
@@ -42,12 +44,14 @@
             width: 50%;
             height: 50%;
             padding: 0;
-            vertical-align: top;
+            /* Each form has a fixed compact height. Center it inside its
+               half-page cell so the outer top and bottom whitespace match. */
+            vertical-align: middle;
         }
 
         .copy-table {
             width: 100%;
-            height: 125mm;
+            height: 120mm;
             border-collapse: collapse;
             table-layout: fixed;
             border: .45mm solid #000;
@@ -66,36 +70,47 @@
         }
 
         .header-cell {
-            height: 17mm;
-            padding: 1mm 1.4mm;
+            height: 20mm;
+            /* Small top inset keeps the header marks from sitting on the border. */
+            padding: 2mm 1.4mm 1mm;
         }
 
-        .form-header {
-            display: grid;
-            grid-template-columns: 15mm 1fr 16mm;
-            align-items: center;
-            height: 100%;
-            column-gap: 1.5mm;
+        .ob-header-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
         }
 
-        .logo-slot {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 1.5mm;
+        .ob-header-table td {
+            border: 0;
+            padding: 0;
+            vertical-align: middle;
+        }
+
+        .ob-header-table .logo-slot {
+            width: 22mm;
+            text-align: center;
+        }
+
+        .ob-header-table .logo-slot.right {
+            width: 22mm;
         }
 
         .form-logo {
-            width: 11mm;
-            max-height: 11mm;
+            /* The DMW asset includes the Tahanan ng OFW tagline, so it needs
+               a larger image box than the Bagong Pilipinas mark to look equal. */
+            width: 16mm;
+            max-height: 15mm;
             object-fit: contain;
             display: block;
             margin: 0 auto;
         }
 
         .form-logo.right {
-            width: 13.5mm;
-            max-height: 11mm;
+            /* The Bagong Pilipinas mark is visually denser than the DMW seal
+               with its tagline, so it needs a smaller box. */
+            width: 13mm;
+            max-height: 13mm;
         }
 
         .agency-block {
@@ -110,8 +125,8 @@
         }
 
         .form-title {
-            margin-top: .8mm;
-            font-size: 6.8pt;
+            margin-top: 1.8mm;
+            font-size: 9pt;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .01em;
@@ -120,7 +135,7 @@
         .label {
             font-weight: 700;
             text-transform: uppercase;
-            font-size: 5.5pt;
+            font-size: 7pt;
             white-space: nowrap;
         }
 
@@ -138,7 +153,7 @@
 
         .field-label {
             display: block;
-            font-size: 5.5pt;
+            font-size: 7pt;
             font-weight: 700;
             text-transform: uppercase;
             line-height: 1;
@@ -149,7 +164,7 @@
             display: block;
             margin-top: 1.4mm;
             text-align: center;
-            font-size: 6pt;
+            font-size: 7.2pt;
             font-weight: 700;
             text-transform: uppercase;
             line-height: 1.12;
@@ -157,7 +172,7 @@
         }
 
         .value {
-            font-size: 6pt;
+            font-size: 7.2pt;
             font-weight: 700;
             text-transform: uppercase;
             overflow-wrap: anywhere;
@@ -222,9 +237,8 @@
             margin-top: 15mm;
             min-height: 3mm;
             border-bottom: .22mm solid #000;
-            display: flex;
-            align-items: end;
-            justify-content: center;
+            display: block;
+            text-align: center;
             padding-bottom: .25mm;
             font-size: 5.5pt;
             font-weight: 700;
@@ -255,7 +269,7 @@
         }
 
         .pass-slip-table {
-            height: 121mm;
+            height: 117mm;
             border: .35mm solid #000;
             font-size: 8.2pt;
             line-height: 1.15;
@@ -267,7 +281,7 @@
 
         .pass-header-cell {
             height: 21mm;
-            padding: 2.2mm 4.5mm 0 !important;
+            padding: 1.5mm 4.5mm 0 !important;
         }
 
         .pass-header {
@@ -278,24 +292,26 @@
         }
 
         .pass-logo {
-            width: 9.5mm;
-            max-height: 9.5mm;
+            /* Visually balance the seal + tagline with the Bagong Pilipinas mark. */
+            width: 16mm;
+            max-height: 15mm;
             object-fit: contain;
             display: block;
             margin: 0 auto;
         }
 
         .pass-logo.right {
-            width: 10.5mm;
+            width: 13mm;
+            max-height: 13mm;
         }
 
         .pass-title {
             padding-top: 1.2mm;
             text-align: center;
-            font-size: 12pt;
-            font-weight: 800;
+            font-size: 11pt;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: .02em;
+            letter-spacing: .01em;
         }
 
         .pass-date-row {
@@ -317,13 +333,13 @@
             display: flex;
             align-items: flex-end;
             gap: 1.8mm;
-            min-height: 4.7mm;
+            min-height: 4.2mm;
             font-size: 8.2pt;
             font-weight: 400;
         }
 
         .pass-line-row.compact {
-            min-height: 4.25mm;
+            min-height: 3.9mm;
         }
 
         .pass-label {
@@ -350,7 +366,7 @@
         }
 
         .pass-instruction {
-            margin: .8mm 0 .3mm;
+            margin: .45mm 0 .2mm;
             font-size: 8.2pt;
             font-weight: 700;
             font-style: italic;
@@ -358,12 +374,22 @@
         }
 
         .pass-reason-line {
-            margin-top: .4mm;
+            margin: .8mm 0 1.2mm;
+            min-height: 3.7mm;
+            line-height: 3.5mm;
+        }
+
+        .pass-time-row {
+            min-height: 5.5mm !important;
+        }
+
+        .pass-time-row + .pass-time-row {
+            margin-top: .8mm;
         }
 
         .pass-signature {
             width: 42mm;
-            margin: 7.5mm auto .7mm;
+            margin: 5mm auto .6mm;
             border-bottom: .22mm solid #000;
             min-height: 3mm;
             display: flex;
@@ -386,8 +412,8 @@
 
         .pass-approval {
             width: 100%;
-            height: 22mm;
-            margin-top: .8mm;
+            height: 20mm;
+            margin-top: .6mm;
             border-collapse: collapse;
             table-layout: fixed;
         }
@@ -410,8 +436,17 @@
         .pass-approval-line {
             width: 32mm;
             min-height: 3mm;
-            margin: 9mm auto .4mm;
+            margin: 1.5mm auto .35mm;
             border-bottom: .22mm solid #000;
+        }
+
+        .pass-approval-name {
+            min-height: 3mm;
+            margin-top: 1mm;
+            text-align: center;
+            font-size: 7.2pt;
+            font-weight: 700;
+            text-transform: uppercase;
         }
 
         .pass-approval-role {
@@ -430,7 +465,7 @@
         .pass-guard-line {
             width: 58mm;
             min-height: 3mm;
-            margin: 5.8mm auto .4mm;
+            margin: 4.5mm auto .35mm;
             border-bottom: .22mm solid #000;
         }
 
@@ -517,6 +552,114 @@
             background: #ffffff;
         }
 
+        /* DomPDF does not implement CSS grid the same way as browsers. */
+        .pdf-sheet .copies-layout {
+            /* Match the reference's four-copy layout: fixed half-page cells
+               with the same gap at every outer edge. */
+            /* Fixed table heights make DomPDF push the lower copies onto a
+               second page. Let it determine the natural one-page grid. */
+            height: auto;
+            /* Shift the group down to match the side inset, while the taller
+               copies consume the former excess bottom whitespace. */
+            margin: 4mm 0 0;
+            border-spacing: 4mm;
+        }
+
+        .pdf-sheet .copies-layout > tbody > tr > td {
+            height: auto;
+        }
+
+        .pdf-sheet .official-business-table {
+            height: 126mm;
+        }
+
+        .pdf-sheet .pass-slip-table {
+            height: 123mm;
+        }
+
+        /* Keep each Official Business copy within its half-page cell. DomPDF
+           otherwise moves the body rows to the following page. */
+        .pdf-sheet .official-business-table .header-cell {
+            height: 20mm;
+        }
+
+        .pdf-sheet .official-business-table .ob-header-table,
+        .pdf-sheet .pass-header-pdf {
+            margin-top: 1.5mm;
+        }
+
+        .pdf-sheet .official-business-table .label-cell {
+            height: 10mm;
+            padding-top: 1.2mm !important;
+        }
+
+        .pdf-sheet .official-business-table .field-cell {
+            height: 6mm;
+            padding-top: .5mm !important;
+        }
+
+        .pdf-sheet .official-business-table .purpose-label-cell {
+            height: 4mm;
+        }
+
+        .pdf-sheet .official-business-table .purpose-value {
+            height: 18mm;
+        }
+
+        .pdf-sheet .official-business-table .time-cell {
+            height: 12mm;
+            padding-top: 1.8mm !important;
+        }
+
+        .pdf-sheet .official-business-table .signature-space {
+            height: 11mm;
+        }
+
+        .pdf-sheet .official-business-table .approval-cell {
+            height: 31mm;
+        }
+
+        .pdf-sheet .official-business-table .approval-name {
+            margin-top: 19mm;
+        }
+
+        .pdf-sheet .pass-header-pdf {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .pdf-sheet .pass-header-pdf td {
+            padding: 0;
+            vertical-align: top;
+        }
+
+        .pdf-sheet .pass-header-pdf .logo-column {
+            width: 22mm;
+            text-align: center;
+        }
+
+        .pdf-sheet .pass-header-pdf .pass-logo {
+            width: 16mm;
+            height: auto;
+            margin: 0 auto;
+        }
+
+        .pdf-sheet .pass-header-pdf .pass-logo.right {
+            width: 13mm;
+            height: auto;
+        }
+
+        .pdf-sheet .pass-header-pdf .pass-date-row {
+            display: block;
+            margin-top: 2mm;
+            text-align: center;
+        }
+
+        .pdf-sheet .pass-header-pdf .pass-date-row .pass-line {
+            margin: 0 auto;
+        }
+
         @media print {
             html,
             body {
@@ -528,8 +671,8 @@
             }
 
             .sheet {
-                width: 194mm;
-                height: 281mm;
+                width: 200mm;
+                height: 287mm;
                 min-height: 0;
                 margin: 0;
                 padding: 0;
@@ -542,7 +685,7 @@
                 height: 100%;
                 margin: 0;
                 border-collapse: separate;
-                border-spacing: 7.5mm 7mm;
+                border-spacing: 7.5mm 9mm;
                 table-layout: fixed;
             }
 
@@ -559,7 +702,7 @@
                 width: 50%;
                 height: 50%;
                 padding: 0;
-                vertical-align: top;
+                vertical-align: middle;
             }
 
             .copy-table {
@@ -637,8 +780,17 @@
         $timeTo = $locatorSlip->time_to ? \Carbon\Carbon::parse($locatorSlip->time_to)->format('h:i A') : '';
         $formType = ($locatorSlip->type ?? '') === 'Personal' ? 'Pass Slip' : ($locatorSlip->type ?: 'Official Business');
         $formTitle = $formType === 'Pass Slip' ? 'Pass Slip Form' : 'Official Business Form';
-        $signatureUrl = $employee?->effective_signature_url;
-        $isPreview = request()->boolean('preview');
+        $isPdf = $pdfMode ?? false;
+        $isPreview = $previewMode ?? request()->boolean('preview');
+        $signatureUrl = $isPdf
+            ? ($signaturePath ?? $employee?->e_signature_absolute_path)
+            : $employee?->effective_signature_url;
+        $dmwLogoSource = $isPdf
+            ? ($dmwLogoPath ?? public_path('images/official DMW.png'))
+            : asset('images/official DMW.png');
+        $bagongPilipinasLogoSource = $isPdf
+            ? ($bagongPilipinasLogoPath ?? public_path('images/bagong-pilipinas-logo.png'))
+            : asset('images/bagong-pilipinas-logo.png');
 
         // Show only one copy inside the preview modal.
         // Keep four copies when opening the actual printable page.
@@ -647,7 +799,7 @@
             : ['EMPLOYEE FILE', 'HR/FAD FILE', 'EMPLOYEE FILE', 'HR/FAD FILE'];
     @endphp
 
-    <main class="sheet{{ $isPreview ? ' preview-sheet' : '' }}">
+    <main class="sheet{{ $isPreview ? ' preview-sheet' : '' }}{{ $isPdf ? ' pdf-sheet' : '' }}">
         <table
             class="copies-layout{{ $isPreview ? ' preview-layout' : '' }}"
             aria-label="{{ $formTitle }} copies"
@@ -658,7 +810,7 @@
                         @foreach($copyRow as $copyLabel)
                             <td>
                                 <div class="copy-wrap">
-                                <table class="copy-table{{ $formType === 'Pass Slip' ? ' pass-slip-table' : '' }}" aria-label="{{ $copyLabel }} {{ $formTitle }}">
+                                <table class="copy-table{{ $formType === 'Pass Slip' ? ' pass-slip-table' : ' official-business-table' }}" aria-label="{{ $copyLabel }} {{ $formTitle }}">
                                     <colgroup>
                                         <col style="width: 25%">
                                         <col style="width: 25%">
@@ -668,17 +820,37 @@
                                     @if($formType === 'Pass Slip')
                                     <tr>
                                         <td colspan="4" class="pass-header-cell">
-                                            <div class="pass-header">
-                                                <img class="pass-logo" src="{{ asset('images/dmw.png') }}" alt="">
-                                                <div>
-                                                    <div class="pass-title">PASS SLIP</div>
-                                                    <div class="pass-date-row">
-                                                        <span>Date :</span>
-                                                        <span class="pass-line" style="max-width: 29mm;">{{ $dateCovered }}</span>
+                                            @if($isPdf)
+                                                <table class="pass-header-pdf" aria-hidden="true">
+                                                    <tr>
+                                                        <td class="logo-column">
+                                                            <img class="pass-logo" src="{{ $dmwLogoSource }}" alt="Department of Migrant Workers - Tahanan ng OFW">
+                                                        </td>
+                                                        <td>
+                                                            <div class="pass-title">PASS SLIP</div>
+                                                            <div class="pass-date-row">
+                                                                <span>Date :</span>
+                                                                <span class="pass-line" style="max-width: 29mm;">{{ $dateCovered }}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td class="logo-column">
+                                                            <img class="pass-logo right" src="{{ $bagongPilipinasLogoSource }}" alt="">
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            @else
+                                                <div class="pass-header">
+                                                    <img class="pass-logo" src="{{ $dmwLogoSource }}" alt="Department of Migrant Workers - Tahanan ng OFW">
+                                                    <div>
+                                                        <div class="pass-title">PASS SLIP</div>
+                                                        <div class="pass-date-row">
+                                                            <span>Date :</span>
+                                                            <span class="pass-line" style="max-width: 29mm;">{{ $dateCovered }}</span>
+                                                        </div>
                                                     </div>
+                                                    <img class="pass-logo right" src="{{ $bagongPilipinasLogoSource }}" alt="">
                                                 </div>
-                                                <img class="pass-logo right" src="{{ asset('images/bagong-pilipinas-logo.png') }}" alt="">
-                                            </div>
+                                            @endif
                                         </td>
                                     </tr>
                                     <tr>
@@ -703,11 +875,11 @@
                                             </div>
                                             <span class="pass-line pass-reason-line"></span>
 
-                                            <div class="pass-line-row compact">
+                                            <div class="pass-line-row compact pass-time-row">
                                                 <span class="pass-label">Time of Departure :</span>
                                                 <span class="pass-line">{{ $timeFrom }}</span>
                                             </div>
-                                            <div class="pass-line-row compact">
+                                            <div class="pass-line-row compact pass-time-row">
                                                 <span class="pass-label">Est. Time of Return :</span>
                                                 <span class="pass-line">{{ $timeTo }}</span>
                                             </div>
@@ -723,11 +895,13 @@
                                                 <tr>
                                                     <td>
                                                         <div class="pass-approval-label">RECOMMENDING APPROVAL:</div>
+                                                        <div class="pass-approval-name">{{ $chiefName }}</div>
                                                         <div class="pass-approval-line"></div>
                                                         <div class="pass-approval-role">Division Chief</div>
                                                     </td>
                                                     <td>
                                                         <div class="pass-approval-label" style="text-align:center;">APPROVED BY:</div>
+                                                        <div class="pass-approval-name">{{ $regionalDirectorName }}</div>
                                                         <div class="pass-approval-line"></div>
                                                         <div class="pass-approval-role">Director/Head, B/S/O</div>
                                                     </td>
@@ -748,19 +922,21 @@
                                     @else
                                     <tr>
                                         <td colspan="4" class="header-cell">
-                                            <div class="form-header">
-                                                <div class="logo-slot">
-                                                    <img class="form-logo" src="{{ asset('images/dmw.png') }}" alt="">
-                                                </div>
-                                                <div class="agency-block">
-                                                    <div class="agency-name">Department of Migrant Workers</div>
-                                                    <div>Regional Office XI</div>
-                                                    <div class="form-title">{{ $formTitle }}</div>
-                                                </div>
-                                                <div class="logo-slot">
-                                                    <img class="form-logo right" src="{{ asset('images/bagong-pilipinas-logo.png') }}" alt="">
-                                                </div>
-                                            </div>
+                                            <table class="ob-header-table" aria-hidden="true">
+                                                <tr>
+                                                    <td class="logo-slot">
+                                                        <img class="form-logo" src="{{ $dmwLogoSource }}" alt="Department of Migrant Workers - Tahanan ng OFW">
+                                                    </td>
+                                                    <td class="agency-block">
+                                                        <div class="agency-name">Department of Migrant Workers</div>
+                                                        <div>Regional Office XI</div>
+                                                        <div class="form-title">{{ $formTitle }}</div>
+                                                    </td>
+                                                    <td class="logo-slot right">
+                                                        <img class="form-logo right" src="{{ $bagongPilipinasLogoSource }}" alt="">
+                                                    </td>
+                                                </tr>
+                                            </table>
                                         </td>
                                     </tr>
                                     <tr>

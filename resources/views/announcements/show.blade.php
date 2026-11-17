@@ -6,64 +6,33 @@
 
             {{-- Back button --}}
             <div class="mb-3">
-                <a
-                    href="{{ in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'chief', 'regionaldirector'], true)
-                        ? route('announcements.index')
-                        : route('announcements.view') }}"
-                    class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-600 shadow-sm transition hover:border-indigo-300 hover:bg-gray-50 hover:text-indigo-600"
-                >
-                    <svg
-                        class="mr-2 h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M11 17l-5-5m0 0l5-5m-5 5h12"
-                        />
-                    </svg>
-
-                    {{ __('Back') }}
-                </a>
+                <x-page-action href="{{ in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'chief', 'regionaldirector'], true) ? route('announcements.index') : route('announcements.view') }}" />
             </div>
 
             {{-- Announcement card --}}
             <article class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                <div class="p-4 sm:p-5">
+                <div class="p-5 sm:p-6">
 
-                    {{-- Date, categories, and actions --}}
-                    <div class="mb-4 flex flex-col gap-3 border-b border-gray-200 pb-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="flex flex-wrap items-center gap-3">
-                            <span class="flex items-center text-xs font-medium text-gray-500">
-                                <svg
-                                    class="mr-1.5 h-4 w-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                    aria-hidden="true"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                    />
-                                </svg>
+                    @php
+                        $displayTags = collect(explode(',', $announcement->tags ?? ''))
+                            ->map(fn ($tag) => trim($tag))
+                            ->filter(fn ($tag) => filled($tag) && strcasecmp($tag, 'important') !== 0);
+                        $authorName = $announcement->author?->display_name ?: $announcement->author?->name ?: __('HR Office');
+                        $authorContext = collect([
+                            $announcement->author?->employee?->division,
+                            Str::headline($announcement->author?->employee?->position ?: $announcement->author?->role ?: __('Staff')),
+                        ])->filter()->implode(' - ');
+                        $publishedDate = $announcement->published_at ?? $announcement->created_at;
+                    @endphp
 
-                                {{ $announcement->created_at->format('M d, Y h:i A') }}
-                            </span>
-
-                            @if($announcement->tags)
-                                @foreach(explode(',', $announcement->tags) as $tag)
-                                    <span class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                                        {{ trim($tag) }}
-                                    </span>
-                                @endforeach
-                            @endif
+                    {{-- Category and actions --}}
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                            @foreach($displayTags as $tag)
+                                <span class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                    {{ $tag }}
+                                </span>
+                            @endforeach
                         </div>
 
                         {{-- Admin actions --}}
@@ -73,98 +42,59 @@
                                 || ($viewerRole === 'chief' && $announcement->author_id === auth()->id());
                         @endphp
                         @if($canManageAnnouncement)
-                            <div class="flex shrink-0 gap-2">
+                            <div class="flex shrink-0 gap-0.5">
                                 <a
                                     href="{{ route('announcements.edit', $announcement) }}"
-                                    class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 transition-colors hover:border-indigo-300 hover:bg-indigo-100"
+                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-700 transition-colors duration-200 hover:bg-blue-50 hover:text-blue-900"
                                     title="{{ __('Edit') }}"
                                     aria-label="{{ __('Edit') }}"
                                 >
-                                    <svg
-                                        class="h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                        aria-hidden="true"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M16.862 4.487l1.651-1.651a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
-                                        />
-
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M19.5 7.125L16.875 4.5"
-                                        />
-                                    </svg>
+                                    <i class="fa-solid fa-pen text-sm" aria-hidden="true"></i>
                                 </a>
 
-                                <form
-                                    action="{{ route('announcements.destroy', $announcement) }}"
-                                    method="POST"
-                                    onsubmit="return confirm('{{ __('Are you sure you want to delete this announcement?') }}');"
-                                >
-                                    @csrf
-                                    @method('DELETE')
-
-                                    <button
-                                        type="submit"
-                                        class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-700 transition-colors hover:border-red-300 hover:bg-red-100"
-                                        title="{{ __('Delete') }}"
-                                        aria-label="{{ __('Delete') }}"
-                                    >
-                                        <svg
-                                            class="h-4 w-4"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                            aria-hidden="true"
-                                        >
-                                            <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                stroke-width="2"
-                                                d="M6 7h12m-9 0V5.25A1.25 1.25 0 0110.25 4h3.5A1.25 1.25 0 0115 5.25V7m-7 0l.75 12A2 2 0 0010.75 21h2.5a2 2 0 002-1.875L16 7"
-                                            />
-                                        </svg>
-                                    </button>
-                                </form>
+                                <x-announcement-archive-action :announcement="$announcement" />
                             </div>
                         @endif
                     </div>
 
-                    {{-- Title --}}
-                    <div class="mb-4 border-b border-gray-200 pb-4">
-                        <p class="mb-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
-                            {{ __('Title') }}
-                        </p>
-
-                        <h1 class="text-3xl font-black leading-tight text-gray-900">
+                    {{-- Title and publication details --}}
+                    <div class="border-b border-gray-200 pb-5">
+                        <h1 class="text-2xl font-black leading-tight text-gray-900 sm:text-3xl">
                             {{ $announcement->title }}
                         </h1>
+
+                        <div class="mt-5 flex flex-col gap-3 text-sm sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <p class="font-semibold text-gray-800">{{ $authorName }}</p>
+                                @if($authorContext)
+                                    <p class="mt-0.5 text-gray-500">{{ $authorContext }}</p>
+                                @endif
+                            </div>
+
+                            <p class="inline-flex items-center gap-2 text-sm text-gray-500">
+                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                {{ __('Posted') }} {{ $publishedDate?->format('g:i A') }}
+                                <span class="text-gray-300" aria-hidden="true">|</span>
+                                {{ $publishedDate?->format('M d, Y') }}
+                            </p>
+                        </div>
                     </div>
 
                     {{-- Announcement content --}}
-                    <section>
-                        <p class="mb-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
-                            {{ __('Description') }}
-                        </p>
+                    <section class="pt-5">
                         <div class="prose prose-indigo max-w-none whitespace-pre-wrap text-base leading-6 text-gray-700">
                             {!! nl2br(e($announcement->content)) !!}
                         </div>
                     </section>
 
                     {{-- Attachment --}}
-                    @if($announcement->attachment_path)
-                        <div class="mt-4 border-t border-gray-200 pt-3">
-                            <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                {{ __('Attachment') }}
-                            </span>
-
+                    <div class="mt-4 border-t border-gray-200 pt-3">
+                        <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">
+                            {{ __('Attachment') }}
+                        </span>
+                        @if($announcement->attachment_path)
                             <a
                                 href="{{ route('announcements.attachment', $announcement) }}"
                                 target="_blank"
@@ -190,34 +120,11 @@
                                     {{ basename($announcement->attachment_path) }}
                                 </span>
                             </a>
-                        </div>
-                    @endif
-
-                    {{-- Author shown once only --}}
-                    <div class="mt-4 border-t border-gray-200 pt-3 text-sm text-gray-500">
-                        <p class="mb-1.5 text-[10px] font-black uppercase tracking-widest text-gray-400">
-                            {{ __('Posted By') }}
-                        </p>
-                        <p class="flex flex-wrap items-center gap-2">
-                            <span class="font-semibold text-gray-700">
-                                {{ $announcement->author?->display_name
-                                    ?: $announcement->author?->name
-                                    ?: __('HR Office') }}
-                            </span>
-
-                            <span
-                                class="h-4 w-px bg-gray-300"
-                                aria-hidden="true"
-                            ></span>
-
-                            <span>
-                                {{ collect([
-                                    $announcement->author?->employee?->division_abbreviation,
-                                    Str::headline($announcement->author?->employee?->position ?: $announcement->author?->role ?: __('Staff')),
-                                ])->filter()->implode(' - ') }}
-                            </span>
-                        </p>
+                        @else
+                            <p class="text-sm text-gray-500">{{ __('No attachment provided.') }}</p>
+                        @endif
                     </div>
+
                 </div>
             </article>
         </div>

@@ -47,24 +47,19 @@
             }
         </style>
     @endif
-    <x-slot name="title">{{ __('Create Travel Authority') }}</x-slot>
+    <x-slot name="title">{{ isset($travelOrder) ? __('Edit Travel Authority') : __('Create Travel Authority') }}</x-slot>
 
     <div class="py-12 modal-form-shell">
         <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
             <div class="mb-5 modal-page-back">
-                <a href="{{ route('travel-orders.index') }}" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                    {{ __('Back') }}
-                </a>
+                <x-page-action href="{{ route('travel-orders.index') }}" />
             </div>
 
             <div class="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg p-8 border border-gray-100 modal-form-card">
                 <h2 class="text-2xl font-black text-gray-900 mb-8 modal-form-title">{{ __('Create Travel Authority') }}</h2>
 
                 <form
-                    action="{{ request()->boolean('modal') ? route('travel-orders.store', ['modal' => 1]) : route('travel-orders.store') }}"
+                    action="{{ isset($travelOrder) ? route('travel-orders.update', $travelOrder) : (request()->boolean('modal') ? route('travel-orders.store', ['modal' => 1]) : route('travel-orders.store')) }}"
                     method="POST"
                     enctype="multipart/form-data"
                     class="space-y-6"
@@ -73,18 +68,19 @@
                         'name' => trim($emp->lastname . ', ' . $emp->firstname . ' ' . $emp->middlename),
                         'position' => $emp->position,
                         'division' => $emp->division,
-                    ])->values()), @js(collect(old('companions', []))->map(fn ($id) => (int) $id)->values()), '{{ old('travel_date_start') }}', '{{ old('travel_date_end') }}', '{{ now()->toDateString() }}')"
+                    ])->values()), @js(collect(old('companions', isset($travelOrder) ? $travelOrder->companions->modelKeys() : []))->map(fn ($id) => (int) $id)->values()), '{{ old('travel_date_start', ($travelOrder ?? null)?->travel_date_start?->toDateString()) }}', '{{ old('travel_date_end', ($travelOrder ?? null)?->travel_date_end?->toDateString()) }}', '{{ now()->toDateString() }}')"
                     x-init="init()"
                 >
                     @csrf
+                    @isset($travelOrder) @method('PUT') @endisset
 
                     {{-- Travel Type --}}
                     <div>
                         <label for="travel_type" class="block text-sm font-bold text-gray-700 mb-1">{{ __('Travel Type') }} <span class="text-red-500">*</span></label>
                         <select id="travel_type" name="travel_type" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" required>
                             <option value="">-- Select Travel Type --</option>
-                            <option value="local" {{ old('travel_type') === 'local' ? 'selected' : '' }}>Local</option>
-                            <option value="foreign" {{ old('travel_type') === 'foreign' ? 'selected' : '' }}>Foreign</option>
+                            <option value="local" {{ old('travel_type', ($travelOrder ?? null)?->travel_type) === 'local' ? 'selected' : '' }}>Local</option>
+                            <option value="foreign" {{ old('travel_type', ($travelOrder ?? null)?->travel_type) === 'foreign' ? 'selected' : '' }}>Foreign</option>
                         </select>
                         @error('travel_type') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                     </div>
@@ -157,14 +153,14 @@
                     {{-- Place(s) of Travel --}}
                     <div>
                         <label for="places_of_travel" class="block text-sm font-bold text-gray-700 mb-1">{{ __('Place(s) of Travel') }} <span class="text-red-500">*</span></label>
-                        <input type="text" id="places_of_travel" name="places_of_travel" value="{{ old('places_of_travel') }}" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="e.g. Manila, Cebu City" required>
+                        <input type="text" id="places_of_travel" name="places_of_travel" value="{{ old('places_of_travel', ($travelOrder ?? null)?->places_of_travel) }}" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="e.g. Manila, Cebu City" required>
                         @error('places_of_travel') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                     </div>
 
                     {{-- Purpose of Travel --}}
                     <div>
                         <label for="purpose" class="block text-sm font-bold text-gray-700 mb-1">{{ __('Purpose of Travel') }} <span class="text-red-500">*</span></label>
-                        <textarea id="purpose" name="purpose" rows="4" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="Describe the purpose of travel..." required>{{ old('purpose') }}</textarea>
+                        <textarea id="purpose" name="purpose" rows="4" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="Describe the purpose of travel..." required>{{ old('purpose', ($travelOrder ?? null)?->purpose) }}</textarea>
                         @error('purpose') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                     </div>
 
@@ -180,7 +176,7 @@
                                 {{ __('Notes / Remarks') }}
                                 <span class="text-gray-400 font-normal text-xs">- Optional</span>
                             </label>
-                            <textarea id="notes_remarks" name="notes_remarks" rows="3" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">{{ old('notes_remarks') }}</textarea>
+                            <textarea id="notes_remarks" name="notes_remarks" rows="3" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">{{ old('notes_remarks', ($travelOrder ?? null)?->notes_remarks) }}</textarea>
                             @error('notes_remarks') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                         </div>
 
@@ -190,7 +186,7 @@
                                     {{ __('Name of Driver') }}
                                     <span class="text-gray-400 font-normal text-xs">- Optional</span>
                                 </label>
-                                <input type="text" id="driver_name" name="driver_name" value="{{ old('driver_name') }}" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                                <input type="text" id="driver_name" name="driver_name" value="{{ old('driver_name', ($travelOrder ?? null)?->driver_name) }}" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                                 @error('driver_name') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                             </div>
 
@@ -199,7 +195,7 @@
                                     {{ __('Vehicle / Plate No.') }}
                                     <span class="text-gray-400 font-normal text-xs">- Optional</span>
                                 </label>
-                                <input type="text" id="vehicle_plate_no" name="vehicle_plate_no" value="{{ old('vehicle_plate_no') }}" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                                <input type="text" id="vehicle_plate_no" name="vehicle_plate_no" value="{{ old('vehicle_plate_no', ($travelOrder ?? null)?->vehicle_plate_no) }}" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                                 @error('vehicle_plate_no') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                             </div>
                         </div>
@@ -265,7 +261,7 @@
     </a>
 @endif
                         <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 hover:-translate-y-0.5">
-                            {{ __('Submit Travel Authority') }}
+                            {{ isset($travelOrder) ? __('Save Changes') : __('Submit Travel Authority') }}
                         </button>
                     </div>
                 </form>

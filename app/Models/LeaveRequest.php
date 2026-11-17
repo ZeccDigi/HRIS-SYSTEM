@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Carbon\CarbonPeriod;
 
 class LeaveRequest extends Model
 {
+    use SoftDeletes;
     protected $fillable = [
         'employee_id',
         'leave_type_id',
@@ -31,6 +33,15 @@ class LeaveRequest extends Model
         'is_paid',
         'commutation_requested',
     ];
+
+    public function canBeEditedBy(?Employee $employee): bool
+    {
+        return $employee !== null
+            && (int) $this->employee_id === (int) $employee->id
+            && $this->status === 'pending'
+            && in_array($this->hrstaff_status, [null, 'pending'], true)
+            && $this->approved_by_hrstaff === null;
+    }
 
     public function employee()
     {

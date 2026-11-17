@@ -33,7 +33,8 @@ class MyLeaveController extends Controller
         $search = trim((string) $request->query('search', ''));
         $year = (string) $request->query('year', now()->year);
         $status = (string) $request->query('status', '');
-        $leaveType = (string) $request->query('leave_type', '');
+        $month = (string) $request->query('month', '');
+        $perPage = $this->perPage($request);
 
         $allLeaveTypes = $employee->leaveRequests()
             ->with('leaveType')
@@ -46,18 +47,6 @@ class MyLeaveController extends Controller
             ->sort()
             ->values();
 
-        $leaveTypeIds = collect();
-        if ($leaveType !== '') {
-            $leaveTypeIds = LeaveType::query()
-                ->get(['id', 'name'])
-                ->filter(fn (LeaveType $type) => (string) \Illuminate\Support\Str::of($type->name)
-                    ->replaceMatches('/\s+Leave\b/i', '')
-                    ->trim()
-                    ->lower() === $leaveType)
-                ->pluck('id')
-                ->values();
-        }
-
         $leaves = $employee->leaveRequests()
             ->with(['leaveType', 'employee', 'chief', 'hrstaff', 'regionalDirector'])
             ->when($search !== '', function ($query) use ($search) {
@@ -69,7 +58,7 @@ class MyLeaveController extends Controller
                 });
             })
             ->when($year !== '', fn ($query) => $query->whereYear('date_filed', $year))
-            ->when($leaveType !== '', fn ($query) => $query->whereIn('leave_type_id', $leaveTypeIds))
+            ->when((int) $month >= 1 && (int) $month <= 12, fn ($query) => $query->whereMonth('date_filed', (int) $month))
             ->when($status === 'cancelled', fn ($query) => $query->where('status', 'cancelled'))
             ->when($status === 'rejected', function ($query) {
                 $query->where(function ($query) {
@@ -116,18 +105,17 @@ class MyLeaveController extends Controller
                     });
             })
             ->latest()
-            ->paginate(5)
+            ->paginate($perPage)
             ->withQueryString();
         $credits = $employee->leaveCredits()->with('leaveType')->get();
 
         return view('leaves.index', [
             'leaves' => $leaves,
             'credits' => $credits,
-            'leaveTypes' => $allLeaveTypes,
             'search' => $search,
             'year' => $year,
+            'month' => $month,
             'status' => $status,
-            'leaveType' => $leaveType,
         ]);
     }
 
@@ -163,16 +151,17 @@ class MyLeaveController extends Controller
             'leave_type_id' => 'required|exists:leave_types,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'reason' => 'required|string',
             'is_paid' => 'required|boolean',
             'leave_detail_type' => $this->leaveDetailTypeRules($leaveType),
             'leave_detail' => $this->leaveDetailTextRules($leaveType),
+            'monetization_requested' => $this->monetizationRules($leaveType),
             'commutation_requested' => 'required|boolean',
             'attachment' => 'nullable|file|mimes:pdf|max:5120', // Max 5MB
         ]);
 
         $leaveType = LeaveType::findOrFail($validated['leave_type_id']);
         $this->normalizeLeaveDetails($validated, $leaveType);
+        $this->normalizeReason($validated, $leaveType);
         $this->validateLeaveEligibilityAndDates($request, $employee, $leaveType);
 
             if ($request->hasFile('attachment')) {
@@ -316,9 +305,7 @@ class MyLeaveController extends Controller
             abort(403);
         }
 
-        if ($leaf->status !== 'pending') {
-            return redirect()->route('leaves.index')->with('error', 'Only pending requests can be edited.');
-        }
+        abort_unless($leaf->canBeEditedBy($employee), 403);
 
         $employee->loadMissing(['pdsPersonal', 'pdsQuestionnaire', 'pdsChildren']);
         $leaveTypes = $this->eligibleLeaveTypes($employee);
@@ -335,24 +322,23 @@ class MyLeaveController extends Controller
     public function update(Request $request, LeaveRequest $leaf): RedirectResponse
     {
         $employee = auth()->user()->employee;
-        if ($leaf->employee_id !== $employee?->id || $leaf->status !== 'pending') {
-            abort(403);
-        }
+        abort_unless($leaf->canBeEditedBy($employee), 403);
 
         $leaveType = LeaveType::find($request->input('leave_type_id'));
         $validated = $request->validate([
             'leave_type_id' => 'required|exists:leave_types,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'reason' => 'required|string',
             'is_paid' => 'required|boolean',
             'leave_detail_type' => $this->leaveDetailTypeRules($leaveType),
             'leave_detail' => $this->leaveDetailTextRules($leaveType),
+            'monetization_requested' => $this->monetizationRules($leaveType),
             'commutation_requested' => 'required|boolean',
         ]);
 
         $leaveType = LeaveType::findOrFail($validated['leave_type_id']);
         $this->normalizeLeaveDetails($validated, $leaveType);
+        $this->normalizeReason($validated, $leaveType);
         $this->validateLeaveEligibilityAndDates($request, $employee, $leaveType);
         $duration = LeaveRequest::calculateBusinessDays($validated['start_date'], $validated['end_date']);
         $leaveYear = Carbon::parse($validated['start_date'])->year;
@@ -377,10 +363,11 @@ class MyLeaveController extends Controller
         $typeAvailableBalance = $this->selectedTypeAvailableBalance($employee, $leaveType, $leaveYear, $duration, $leaf->id);
         $isPaid = (bool) $validated['is_paid'] && $availableBalance >= $duration && $typeAvailableBalance >= $duration;
 
-        $leaf->update([
-            ...$validated,
-            'is_paid' => $isPaid,
-        ]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($leaf, $employee, $validated, $isPaid) {
+            $current = LeaveRequest::query()->lockForUpdate()->findOrFail($leaf->id);
+            abort_unless($current->canBeEditedBy($employee), 403);
+            $current->update([...$validated, 'is_paid' => $isPaid]);
+        });
 
         AuditLogListener::logActivity(
             'Update Leave Application',
@@ -464,6 +451,29 @@ class MyLeaveController extends Controller
             || str_contains($name, 'women');
 
         return $needsDetails ? 'required|string|max:1000' : 'nullable|string|max:1000';
+    }
+
+    private function monetizationRules(?LeaveType $leaveType): string
+    {
+        if (! $leaveType) {
+            return 'nullable|boolean';
+        }
+
+        $name = strtolower($leaveType->name);
+
+        return str_contains($name, 'vacation') || str_contains($name, 'sick')
+            ? 'nullable|boolean'
+            : 'prohibited';
+    }
+
+    private function normalizeReason(array &$validated, LeaveType $leaveType): void
+    {
+        $isMonetization = (bool) ($validated['monetization_requested'] ?? false);
+        unset($validated['monetization_requested']);
+
+        $validated['reason'] = $isMonetization
+            ? 'Monetization of Leave Credits'
+            : (trim((string) ($validated['leave_detail'] ?? '')) ?: $leaveType->name);
     }
 
     private function normalizeLeaveDetails(array &$validated, LeaveType $leaveType): void
@@ -673,5 +683,12 @@ class MyLeaveController extends Controller
             ->map(fn (Holiday $holiday) => $holiday->date->format('Y-m-d'))
             ->values()
             ->all();
+    }
+
+    private function perPage(Request $request): int
+    {
+        $perPage = (int) $request->query('per_page', 5);
+
+        return in_array($perPage, [5, 10, 20, 50], true) ? $perPage : 5;
     }
 }

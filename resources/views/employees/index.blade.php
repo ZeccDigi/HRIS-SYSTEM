@@ -13,8 +13,8 @@
         $formatRole = fn ($role) => $roleLabels[strtolower((string) $role)] ?? 'Unassigned';
     @endphp
 
-    <div class="overflow-x-hidden py-12" x-data="{ tab: 'employees' }">
-        <div class="mx-auto w-full max-w-7xl min-w-0 px-4 sm:px-6 lg:px-8">
+    <div class="overflow-x-hidden py-6" x-data="{ tab: 'employees', archiveConfirmOpen: false, archiveAction: '', archiveEmployeeName: '' }">
+        <div class="mx-auto w-full min-w-0 px-3 sm:px-4 lg:px-5">
             @if(session('success'))
                 <div class="mb-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700">
                     {{ session('success') }}
@@ -61,7 +61,7 @@
                             class="px-4 py-2 text-sm font-semibold rounded-lg transition"
                             :class="tab === 'archived' ? 'bg-slate-200 text-slate-800' : 'text-gray-500 hover:text-gray-700'"
                             @click="tab = 'archived'">
-                        Archived Employees ({{ $archivedEmployees->count() }})
+                        Archived Employees ({{ $archivedEmployees->total() }})
                     </button>
                 </div>
                 </div>
@@ -75,9 +75,8 @@
                 </a>
             </div>
 
-            <div class="w-full max-w-full min-w-0 overflow-hidden bg-white shadow-sm sm:rounded-lg border border-gray-100" x-show="tab === 'employees'" x-cloak>
-                <div class="min-w-0 p-6 text-gray-900">
-                    <form id="employeeFilterForm" method="GET" action="{{ route('employees.index') }}" data-filter-url="{{ route('employees.filter') }}" class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/70 p-2 sm:flex-row sm:items-center">
+            <form id="employeeFilterForm" method="GET" action="{{ route('employees.index') }}" data-filter-url="{{ route('employees.filter') }}" class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/70 p-2 sm:flex-row sm:items-center" x-show="tab === 'employees'" x-cloak>
+                        <input type="hidden" name="per_page" value="{{ $perPage }}">
                         <div class="relative min-w-0 sm:flex-1">
                             <label for="search" class="sr-only">{{ __('Search employee') }}</label>
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -110,23 +109,33 @@
                                 {{ __('Reset') }}
                             </button>
                         </div>
-                    </form>
+            </form>
 
-                    <div class="w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain">
+            <div class="w-full max-w-full min-w-0" x-show="tab === 'employees'" x-cloak>
+                <div class="min-w-0 text-gray-900">
+                    <div class="w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white">
                         <table class="min-w-full w-full table-fixed divide-y divide-gray-200">
                             <thead>
                                 <tr class="bg-gray-50">
-                                    <th class="w-[28%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Employees Name') }}</th>
-                                    <th class="w-[18%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('RFID Number') }}</th>
-                                    <th class="w-[27%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Division') }}</th>
-                                    <th class="w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Role') }}</th>
-                                    <th class="w-[12%] px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Actions') }}</th>
+                                    <th class="w-[22%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Employees Name') }}</th>
+                                    <th class="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('RFID Number') }}</th>
+                                    <th class="w-[34%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Division') }}</th>
+                                    <th class="w-[18%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Role') }}</th>
+                                    <th class="w-[14%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="employeeTableBody" class="bg-white divide-y divide-gray-200">
                                 @include('employees.partials.rows', ['employees' => $employees])
                             </tbody>
                         </table>
+                    </div>
+                    <div id="employeeTablePagination">
+                        @include('partials.table-pagination', [
+                            'paginator' => $employees,
+                            'label' => __('employees'),
+                            'perPageOptions' => [5, 10, 20, 50],
+                            'perPageSelectId' => 'employees_per_page',
+                        ])
                     </div>
                 </div>
             </div>
@@ -241,7 +250,53 @@
                             </tbody>
                         </table>
                     </div>
+                    @include('partials.table-pagination', [
+                        'paginator' => $archivedEmployees,
+                        'label' => __('archived employees'),
+                        'perPageOptions' => [5, 10, 20, 50],
+                        'perPageSelectId' => 'archived_employees_per_page',
+                        'perPageParam' => 'archive_per_page',
+                        'perPage' => $archivePerPage,
+                    ])
                 </div>
+            </div>
+
+            <div
+                x-cloak
+                x-show="archiveConfirmOpen"
+                x-transition.opacity
+                @keydown.escape.window="archiveConfirmOpen = false"
+                class="fixed inset-0 z-[100000] flex items-center justify-center p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="archiveEmployeeModalTitle"
+            >
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="archiveConfirmOpen = false"></div>
+
+                <form method="POST" :action="archiveAction" class="relative z-10 w-full max-w-sm overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                    @csrf
+                    @method('DELETE')
+
+                    <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-4 py-3">
+                        <div>
+                            <h2 id="archiveEmployeeModalTitle" class="text-base font-black text-slate-900">{{ __('Archive Employee') }}</h2>
+                            <p class="mt-0.5 text-xs text-slate-500" x-text="archiveEmployeeName"></p>
+                        </div>
+                        <div class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                            <i class="fa-solid fa-triangle-exclamation text-sm" aria-hidden="true"></i>
+                        </div>
+                    </div>
+
+                    <div class="px-4 py-4 text-center">
+                        <p class="text-sm font-bold leading-5 text-blue-950">{{ __('Archive this employee and disable their login access?') }}</p>
+                        <p class="mt-2 whitespace-nowrap text-xs leading-5 text-slate-500">{{ __('You can restore the record later from Archived Employees.') }}</p>
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:justify-end">
+                        <button type="button" @click="archiveConfirmOpen = false" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-widest text-slate-600 transition hover:bg-slate-100">{{ __('Cancel') }}</button>
+                        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-red-700">{{ __('Archive') }}</button>
+                    </div>
+                </form>
             </div>
 
         </div>
@@ -253,6 +308,7 @@
         const employeeDivisionSelect = document.getElementById('division');
         const employeeSortSelect = document.getElementById('sort');
         const employeeTableBody = document.getElementById('employeeTableBody');
+        const employeeTablePagination = document.getElementById('employeeTablePagination');
         const employeeFilterReset = document.getElementById('employeeFilterReset');
         let employeeSearchTimer;
 
@@ -280,6 +336,9 @@
 
                 const data = await response.json();
                 employeeTableBody.innerHTML = data.html;
+                if (employeeTablePagination && typeof data.pagination === 'string') {
+                    employeeTablePagination.innerHTML = data.pagination;
+                }
 
                 const nextUrl = `${employeeFilterForm.action}?${params.toString()}`;
                 window.history.replaceState({}, '', nextUrl);

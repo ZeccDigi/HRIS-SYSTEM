@@ -14,6 +14,8 @@
         .pds-form-body select,
         .pds-form-body textarea {
             background-color: #eef2ff !important;
+            padding-left: 0.375rem !important;
+            padding-right: 0.375rem !important;
         }
 
         /* Radio button styling for high contrast and clear visibility */
@@ -256,19 +258,9 @@
             <div class="mb-6 flex flex-col gap-5 print:hidden">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     @if(! $isReadOnly)
-                        <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-indigo-600">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
-                            </svg>
-                            {{ __('Back') }}
-                        </a>
+                        <x-page-action href="{{ route('dashboard') }}" />
                     @else
-                        <a href="{{ route('employees.show', ['employee' => $employee, 'tab' => 'pds']) }}" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-indigo-600">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
-                            </svg>
-                            {{ __('Back') }}
-                        </a>
+                        <x-page-action href="{{ route('employees.show', ['employee' => $employee, 'tab' => 'pds']) }}" />
                     @endif
                     <div class="flex flex-wrap items-center gap-2">
                         @unless($isReadOnly)
@@ -355,11 +347,11 @@
                 @endif
 
                 @if(!($isReadOnly ?? false))
-                    <form action="{{ route('pds.update') }}" method="POST" class="pds-form-body px-3 pb-8 pt-6 sm:px-4 lg:px-5" enctype="multipart/form-data">
+                    <form action="{{ route('pds.update') }}" method="POST" class="pds-form-body px-2 pb-6 pt-5 sm:px-3 lg:px-4" enctype="multipart/form-data">
                         @csrf
                         @method('PUT')
                 @else
-                    <div class="pds-form-body px-3 pb-8 pt-6 sm:px-4 lg:px-5">
+                    <div class="pds-form-body px-2 pb-6 pt-5 sm:px-3 lg:px-4">
                 @endif
 
                     <!-- Section I: Personal Information -->

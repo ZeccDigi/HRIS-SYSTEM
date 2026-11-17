@@ -48,6 +48,25 @@ test('employee can select and view a historical yearly PDS snapshot', function (
         ->assertOk()
         ->assertSee('Garcia Current')
         ->assertSee('current@example.com');
+
+    $hr = User::factory()->create(['must_change_password' => false]);
+    Employee::factory()->for($hr)->create(['account_role' => 'hrstaff']);
+    foreach ([2025, 2026] as $year) {
+        $employee->salns()->create([
+            'as_of_date' => "${year}-12-31",
+            'type_of_filing' => 'annual_filing',
+            'declarant_info' => [],
+            'filing_status' => 'not_applicable',
+        ]);
+    }
+
+    $this->actingAs($hr)->get(route('employees.show', [
+        'employee' => $employee, 'tab' => 'saln', 'pds_year' => 2025, 'saln_year' => 2025,
+    ]))->assertOk()
+        ->assertSee('Saved PDS for 2025')
+        ->assertSee(route('employees.pds.print', ['employee' => $employee, 'year' => 2025]))
+        ->assertSee('Dec 31, 2025')
+        ->assertDontSee('Dec 31, 2026');
 });
 
 test('updating the PDS stores the current year snapshot', function () {

@@ -49,7 +49,7 @@ test('email verification status is unchanged when profile information is updated
     $this->assertNotNull($user->refresh()->email_verified_at);
 });
 
-test('user can delete their account', function () {
+test('users cannot delete their own HRIS account from the profile page', function () {
     $user = User::factory()->create();
 
     $response = $this
@@ -59,14 +59,12 @@ test('user can delete their account', function () {
         ]);
 
     $response
-        ->assertSessionHasNoErrors()
-        ->assertRedirect('/');
+        ->assertStatus(405);
 
-    $this->assertGuest();
-    $this->assertNull($user->fresh());
+    $this->assertNotNull($user->fresh());
 });
 
-test('correct password must be provided to delete account', function () {
+test('the disabled account-deletion endpoint does not validate passwords', function () {
     $user = User::factory()->create();
 
     $response = $this
@@ -77,8 +75,7 @@ test('correct password must be provided to delete account', function () {
         ]);
 
     $response
-        ->assertSessionHasErrorsIn('userDeletion', 'password')
-        ->assertRedirect('/profile');
+        ->assertStatus(405);
 
     $this->assertNotNull($user->fresh());
 });

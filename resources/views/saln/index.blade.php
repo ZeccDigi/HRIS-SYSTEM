@@ -10,7 +10,7 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                     @if($salns->isNotEmpty())
-                        <a href="{{ route('salns.show', ['saln' => $salns->first(), 'print' => 1]) }}" class="inline-flex w-fit items-center gap-2 rounded-xl bg-[#0038a8] px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-md shadow-blue-100 hover:bg-[#002f8f] transition">
+                        <a href="{{ route('salns.download', ['saln' => $salns->first(), 'inline' => 1]) }}" target="_blank" rel="noopener noreferrer" data-no-transition class="inline-flex w-fit items-center gap-2 rounded-xl bg-[#0038a8] px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-md shadow-blue-100 hover:bg-[#002f8f] transition">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-12 0h12v-6H6v6z"></path>
                             </svg>

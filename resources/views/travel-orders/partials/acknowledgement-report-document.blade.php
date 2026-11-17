@@ -7,15 +7,15 @@
 @endphp
 <article class="ar-document">
     <header class="ar-header">
-        <img src="{{ asset('images/dmw.png') }}" alt="DMW Logo" class="ar-logo">
+        <img src="{{ $dmwLogoPath ?? asset('images/dmw.png') }}" alt="DMW Logo" class="ar-logo">
         <div class="ar-agency"><strong>DEPARTMENT OF MIGRANT WORKERS</strong><strong>REGIONAL OFFICE XI</strong><span>3rd Floor, NCCC Mall, Buhangin, Davao City</span></div>
     </header>
     <h1 class="ar-title">TRAVEL AUTHORITY REPORT (TAR)</h1>
     <table class="ar-info">
         <tr><th>Name</th><td>{{ $employeeName }}</td></tr>
-        <tr><th>Activity</th><td>{{ $travelOrder->tar_activity ?: $travelOrder->purpose ?: 'N/A' }}</td></tr>
+        <tr><th>Activity</th><td>{{ \Illuminate\Support\Str::title($travelOrder->tar_activity ?: $travelOrder->purpose ?: 'N/A') }}</td></tr>
         <tr><th>Date</th><td>{{ $travelOrder->tar_activity_date?->format('F d, Y') ?: $travelOrder->travel_date_end?->format('F d, Y') ?: 'N/A' }}</td></tr>
-        <tr><th>Venue</th><td>{{ $travelOrder->tar_venue ?: $travelOrder->places_of_travel ?: 'N/A' }}</td></tr>
+        <tr><th>Venue</th><td>{{ \Illuminate\Support\Str::title($travelOrder->tar_venue ?: $travelOrder->places_of_travel ?: 'N/A') }}</td></tr>
         <tr><th>Participants<br>Present</th><td><div class="tall">{{ $travelOrder->tar_participants_present ?: 'N/A' }}</div></td></tr>
         <tr><th>Participants<br>of DMW</th><td><div class="tall">{{ $travelOrder->tar_dmw_participants ?: $employeeName }}</div></td></tr>
     </table>

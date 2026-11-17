@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\ActivityVisitController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CtoController;
 use App\Http\Controllers\DashboardController;
@@ -43,6 +44,8 @@ Route::get('/dashboard/leave-calendar', [DashboardController::class, 'leaveCalen
     ->name('dashboard.leave-calendar');
 
 Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->group(function () {
+    Route::post('activity-visits/start', [ActivityVisitController::class, 'start'])->name('activity-visits.start');
+    Route::post('activity-visits/end', [ActivityVisitController::class, 'end'])->name('activity-visits.end');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/employees/{employee}/profile-picture', [EmployeeController::class, 'uploadProfilePicture'])->name('employees.profile-picture');
@@ -58,6 +61,7 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     Route::delete('employees/{employee}/force-delete', [EmployeeController::class, 'forceDelete'])->name('employees.force-delete')->middleware('role:ADMIN');
     Route::get('employees/filter', [EmployeeController::class, 'filter'])->name('employees.filter')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
     Route::post('employees/{employee}/leave-credit-adjustments', [EmployeeController::class, 'storeLeaveCreditAdjustment'])->name('employees.leave-credit-adjustments.store')->middleware('role:ADMIN,HRSTAFF');
+    Route::patch('employees/{employee}/core-time', [EmployeeController::class, 'updateCoreTime'])->name('employees.core-time.update')->middleware('role:ADMIN,HRSTAFF');
     Route::resource('employees', EmployeeController::class)->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
 
     Route::get('reports/print', [ReportController::class, 'print'])->name('reports.print')->middleware('role:ADMIN,HRSTAFF');
@@ -66,6 +70,7 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     // Audit Log Routes
     Route::get('audit-logs/login', [AuditLogController::class, 'login'])->name('audit-logs.login')->middleware('role:ADMIN,HRSTAFF');
     Route::get('audit-logs/activity', [AuditLogController::class, 'activity'])->name('audit-logs.activity')->middleware('role:ADMIN,HRSTAFF');
+    Route::get('archive', [\App\Http\Controllers\ArchiveController::class, 'index'])->name('archive.index')->middleware('role:ADMIN,HRSTAFF');
 
     Route::resource('leave-types', LeaveTypeController::class)->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
     Route::resource('holidays', HolidayController::class)->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
@@ -90,6 +95,7 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     Route::get('/pds/print-clean', [PdsController::class, 'printClean'])->name('pds.print-clean');
     Route::get('/pds/edit', [PdsController::class, 'edit'])->name('pds.edit');
     Route::put('/pds', [PdsController::class, 'update'])->name('pds.update');
+    Route::get('/employees/{employee}/pds/download', [PdsController::class, 'downloadForHr'])->name('employees.pds.download')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
     Route::get('/employees/{employee}/pds/print', [PdsController::class, 'printForHr'])->name('employees.pds.print')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
     Route::get('/employees/{employee}/pds', [PdsController::class, 'showForHr'])->name('employees.pds.show')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
 
@@ -99,10 +105,16 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     Route::resource('announcements', AnnouncementController::class)->except(['show'])->middleware('role:ADMIN,HRSTAFF,CHIEF,REGIONALDIRECTOR');
     Route::resource('announcements', AnnouncementController::class)->only(['show']);
 
+    Route::get('my-dtr/print', [DtrController::class, 'printMyDtr'])->name('my-dtr.print');
     Route::get('my-dtr', [DtrController::class, 'myDtr'])->name('my-dtr.index');
+    Route::get('dtr/employees/{employee}/print', [DtrController::class, 'printEmployeeDtr'])->name('dtr.employee.print')->middleware('role:ADMIN,HRSTAFF,CHIEF,REGIONALDIRECTOR');
+    Route::get('dtr/employees/{employee}', [DtrController::class, 'employeeDtr'])->name('dtr.employee')->middleware('role:ADMIN,HRSTAFF,CHIEF,REGIONALDIRECTOR');
     Route::get('my-cto', [MyCtoController::class, 'index'])->name('my-cto.index');
     Route::get('my-cto/create', [MyCtoController::class, 'create'])->name('my-cto.create');
+    Route::get('my-cto/overtime-details', [MyCtoController::class, 'overtimeDetails'])->name('my-cto.overtime-details');
     Route::post('my-cto', [MyCtoController::class, 'store'])->name('my-cto.store');
+    Route::get('my-cto/{ctoRequest}/edit', [MyCtoController::class, 'edit'])->name('my-cto.edit');
+    Route::put('my-cto/{ctoRequest}', [MyCtoController::class, 'update'])->name('my-cto.update');
     Route::get('my-cto/{ctoRequest}/print', [MyCtoController::class, 'print'])->name('my-cto.print');
     Route::get('my-cto/{ctoRequest}', [MyCtoController::class, 'show'])->name('my-cto.show');
     Route::resource('dtr', DtrController::class)->only(['index', 'show']);
@@ -134,7 +146,7 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     Route::get('travel-orders/{travelOrder}/acknowledgement-report', [TravelOrderController::class, 'acknowledgementReport'])->name('travel-orders.ar.show');
     Route::get('travel-orders/{travelOrder}/acknowledgement-report/file', [TravelOrderController::class, 'viewAcknowledgementReportFile'])->name('travel-orders.ar.file');
     Route::get('travel-orders/{travelOrder}/acknowledgement-report/print', [TravelOrderController::class, 'printAcknowledgementReport'])->name('travel-orders.ar.print');
-    Route::resource('travel-orders', TravelOrderController::class)->only(['index', 'create', 'store', 'show']);
+    Route::resource('travel-orders', TravelOrderController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
     Route::post('/travel-orders/{travelOrder}/tar', [TravelOrderController::class, 'submitTar'])->name('travel-orders.submit-tar');
     Route::patch('/travel-orders/{travelOrder}/tar/review', [TravelOrderController::class, 'reviewTar'])->name('travel-orders.tar.review')->middleware('role:ADMIN,HRSTAFF,CHIEF,REGIONALDIRECTOR');
     Route::get('/hr/travel-orders', [TravelOrderController::class, 'adminIndex'])->name('hr.travel-orders.index')->middleware('role:ADMIN,HRSTAFF,RECORDOFFICER,CHIEF,REGIONALDIRECTOR');

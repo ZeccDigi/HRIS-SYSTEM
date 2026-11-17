@@ -5,7 +5,7 @@
         <div class="rounded-2xl border border-gray-100 bg-white/80 p-6 shadow-lg backdrop-blur-xl">
             <h2 class="mb-6 text-2xl font-bold text-gray-800">Edit Locator Slip</h2>
 
-            <form action="{{ route('locator-slips.update', $locatorSlip) }}" method="POST" x-data="locatorSlipDateForm('{{ old('date_covered', $locatorSlip->date_covered) }}', '{{ now()->toDateString() }}')">
+            <form action="{{ route('locator-slips.update', $locatorSlip) }}" method="POST" x-data="locatorSlipDateForm(@js(old('date_covered', $locatorSlip->date_covered?->toDateString())), @js(now()->toDateString()))">
                 @csrf
                 @method('PUT')
 

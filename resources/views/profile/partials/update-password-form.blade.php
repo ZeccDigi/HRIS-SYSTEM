@@ -5,32 +5,17 @@
         csrf: @js(csrf_token()),
     })"
 >
-    @php($isTemporaryPassword = auth()->user()?->must_change_password)
-
     <header>
         <h2 class="text-lg font-medium text-gray-900">
             {{ __('Update Password') }}
         </h2>
 
         <p class="mt-1 text-sm text-gray-600">
-            {{ $isTemporaryPassword
-                ? __('Set your new password. An OTP will be sent after you click Save.')
-                : __('Enter your current password and new password. An OTP will be sent after you click Save.') }}
+            {{ __('Set a new password. An OTP will be sent after you click Save.') }}
         </p>
     </header>
 
     <form class="mt-6 space-y-6" @submit.prevent="requestOtp">
-        @unless($isTemporaryPassword)
-            <div>
-                <x-input-label for="update_password_current_password" :value="__('Current Password')" />
-                <div class="relative mt-1">
-                    <x-text-input id="update_password_current_password" type="password" class="block w-full pr-14" autocomplete="current-password" x-model="currentPassword" />
-                    <button type="button" @click="togglePassword('update_password_current_password', $el)" class="absolute inset-y-0 right-0 flex items-center pr-4 text-sm font-semibold text-gray-500 hover:text-[#0038a8] focus:outline-none transition-colors">{{ __('Show') }}</button>
-                </div>
-                <p x-show="errors.current_password" x-text="errors.current_password" class="mt-2 text-sm text-red-600"></p>
-            </div>
-        @endunless
-
         <div>
             <x-input-label for="update_password_password" :value="__('New Password')" />
             <div class="relative mt-1">
@@ -116,7 +101,6 @@
     <script>
         function passwordUpdateFlow(config) {
             return {
-                currentPassword: '',
                 password: '',
                 passwordConfirmation: '',
                 otp: '',
@@ -128,7 +112,6 @@
                 errors: {},
                 payload() {
                     return {
-                        current_password: this.currentPassword,
                         password: this.password,
                         password_confirmation: this.passwordConfirmation,
                     };

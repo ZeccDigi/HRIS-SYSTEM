@@ -118,26 +118,13 @@
                     />
                 </div>
 
-                {{-- Travel type --}}
+                {{-- Travel type filter --}}
                 <div class="lg:w-48 lg:shrink-0">
-                    <label for="travelType" class="sr-only">
-                        {{ __('Travel Type') }}
-                    </label>
-
-                    <select
-                        id="travelType"
-                        x-model="travelType"
-                        @change="applyFilters()"
-                        class="block h-9 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    >
-                        <option value="">
-                            {{ __('All Types') }}
-                        </option>
-
+                    <label for="travelType" class="sr-only">{{ __('Travel Type') }}</label>
+                    <select id="travelType" x-model="travelType" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">{{ __('Types') }}</option>
                         @foreach($travelTypes as $value => $label)
-                            <option value="{{ $value }}">
-                                {{ __($label) }}
-                            </option>
+                            <option value="{{ $value }}">{{ __($label) }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -200,47 +187,47 @@
                         <table class="min-w-full table-fixed border-collapse text-left">
                             <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                                 <tr>
-                                    <th class="w-[9%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[8%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('Date Filed') }}
                                     </th>
 
-                                    <th class="w-[12%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[10%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('TA Stamp') }}
                                     </th>
 
-                                    <th class="w-[12%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[10%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('Employee') }}
                                     </th>
 
-                                    <th class="w-[11%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[10%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('Date of Travel') }}
                                     </th>
 
-                                    <th class="w-[12%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[10%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('Destination') }}
                                     </th>
 
-                                    <th class="w-[12%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[9%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('Record Officer') }}
                                     </th>
 
-                                    <th class="w-[12%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[9%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('Regional Director') }}
                                     </th>
 
-                                    <th class="w-[8%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[8%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('Status') }}
                                     </th>
 
-                                    <th class="w-[7%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[8%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('AR Deadline') }}
                                     </th>
 
-                                    <th class="w-[5%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[7%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('AR Status') }}
                                     </th>
 
-                                    <th class="w-[5%] px-3 py-3 text-right text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    <th class="w-[11%] px-2 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">
                                         {{ __('Actions') }}
                                     </th>
                                 </tr>
@@ -297,20 +284,24 @@
                                 @endif
                             </tbody>
                         </table>
+                        @include('partials.client-table-pagination', [
+                            'tableKey' => $section,
+                            'label' => __('travel authorities'),
+                        ])
                     </div>
                 @endforeach
 
-                <div x-show="tab === 'reports'" x-cloak class="overflow-x-auto">
-                    <table class="min-w-[980px] w-full table-fixed border-collapse text-left">
+                <div x-show="tab === 'reports'" x-cloak class="overflow-x-hidden">
+                    <table class="w-full table-fixed border-collapse text-left">
                         <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                             <tr>
-                                <th class="w-[13%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Submitted') }}</th>
-                                <th class="w-[16%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('TA Stamp') }}</th>
-                                <th class="w-[19%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Employee') }}</th>
-                                <th class="w-[18%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Division') }}</th>
-                                <th class="w-[13%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Deadline') }}</th>
-                                <th class="w-[16%] px-3 py-3 text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Review Stage') }}</th>
-                                <th class="w-[5%] px-3 py-3 text-center text-[11px] font-black uppercase tracking-widest text-gray-500">{{ __('Action') }}</th>
+                                <th class="w-[12%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Submitted') }}</th>
+                                <th class="w-[16%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TA Stamp') }}</th>
+                                <th class="w-[17%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Employee') }}</th>
+                                <th class="w-[18%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Division') }}</th>
+                                <th class="w-[13%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Deadline') }}</th>
+                                <th class="w-[17%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Review Stage') }}</th>
+                                <th class="w-[7%] px-2 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Action') }}</th>
                             </tr>
                         </thead>
                         <tbody id="reportsTravelOrderRows" class="divide-y divide-slate-200 bg-white">
@@ -322,6 +313,10 @@
                             @endif
                         </tbody>
                     </table>
+                    @include('partials.client-table-pagination', [
+                        'tableKey' => 'reports',
+                        'label' => __('TAR records'),
+                    ])
                 </div>
             </div>
         </div>
@@ -573,6 +568,9 @@
                 travelType: '',
                 year: String(currentYear),
                 month: '',
+                perPage: 5,
+                pages: { pending: 1, all: 1, reports: 1 },
+                counts: { pending: 0, all: 0, reports: 0 },
 
                 pendingRows: [],
                 allRows: [],
@@ -596,7 +594,7 @@
                 previewData: {
                     title: '',
                     date: '',
-                    status: '',
+                    travelType: '',
                     remarks: '',
                     printUrl: '',
                     directPrintUrl: '',
@@ -645,19 +643,22 @@
                         this.pendingRows,
                         document.getElementById(
                             'pendingTravelOrderRows'
-                        )
+                        ),
+                        'pending'
                     );
 
                     const allVisibleCount = this.filterRows(
                         this.allRows,
                         document.getElementById(
                             'allTravelOrderRows'
-                        )
+                        ),
+                        'all'
                     );
 
                     const reportsVisibleCount = this.filterRows(
                         this.reportsRows,
-                        document.getElementById('reportsTravelOrderRows')
+                        document.getElementById('reportsTravelOrderRows'),
+                        'reports'
                     );
 
                     this.pendingNoResults =
@@ -673,7 +674,7 @@
                         this.reportsRows.length > 0;
                 },
 
-                filterRows(rows, tbody) {
+                filterRows(rows, tbody, tableKey) {
                     if (!tbody) {
                         return 0;
                     }
@@ -681,8 +682,6 @@
                     const searchValue = this.search
                         .trim()
                         .toLowerCase();
-
-                    let visibleCount = 0;
 
                     /*
                      * Always place newest filed records first.
@@ -699,7 +698,7 @@
                         return secondFiled - firstFiled;
                     });
 
-                    rows.forEach((row) => {
+                    const matchingRows = rows.filter((row) => {
                         const filedDate = this.getFiledDate(row);
 
                         const filedYear = filedDate
@@ -736,19 +735,47 @@
                             matchesYear &&
                             matchesMonth;
 
-                        row.classList.toggle(
-                            'hidden',
-                            !visible
-                        );
+                        return visible;
+                    });
 
-                        if (visible) {
-                            visibleCount++;
-                        }
+                    this.counts[tableKey] = matchingRows.length;
+                    const lastPage = this.totalPages(tableKey);
+                    this.pages[tableKey] = Math.min(Math.max(1, this.pages[tableKey]), lastPage);
 
+                    const firstIndex = (this.pages[tableKey] - 1) * this.perPage;
+                    const pageRows = new Set(matchingRows.slice(firstIndex, firstIndex + this.perPage));
+
+                    rows.forEach((row) => {
+                        row.classList.toggle('hidden', !pageRows.has(row));
                         tbody.appendChild(row);
                     });
 
-                    return visibleCount;
+                    return matchingRows.length;
+                },
+
+                totalPages(tableKey) {
+                    return Math.max(1, Math.ceil((this.counts[tableKey] || 0) / this.perPage));
+                },
+
+                pageNumbers(tableKey) {
+                    return Array.from({ length: this.totalPages(tableKey) }, (_, index) => index + 1);
+                },
+
+                rangeStart(tableKey) {
+                    return this.counts[tableKey] > 0 ? ((this.pages[tableKey] - 1) * this.perPage) + 1 : 0;
+                },
+
+                rangeEnd(tableKey) {
+                    return Math.min(this.pages[tableKey] * this.perPage, this.counts[tableKey] || 0);
+                },
+
+                setPage(tableKey, page) {
+                    this.pages[tableKey] = Math.min(Math.max(1, page), this.totalPages(tableKey));
+                    this.applyFilters();
+                },
+
+                resetPages() {
+                    this.pages = { pending: 1, all: 1, reports: 1 };
                 },
 
                 getFiledDate(row) {
@@ -791,6 +818,7 @@
                     this.travelType = '';
                     this.year = String(currentYear);
                     this.month = '';
+                    this.resetPages();
 
                     this.applyFilters();
                 },

@@ -44,25 +44,17 @@ class LoginAudit extends Model
     public function getDurationAttribute(): string
     {
         if (! $this->login_at) {
-            return 'N/A';
+            return '-';
         }
 
         $end = $this->logout_at ?? now();
         $diffSeconds = (int) $this->login_at->diffInSeconds($end);
 
-        if ($diffSeconds < 60) {
-            return '< 1 min';
-        }
-
-        $hours = (int) floor($diffSeconds / 3600);
-        $minutes = (int) floor(($diffSeconds % 3600) / 60);
-
-        $timeStr = '';
-        if ($hours > 0) {
-            $timeStr .= $hours . ($hours == 1 ? ' hr ' : ' hrs ');
-        }
-        $timeStr .= $minutes . ($minutes == 1 ? ' min' : ' mins');
-
-        return trim($timeStr);
+        return sprintf(
+            '%02d:%02d:%02d.00',
+            intdiv($diffSeconds, 3600),
+            intdiv($diffSeconds % 3600, 60),
+            $diffSeconds % 60,
+        );
     }
 }

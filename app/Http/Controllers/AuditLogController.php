@@ -18,7 +18,7 @@ class AuditLogController extends Controller
         $search = trim((string) $request->input('search'));
         $role = strtolower(trim((string) $request->input('role')));
         $status = strtolower((string) $request->input('status'));
-        $module = trim((string) $request->input('module'));
+        $sort = $request->input('sort', 'latest') === 'oldest' ? 'oldest' : 'latest';
         $selectedDate = $request->input('date');
         $selectedYear = $request->has('year') && $request->input('year') !== '' ? $request->input('year') : date('Y');
 
@@ -58,7 +58,7 @@ class AuditLogController extends Controller
         // -----------------------
         // 2. ACTIVITY AUDIT QUERY
         // -----------------------
-        $activityQuery = ActivityAudit::with('user.employee')->latest();
+        $activityQuery = ActivityAudit::with('user.employee')->where('module', '!=', 'Auth');
 
         if ($search) {
             $activityQuery->where(function ($q) use ($search) {
@@ -73,10 +73,6 @@ class AuditLogController extends Controller
             $activityQuery->where('user_role', $role);
         }
 
-        if ($module) {
-            $activityQuery->where('module', $module);
-        }
-
         if ($selectedDate) {
             $activityQuery->whereDate('created_at', $selectedDate);
         }
@@ -85,12 +81,10 @@ class AuditLogController extends Controller
             $activityQuery->whereYear('created_at', $selectedYear);
         }
 
-        $activityAudits = $activityQuery->paginate(15, ['*'], 'activity_page')->withQueryString();
-
-        // Dynamically fetch unique modules from DB, fallback to defaults if none exist yet
-        $dbModules = ActivityAudit::whereNotNull('module')->distinct()->pluck('module');
-        $defaultModules = collect(['Employees', 'Leaves', 'Attendance', 'Audit Logs', 'System', 'Auth']);
-        $modules = $dbModules->isNotEmpty() ? $dbModules->merge($defaultModules)->unique()->values() : $defaultModules;
+        $activityAudits = $activityQuery
+            ->orderBy('created_at', $sort === 'oldest' ? 'asc' : 'desc')
+            ->paginate(15, ['*'], 'activity_page')
+            ->withQueryString();
 
         $roleOptions = [
             'employee' => 'Employee',
@@ -104,12 +98,11 @@ class AuditLogController extends Controller
         return view('audit-logs.login', compact(
             'audits', 
             'activityAudits', 
-            'modules', 
             'roleOptions', 
             'role', 
             'search', 
             'status', 
-            'module', 
+            'sort', 
             'selectedDate', 
             'selectedYear'
         ));

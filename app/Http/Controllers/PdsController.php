@@ -127,12 +127,35 @@ class PdsController extends Controller
             : collect());
 
         $isHrPreview = true;
-        $backUrl = route('employees.show', ['employee' => $employee, 'tab' => 'pds']);
+        $backUrl = route('employees.show', ['employee' => $employee, 'tab' => 'pds', 'pds_year' => $selectedYear]);
         $pendingPdsReviewCount = $selectedYear === (int) now()->year
             ? $employee->pdsSectionReviews->where('status', 'pending')->count()
             : 0;
 
         return view('pds.print-2025', compact('employee', 'isHrPreview', 'backUrl', 'pendingPdsReviewCount', 'selectedYear', 'pdsYears'));
+    }
+
+    /**
+     * Streams the selected PDS record for HR review in the browser PDF viewer.
+     */
+    public function downloadForHr(
+        Request $request,
+        Employee $employee,
+        PdsPdfExporter $exporter,
+        PdsSnapshotService $snapshots
+    ): Response|RedirectResponse {
+        $selectedYear = (int) $request->query('year', now()->year);
+        abort_unless($snapshots->hasYear($employee, $selectedYear), 404);
+
+        $employee = $snapshots->employeeForYear($employee, $selectedYear);
+
+        try {
+            return $exporter->download($employee, 'inline');
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('employees.pds.print', ['employee' => $employee, 'year' => $selectedYear])
+                ->with('error', 'Could not generate the PDS PDF. You can still use the form preview. '.$e->getMessage());
+        }
     }
 
     public function edit(PdsSnapshotService $snapshots): View

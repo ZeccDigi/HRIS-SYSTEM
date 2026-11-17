@@ -149,13 +149,26 @@
                     ];
                     $isDashboardPage = request()->routeIs('dashboard');
                     $isFullWidthPage = $isDashboardPage || request()->routeIs($applicationListRoutes);
-                    $flatContentRoutes = [...$applicationListRoutes, 'announcements.show'];
+                    $flatContentRoutes = [...$applicationListRoutes, 'announcements.show', 'audit-logs.login', 'audit-logs.activity'];
                     $isFlatContentPage = request()->routeIs($flatContentRoutes);
                     $contentPanelClass = $isFlatContentPage
                         ? 'overflow-visible bg-transparent shadow-none border-0'
                         : ($isDashboardPage
                             ? 'overflow-hidden bg-white rounded-xl shadow-sm border border-gray-100/10'
                             : 'overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100/10');
+                    $activityTracking = match (true) {
+                        request()->routeIs('dashboard') => ['module' => 'Dashboard', 'page' => 'Dashboard'],
+                        request()->routeIs('pds.*') => ['module' => 'PDS', 'page' => 'Personal Data Sheet'],
+                        request()->routeIs('salns.*') => ['module' => 'SALN', 'page' => 'SALN'],
+                        request()->routeIs('leaves.*', 'leave-applications.*') => ['module' => 'Leave', 'page' => 'Leave Management'],
+                        request()->routeIs('my-cto.*', 'hr.cto.*') => ['module' => 'CTO', 'page' => 'CTO Management'],
+                        request()->routeIs('travel-orders.*', 'hr.travel-orders.*') => ['module' => 'Travel Authority', 'page' => 'Travel Authority'],
+                        request()->routeIs('locator-slips.*', 'hr.locator-slips.*') => ['module' => 'Locator Slip', 'page' => 'Locator Slip'],
+                        request()->routeIs('my-dtr.*', 'dtr.*') => ['module' => 'DTR', 'page' => 'Daily Time Record'],
+                        request()->routeIs('reports.*') => ['module' => 'Reports', 'page' => 'Reports'],
+                        request()->routeIs('announcements.*') => ['module' => 'Announcements', 'page' => 'Announcements'],
+                        default => null,
+                    };
                 @endphp
                 <main class="flex-1 relative overflow-x-hidden focus:outline-none {{ request()->routeIs('dashboard') ? 'overflow-hidden py-3' : 'overflow-y-auto py-6' }}">
                     <div class="mx-auto w-full min-w-0 {{ $isFullWidthPage ? 'max-w-none px-1 sm:px-2 md:px-3' : 'max-w-7xl px-4 sm:px-6 md:px-8' }}">
@@ -195,5 +208,74 @@
                 });
             })();
         </script>
+        @if($activityTracking)
+            <script>
+                (() => {
+                    const tracking = @json($activityTracking);
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                    const idleLimitMs = {{ (int) config('activity-tracking.idle_seconds', 300) * 1000 }};
+                    let visitToken = null;
+                    let active = false;
+                    let starting = false;
+                    let idleTimer = null;
+
+                    const startVisit = async () => {
+                        if (document.hidden || active || starting) return;
+                        starting = true;
+
+                        try {
+                            const response = await fetch(@json(route('activity-visits.start')), {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                                credentials: 'same-origin',
+                                body: JSON.stringify({
+                                    ...tracking,
+                                    route: @json(request()->route()?->getName()),
+                                    visit_token: visitToken,
+                                }),
+                            });
+                            const data = response.ok ? await response.json() : null;
+                            visitToken = data?.visit_token ?? visitToken;
+                            active = Boolean(visitToken);
+                        } catch (_) {
+                            active = false;
+                        } finally {
+                            starting = false;
+                            if (document.hidden && active) pauseVisit();
+                        }
+                    };
+
+                    const pauseVisit = () => {
+                        if (!active || !visitToken) return;
+                        active = false;
+                        const payload = JSON.stringify({ visit_token: visitToken, _token: csrfToken });
+                        navigator.sendBeacon(@json(route('activity-visits.end')), new Blob([payload], { type: 'application/json' }));
+                    };
+
+                    const resetIdleTimer = () => {
+                        window.clearTimeout(idleTimer);
+                        if (!document.hidden && !active) startVisit();
+                        idleTimer = window.setTimeout(pauseVisit, idleLimitMs);
+                    };
+
+                    document.addEventListener('visibilitychange', () => {
+                        if (document.hidden) {
+                            window.clearTimeout(idleTimer);
+                            pauseVisit();
+                        } else {
+                            startVisit().finally(resetIdleTimer);
+                        }
+                    });
+
+                    ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach((eventName) => {
+                        window.addEventListener(eventName, resetIdleTimer, { passive: true });
+                    });
+
+                    window.addEventListener('pagehide', pauseVisit);
+                    window.addEventListener('pageshow', resetIdleTimer);
+                    startVisit().finally(resetIdleTimer);
+                })();
+            </script>
+        @endif
     </body>
 </html>

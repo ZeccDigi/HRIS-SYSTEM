@@ -22,4 +22,4 @@
     ] : null;
 @endphp
 
-<x-approval-tracker :payload="$trackedPayload" event="leave-selected" empty="No leave to track yet." />
+<x-approval-tracker :payload="$trackedPayload" event="leave-selected" empty="No leave to track yet." compact />

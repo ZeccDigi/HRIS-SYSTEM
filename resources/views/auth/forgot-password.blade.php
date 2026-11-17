@@ -48,7 +48,7 @@
                 
                 <div class="mb-6">
                     <input type="email" name="email" value="{{ old('email') }}"
-                           placeholder="HRIS Username, e.g. juan.delacruz@dmw.gov.ph"
+                           placeholder="e.g. juan.delacruz@dmw.gov.ph"
                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 transition duration-200"
                            required autofocus>
                     @error('email')

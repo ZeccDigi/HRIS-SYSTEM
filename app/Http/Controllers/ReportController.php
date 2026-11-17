@@ -5,13 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\CtoRequest;
 use App\Models\DtrRecord;
 use App\Models\Employee;
+use App\Models\EmployeeReportSnapshot;
 use App\Models\LeaveCredit;
 use App\Models\LeaveRequest;
 use App\Models\LocatorSlip;
 use App\Models\PdsSnapshot;
 use App\Models\Saln;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
@@ -22,9 +25,10 @@ class ReportController extends Controller
         $today = now()->toDateString();
         $firstDay = now()->startOfMonth()->toDateString();
 
-        $selectedType = $request->query('type', 'employee_compliance');
+        $selectedType = $request->query('type', 'hr_overview');
         $from = $this->validDate($request->query('from'), $firstDay);
         $to = $this->validDate($request->query('to'), $today);
+        $reportYear = max(2000, min((int) now()->year, (int) $request->query('year', Carbon::parse($to)->year)));
         $division = trim((string) $request->query('division', 'All Divisions'));
         $division = $division !== '' ? $division : 'All Divisions';
         $employmentStatus = $request->query('employment_status', 'All Employment Status');
@@ -72,7 +76,7 @@ class ReportController extends Controller
 
         $reportTypes = $this->reportTypes();
         $reportGroups = $this->reportGroups();
-        $selectedType = in_array($selectedType, array_column($reportTypes, 'value'), true) ? $selectedType : 'employee_compliance';
+        $selectedType = in_array($selectedType, array_column($reportTypes, 'value'), true) ? $selectedType : 'hr_overview';
         $selectedCategory = collect($reportGroups)
             ->first(fn (array $group) => collect($group['reports'])->contains('value', $selectedType))['value'] ?? 'employee';
 
@@ -82,6 +86,7 @@ class ReportController extends Controller
             'filters' => [
                 'from' => $from,
                 'to' => $to,
+                'year' => $reportYear,
                 'division' => $division,
                 'employmentStatus' => $this->displayEmploymentStatus($employmentStatus),
             ],
@@ -90,11 +95,17 @@ class ReportController extends Controller
             'reportTypes' => $reportTypes,
             'reportGroups' => $reportGroups,
             'reports' => [
+                'hr_overview' => $this->employeeReport(
+                    Carbon::parse($to),
+                    $reportDivision,
+                    $reportEmploymentStatus
+                ),
                 'employee_compliance' => $this->employeeComplianceReport($employees, Carbon::parse($to)->year),
-                'employee_awards' => $this->employeeAwardsReport($employees, $from, $to),
-                'employee_education' => $this->employeeEducationReport($employees),
-                'employee_birthdays' => $this->employeeBirthdayReport($employees),
+                'employee_loyalty_awards' => $this->employeeLoyaltyAwardsReport($employees, $reportYear),
+                'employee_education' => $this->employeeEducationReport($employees, Carbon::parse($to)->year),
+                'employee_birthdays' => $this->employeeBirthdayReport($employees, Carbon::parse($to)),
                 'attendance_tardiness' => $this->attendanceTardinessReport($employees, $from, $to),
+                'attendance_awards' => $this->attendanceAwardsReport($employees, $from, $to),
                 'leave_monetization' => $this->leaveMonetizationReport($reportDivision, $reportEmploymentStatus, $from, $to),
                 'leave_mandatory_missing' => $this->missingMandatoryLeaveReport($employees, Carbon::parse($to)->year),
                 'locator_frequency' => $this->locatorFrequencyReport($reportDivision, $reportEmploymentStatus, $from, $to),
@@ -109,15 +120,40 @@ class ReportController extends Controller
         return view('reports.index', compact('reportData'));
     }
 
-    public function print(Request $request): View
+    public function print(Request $request): Response
     {
         $reportData = $this->index($request)->getData()['reportData'];
-        $report = $reportData['reports'][$reportData['selectedType']];
+        $selectedType = $reportData['selectedType'];
+        $ctoTab = $request->query('cto_tab', 'overtime');
+
+        if ($selectedType === 'overtime_cto') {
+            $report = $reportData['reports'][$ctoTab === 'cto' ? 'cto' : 'overtime'] ?? $reportData['reports']['overtime'];
+        } else {
+            $report = $reportData['reports'][$selectedType] ?? reset($reportData['reports']);
+        }
+
         $reportGroup = collect($reportData['reportGroups'])->firstWhere('value', $reportData['selectedCategory']);
         $reportTypeLabel = $reportGroup['label'] ?? 'HRIS Reports';
-        $subReportLabel = collect($reportGroup['reports'] ?? [])->firstWhere('value', $reportData['selectedType'])['label'] ?? $report['title'];
+        $subReportLabel = collect($reportGroup['reports'] ?? [])->firstWhere('value', $selectedType)['label'] ?? $report['title'];
 
-        return view('reports.print', compact('reportData', 'report', 'reportTypeLabel', 'subReportLabel'));
+        if ($selectedType === 'overtime_cto') {
+            $subReportLabel = $ctoTab === 'cto' ? 'Compensatory Time-Off (CTO)' : 'Overtime Summary';
+        }
+
+        $headerPath = public_path('images/leave-form-header.png');
+        $headerImage = file_exists($headerPath)
+            ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($headerPath))
+            : null;
+        $isWide = count($report['columns'] ?? []) > 6;
+        $filename = 'HRIS_'.preg_replace('/[^A-Za-z0-9]+/', '_', $subReportLabel).'_'.now()->format('Ymd').'.pdf';
+
+        $pdf = Pdf::loadView('reports.pdf', compact('reportData', 'report', 'reportTypeLabel', 'subReportLabel', 'headerImage'))
+            ->setPaper('a4', $isWide ? 'landscape' : 'portrait');
+
+        return $pdf->stream($filename, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+        ]);
     }
 
     private function employeeBaseQuery(string $division, string $employmentStatus)
@@ -130,11 +166,13 @@ class ReportController extends Controller
     private function reportTypes(): array
     {
         return [
+            ['value' => 'hr_overview', 'label' => 'Overview', 'filters' => ['dateRange', 'division', 'employmentStatus']],
             ['value' => 'employee_compliance', 'label' => 'PDS & SALN Compliance', 'filters' => ['dateRange']],
-            ['value' => 'employee_awards', 'label' => 'Loyalty & Attendance Awards', 'filters' => ['dateRange']],
-            ['value' => 'employee_education', 'label' => 'Education Qualifications', 'filters' => []],
-            ['value' => 'employee_birthdays', 'label' => 'Birthdays', 'filters' => []],
+            ['value' => 'employee_loyalty_awards', 'label' => 'Loyalty Awards', 'filters' => ['year']],
+            ['value' => 'employee_education', 'label' => 'Education Qualifications', 'filters' => ['dateRange']],
+            ['value' => 'employee_birthdays', 'label' => 'Birthday', 'filters' => ['dateRange']],
             ['value' => 'attendance_tardiness', 'label' => 'Tardiness', 'filters' => ['dateRange']],
+            ['value' => 'attendance_awards', 'label' => 'Attendance Awards', 'filters' => ['dateRange']],
             ['value' => 'leave_monetization', 'label' => 'Monetization Applications', 'filters' => ['dateRange']],
             ['value' => 'leave_mandatory_missing', 'label' => 'Mandatory/Force Leave Remaining', 'filters' => ['dateRange']],
             ['value' => 'leave_balance', 'label' => 'Leave Balance', 'filters' => ['dateRange']],
@@ -148,8 +186,8 @@ class ReportController extends Controller
         $subReports = collect($this->reportTypes())->keyBy('value');
 
         return collect([
-            ['value' => 'employee', 'label' => 'Employee Reports', 'reports' => ['employee_compliance', 'employee_awards', 'employee_education', 'employee_birthdays']],
-            ['value' => 'attendance', 'label' => 'Attendance Reports', 'reports' => ['attendance_tardiness']],
+            ['value' => 'employee', 'label' => 'Employee Reports', 'reports' => ['hr_overview', 'employee_compliance', 'employee_loyalty_awards', 'employee_education', 'employee_birthdays']],
+            ['value' => 'attendance', 'label' => 'Attendance Reports', 'reports' => ['attendance_tardiness', 'attendance_awards']],
             ['value' => 'leave', 'label' => 'Leave Reports', 'reports' => ['leave_monetization', 'leave_mandatory_missing', 'leave_balance']],
             ['value' => 'locator', 'label' => 'Locator Slip Reports', 'reports' => ['locator_frequency']],
             ['value' => 'overtime_cto', 'label' => 'Overtime & CTO Reports', 'reports' => ['overtime_cto']],
@@ -208,26 +246,27 @@ class ReportController extends Controller
             $rows->all(),
             $employees,
             [
-                $this->chart('PDS Submission', 'doughnut', $this->countCells($rows, 3)),
-                $this->chart('SALN Submission', 'doughnut', $this->countCells($rows, 5)),
+                $this->chart('PDS Submission', 'doughnut', [
+                    ['label' => 'Submitted', 'value' => $rows->where('cells.2', '!=', 'Not Submitted')->count(), 'color' => '#0038a8'],
+                    ['label' => 'Not Submitted', 'value' => $rows->where('cells.2', 'Not Submitted')->count(), 'color' => '#bfdbfe'],
+                ]),
+                $this->chart('SALN Submission', 'doughnut', [
+                    ['label' => 'Submitted', 'value' => $rows->where('cells.4', '!=', 'Not Submitted')->count(), 'color' => '#0038a8'],
+                    ['label' => 'Not Submitted', 'value' => $rows->where('cells.4', 'Not Submitted')->count(), 'color' => '#bfdbfe'],
+                ]),
                 $this->chart('Employees by Division', 'bar', $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned'))),
             ]
         );
     }
 
-    private function employeeAwardsReport(Collection $employees, string $from, string $to): array
+    private function employeeLoyaltyAwardsReport(Collection $employees, int $year): array
     {
-        $absences = DtrRecord::query()
-            ->whereBetween('date', [$from, $to])
-            ->whereIn('employee_id', $employees->pluck('id'))
-            ->whereRaw('LOWER(status) = ?', ['absent'])
-            ->get()
-            ->countBy('employee_id');
-
-        $qualified = $employees->filter(fn (Employee $employee) => $employee->service_start_date);
-        $rows = $qualified->map(function (Employee $employee) use ($absences) {
-            $years = (int) floor($employee->service_start_date->diffInYears(now()));
-            $absenceCount = (int) $absences->get($employee->id, 0);
+        $asOf = Carbon::create($year, 12, 31)->endOfDay();
+        $withServiceDate = $employees->filter(fn (Employee $employee) => $employee->service_start_date);
+        $rows = $withServiceDate->map(function (Employee $employee) use ($asOf) {
+            $years = $employee->service_start_date->gt($asOf)
+                ? 0
+                : (int) floor($employee->service_start_date->diffInYears($asOf));
             $milestone = $years >= 20 ? '20-Year Loyalty Award' : ($years >= 10 ? '10-Year Loyalty Award' : 'N/A');
             $qualification = $years >= 10 ? 'Qualified' : 'Unqualified';
 
@@ -238,36 +277,90 @@ class ReportController extends Controller
                 (string) $years,
                 $milestone,
                 $qualification,
-                (string) $absenceCount,
-                $absenceCount === 0 ? 'Qualified' : 'Unqualified',
             ], $employee);
         })->sortByDesc(fn ($row) => (int) $row['cells'][3])->values();
 
         return $this->reportPayload(
-            'Loyalty & Attendance Awards',
+            "Loyalty Awards — {$year}",
             [
                 $this->metric('10+ Years', $rows->filter(fn ($row) => (int) $row['cells'][3] >= 10)->count(), 'blue', 'calendar'),
                 $this->metric('20+ Years', $rows->filter(fn ($row) => (int) $row['cells'][3] >= 20)->count(), 'green', 'check'),
-                $this->metric('No Absences', $rows->where('cells.6', '0')->count(), 'green', 'check'),
-                $this->metric('Missing Start Date', $employees->count() - $qualified->count(), 'amber', 'clock'),
+                $this->metric('Qualified', $rows->where('cells.5', 'Qualified')->count(), 'green', 'check'),
+                $this->metric('Missing Start Date', $employees->count() - $withServiceDate->count(), 'amber', 'clock'),
             ],
             'Service Years by Employee',
             $rows->map(fn ($row) => ['label' => $this->abbreviateLabel($row['cells'][0]), 'fullLabel' => $row['cells'][0], 'value' => (int) $row['cells'][3]])->all(),
-            ['Employee', 'Division', 'Service Start', 'Years in Service', 'Award Milestone', 'Loyalty Qualification', 'Absences', 'Attendance Qualification'],
+            ['Employee', 'Division', 'Service Start', 'Years in Service', 'Award Milestone', 'Qualification'],
             $rows->all(),
-            $qualified,
+            $withServiceDate,
             [
                 $this->chart('Years in Service', 'bar', $rows->map(fn ($row) => ['label' => $row['cells'][0], 'value' => (int) $row['cells'][3]])),
                 $this->chart('Loyalty Qualification', 'doughnut', $this->countCells($rows, 5)),
-                $this->chart('Attendance Qualification', 'doughnut', $this->countCells($rows, 7)),
+                $this->chart('Loyalty Awards by Division', 'bar', $this->bars($rows->where('cells.5', 'Qualified')->countBy('division'))),
             ]
         );
     }
 
-    private function employeeEducationReport(Collection $employees): array
+    private function attendanceAwardsReport(Collection $employees, string $from, string $to): array
+    {
+        $absences = DtrRecord::query()
+            ->whereBetween('date', [$from, $to])
+            ->whereIn('employee_id', $employees->pluck('id'))
+            ->whereRaw('LOWER(status) = ?', ['absent'])
+            ->get()
+            ->countBy('employee_id');
+
+        $rows = $employees->map(function (Employee $employee) use ($absences) {
+            $absenceCount = (int) $absences->get($employee->id, 0);
+            $qualification = $absenceCount === 0 ? 'Qualified' : 'Unqualified';
+
+            return $this->row([
+                $this->employeeName($employee),
+                $employee->division ?: 'N/A',
+                (string) $absenceCount,
+                $qualification,
+            ], $employee);
+        })->sortBy(fn ($row) => [(int) $row['cells'][2], $row['cells'][0]])->values();
+
+        return $this->reportPayload(
+            'Attendance Awards',
+            [
+                $this->metric('Employees', $employees->count(), 'blue', 'users'),
+                $this->metric('Qualified', $rows->where('cells.3', 'Qualified')->count(), 'green', 'check'),
+                $this->metric('Unqualified', $rows->where('cells.3', 'Unqualified')->count(), 'amber', 'clock'),
+                $this->metric('Total Absences', $rows->sum(fn ($row) => (int) $row['cells'][2]), 'red', 'x'),
+            ],
+            'Attendance Award Qualification by Division',
+            $this->bars($rows->where('cells.3', 'Qualified')->countBy('division')),
+            ['Employee', 'Division', 'Absences', 'Qualification'],
+            $rows->all(),
+            $employees,
+            [
+                $this->chart('Attendance Award Qualification', 'doughnut', $this->countCells($rows, 3)),
+                $this->chart('Qualified by Division', 'bar', $this->bars($rows->where('cells.3', 'Qualified')->countBy('division'))),
+                $this->chart('Absences by Employee', 'bar', $rows->map(fn ($row) => ['label' => $row['cells'][0], 'value' => (int) $row['cells'][2]])),
+            ]
+        );
+    }
+
+    private function employeeEducationReport(Collection $employees, int $year): array
     {
         $employees->loadMissing('pdsEducation');
-        $rows = $employees->map(function (Employee $employee) {
+        $employeeIds = $employees->pluck('id');
+        $pds = PdsSnapshot::query()
+            ->where('year', $year)
+            ->whereIn('employee_id', $employeeIds)
+            ->get()
+            ->keyBy('employee_id');
+        $salns = Saln::query()
+            ->whereYear('as_of_date', $year)
+            ->whereIn('employee_id', $employeeIds)
+            ->orderByDesc('submitted_at')
+            ->get()
+            ->groupBy('employee_id')
+            ->map->first();
+
+        $rows = $employees->map(function (Employee $employee) use ($pds, $salns) {
             $education = $employee->pdsEducation
                 ->map(function ($record) {
                     $text = strtolower(implode(' ', array_filter([$record->level, $record->course, $record->highest_level])));
@@ -292,20 +385,26 @@ class ReportController extends Controller
                 $record->course ?: 'N/A',
                 $record->school_name ?: 'N/A',
                 $record->year_graduated ?: 'N/A',
+                $pds->has($employee->id) ? 'Submitted' : 'Not Submitted',
+                $salns->has($employee->id) ? 'Submitted' : 'Not Submitted',
             ], $employee);
         })->filter()->values();
 
+        $completeRecords = $rows->filter(
+            fn (array $row) => $row['cells'][6] === 'Submitted' && $row['cells'][7] === 'Submitted'
+        )->count();
+
         return $this->reportPayload(
-            'Education Qualifications',
+            "Education Qualifications — {$year}",
             [
                 $this->metric('Doctorate', $rows->where('cells.2', 'Doctorate')->count(), 'blue', 'chart'),
                 $this->metric("Master's", $rows->where('cells.2', "Master's Degree")->count(), 'green', 'check'),
                 $this->metric("Bachelor's", $rows->where('cells.2', "Bachelor's Degree")->count(), 'blue', 'users'),
-                $this->metric('With Records', $rows->count(), 'blue', 'users'),
+                $this->metric('PDS & SALN Submitted', $completeRecords, 'blue', 'users'),
             ],
             'Qualifications',
             $this->bars($rows->countBy(fn ($row) => $row['cells'][2])),
-            ['Employee', 'Division', 'Highest Qualification', 'Course/Degree', 'School', 'Year Graduated'],
+            ['Employee', 'Division', 'Highest Qualification', 'Course/Degree', 'School', 'Year Graduated', 'PDS Status', 'SALN Status'],
             $rows->all(),
             $employees,
             [
@@ -316,13 +415,58 @@ class ReportController extends Controller
         );
     }
 
-    private function employeeBirthdayReport(Collection $employees): array
+    private function employeeGenderDistributionReport(Collection $employees): array
     {
-        $today = now();
-        $birthdayEmployees = $employees->filter(fn (Employee $employee) => $employee->pdsPersonal?->date_of_birth && Carbon::parse($employee->pdsPersonal->date_of_birth)->month === $today->month);
-        $rows = $birthdayEmployees->map(function (Employee $employee) use ($today) {
+        $rows = $employees->map(function (Employee $employee) {
+            $gender = strtolower(trim((string) $employee->pdsPersonal?->sex));
+            $gender = match ($gender) {
+                'male', 'm' => 'Male',
+                'female', 'f' => 'Female',
+                default => 'Not Specified',
+            };
+
+            return $this->row([
+                $this->employeeName($employee),
+                $employee->division ?: 'N/A',
+                $gender,
+            ], $employee);
+        })->sortBy(fn (array $row) => [$row['cells'][2], $row['cells'][0]])->values();
+
+        $male = $rows->where('cells.2', 'Male');
+        $female = $rows->where('cells.2', 'Female');
+        $notSpecified = $rows->where('cells.2', 'Not Specified');
+
+        return $this->reportPayload(
+            'Gender Distribution',
+            [
+                $this->metric('Employees', $rows->count(), 'blue', 'users'),
+                $this->metric('Male', $male->count(), 'blue', 'users'),
+                $this->metric('Female', $female->count(), 'blue', 'users'),
+                $this->metric('Not Specified', $notSpecified->count(), 'amber', 'clock'),
+            ],
+            'Gender Distribution',
+            $this->countCells($rows, 2),
+            ['Employee', 'Division', 'Gender'],
+            $rows->all(),
+            $employees,
+            [
+                $this->chart('Gender Distribution', 'doughnut', [
+                    ['label' => 'Male', 'value' => $male->count(), 'color' => '#0038a8'],
+                    ['label' => 'Female', 'value' => $female->count(), 'color' => '#ec4899'],
+                    ['label' => 'Not Specified', 'value' => $notSpecified->count(), 'color' => '#94a3b8'],
+                ]),
+                $this->chart('Male Employees by Division', 'bar', $this->bars($male->countBy('division'))),
+                $this->chart('Female Employees by Division', 'bar', $this->bars($female->countBy('division'))),
+            ]
+        );
+    }
+
+    private function employeeBirthdayReport(Collection $employees, Carbon $selectedDate): array
+    {
+        $birthdayEmployees = $employees->filter(fn (Employee $employee) => $employee->pdsPersonal?->date_of_birth && Carbon::parse($employee->pdsPersonal->date_of_birth)->month === $selectedDate->month);
+        $rows = $birthdayEmployees->map(function (Employee $employee) use ($selectedDate) {
             $birthday = Carbon::parse($employee->pdsPersonal->date_of_birth);
-            $isToday = $birthday->month === $today->month && $birthday->day === $today->day;
+            $isToday = $birthday->month === $selectedDate->month && $birthday->day === $selectedDate->day;
 
             return $this->row([
                 $this->employeeName($employee),
@@ -334,7 +478,7 @@ class ReportController extends Controller
         })->sortBy(fn ($row) => Carbon::parse($row['cells'][2])->day)->values();
 
         return $this->reportPayload(
-            'Employee Birthdays — '.$today->format('F Y'),
+            'Employee Birthdays — '.$selectedDate->format('F Y'),
             [
                 $this->metric('Today', $rows->where('cells.4', 'Birthday Today')->count(), 'green', 'calendar'),
                 $this->metric('This Month', $rows->count(), 'blue', 'calendar'),
@@ -354,37 +498,69 @@ class ReportController extends Controller
         );
     }
 
-    private function employeeReport(Collection $employees): array
+    private function employeeReport(Carbon $selectedDate, string $division, string $employmentStatus): array
     {
-        $activeAccounts = $employees->filter(fn (Employee $employee) => strtolower((string) $employee->user?->account_status) === 'active')->count();
-        $regular = $employees->filter(fn (Employee $employee) => $this->isRegularStatus($employee->employment_status))->count();
+        $snapshotMonth = $selectedDate->copy()->startOfMonth();
+        $snapshots = EmployeeReportSnapshot::query()
+            ->whereDate('snapshot_month', $snapshotMonth->toDateString())
+            ->get()
+            ->filter(function (EmployeeReportSnapshot $snapshot) use ($division, $employmentStatus) {
+                $data = $snapshot->data ?? [];
 
-        return $this->reportPayload(
-            'Employee Report',
+                return ($division === 'All Divisions' || trim((string) ($data['division'] ?? '')) === $division)
+                    && ($employmentStatus === 'All Employment Status' || $this->sameStatus($data['employment_status'] ?? null, $employmentStatus));
+            })
+            ->values();
+
+        $rows = $snapshots->map(function (EmployeeReportSnapshot $snapshot) {
+            $data = $snapshot->data ?? [];
+            $gender = strtolower(trim((string) ($data['gender'] ?? '')));
+
+            return $this->row([
+                $data['rfid_number'] ?: 'N/A',
+                $data['employee_name'] ?: 'N/A',
+                $data['division'] ?: 'N/A',
+                $data['position'] ?: 'N/A',
+                $this->displayEmploymentStatus($data['employment_status'] ?? null),
+                match ($gender) {
+                    'male', 'm' => 'Male',
+                    'female', 'f' => 'Female',
+                    default => 'Not Specified',
+                },
+                ucfirst(strtolower((string) ($data['account_status'] ?: 'Not Active'))),
+            ], null);
+        })->values();
+
+        $male = $rows->where('cells.5', 'Male')->count();
+        $female = $rows->where('cells.5', 'Female')->count();
+        $activeAccounts = $rows->filter(fn (array $row) => strtolower($row['cells'][6]) === 'active')->count();
+        $regular = $rows->filter(fn (array $row) => $this->isRegularStatus($row['cells'][4]))->count();
+        $employmentItems = collect([
+            ['label' => 'Regular', 'shortLabel' => 'REG.', 'value' => $regular, 'color' => '#0038a8'],
+            ['label' => 'Job Order', 'shortLabel' => 'J.O.', 'value' => $rows->filter(fn (array $row) => $this->sameStatus($row['cells'][4], 'Job Order'))->count(), 'color' => '#f59e0b'],
+            ['label' => 'Contract of Service', 'shortLabel' => 'C.O.S.', 'value' => $rows->filter(fn (array $row) => $this->sameStatus($row['cells'][4], 'Contractual') || $this->sameStatus($row['cells'][4], 'Contract of Service'))->count(), 'color' => '#10b981'],
+        ])->filter(fn (array $item) => $item['value'] > 0)->values();
+
+        $report = $this->reportPayload(
+            'HR Overview — '.$snapshotMonth->format('F Y'),
             [
-                $this->metric('Total Employees', $employees->count(), 'blue', 'users'),
+                $this->metric('Total Employees', $rows->count(), 'blue', 'users'),
                 $this->metric('Active Accounts', $activeAccounts, 'green', 'check'),
-                $this->metric('Divisions', $employees->pluck('division')->filter()->unique()->count(), 'blue', 'chart'),
+                $this->metric('Divisions', $rows->pluck('cells.2')->filter(fn ($value) => $value !== 'N/A')->unique()->count(), 'blue', 'chart'),
                 $this->metric('Regular', $regular, 'blue', 'chart'),
             ],
             'Employees by Division',
-            $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned')),
-            ['Employee ID', 'Employee Name', 'Division', 'Position', 'Employment Status'],
-            $employees->map(fn (Employee $employee) => $this->row([
-                $employee->rfid_number ?: 'N/A',
-                $this->employeeName($employee),
-                $employee->division ?: 'N/A',
-                $employee->position ?: 'N/A',
-                $this->displayEmploymentStatus($employee->employment_status),
-            ], $employee))->values()->all(),
-            $employees,
+            $this->bars($rows->countBy(fn (array $row) => $row['cells'][2])),
+            ['Employee ID', 'Employee Name', 'Division', 'Position', 'Employment Status', 'Gender', 'Account'],
+            $rows->all(),
+            collect(),
             [
-                $this->chart('Employees by Division', 'bar', $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned'))),
+                $this->chart('Employees by Division', 'bar', $this->bars($rows->countBy(fn (array $row) => $row['cells'][2]))),
                 $this->chart('Gender Distribution', 'doughnut', [
-                    ['label' => 'Male', 'value' => $this->genderBreakdown($employees)['male'], 'color' => '#0038a8'],
-                    ['label' => 'Female', 'value' => $this->genderBreakdown($employees)['female'], 'color' => '#ec4899'],
+                    ['label' => 'Male', 'value' => $male, 'color' => '#0038a8'],
+                    ['label' => 'Female', 'value' => $female, 'color' => '#60a5fa'],
                 ]),
-                $this->chart('Employment Status', 'doughnut', collect($this->employmentBreakdown($employees)['items'])->map(fn ($item) => [
+                $this->chart('Employment Status', 'doughnut', $employmentItems->map(fn ($item) => [
                     'label' => $item['label'],
                     'shortLabel' => $item['shortLabel'],
                     'value' => $item['value'],
@@ -392,6 +568,23 @@ class ReportController extends Controller
                 ])->all()),
             ]
         );
+
+        $total = max($rows->count(), 1);
+        $report['gender'] = [
+            'total' => $rows->count(),
+            'male' => $male,
+            'female' => $female,
+            'malePercent' => round(($male / $total) * 100),
+        ];
+        $report['employment'] = [
+            'total' => $employmentItems->sum('value'),
+            'items' => $employmentItems->map(fn (array $item) => [
+                ...$item,
+                'percent' => round(($item['value'] / $total) * 100),
+            ])->all(),
+        ];
+
+        return $report;
     }
 
     private function attendanceTardinessReport(Collection $employees, string $from, string $to): array
@@ -852,7 +1045,6 @@ class ReportController extends Controller
                 $this->metric('Approved', $requests->where('status', 'approved')->count(), 'green', 'check'),
                 $this->metric('Pending', $requests->where('status', 'pending')->count(), 'amber', 'clock'),
                 $this->metric('Rejected', $requests->where('status', 'rejected')->count(), 'red', 'x'),
-                $this->metric('Total Hours', number_format((float) $requests->sum('hours'), 2), 'blue', 'clock'),
             ],
             'Overtime Hours by Division',
             $this->bars($hoursByDivision),

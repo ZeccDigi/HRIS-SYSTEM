@@ -29,9 +29,9 @@
 
                                 $statusClass = function ($status) {
                                     return match (strtolower((string) $status)) {
-                                        'approved', 'submitted' => 'border-green-100 bg-green-50 text-green-700',
+                                        'approved', 'submitted', 'verified', 'current' => 'border-green-100 bg-green-50 text-green-700',
                                         'rejected' => 'border-red-100 bg-red-50 text-red-700',
-                                        'cancelled' => 'border-gray-100 bg-gray-50 text-gray-600',
+                                        'cancelled', 'no record' => 'border-gray-200 bg-gray-50 text-gray-500',
                                         default => 'border-amber-100 bg-amber-50 text-amber-700',
                                     };
                                 };
@@ -44,15 +44,27 @@
                                             'date' => $formatRange($leaveRecentRequest->start_date, $leaveRecentRequest->end_date),
                                             'status' => strtolower((string) $leaveRecentRequest->status) ?: 'pending',
                                             'url' => route('leaves.index'),
-                                        ] : null,
+                                        ] : [
+                                            'label' => 'Leave',
+                                            'title' => 'No leave application',
+                                            'date' => 'No application yet',
+                                            'status' => 'No record',
+                                            'url' => route('leaves.index'),
+                                        ],
                                         $locatorRecentSlip ? [
                                             'label' => 'Locator Slip',
                                             'title' => $locatorRecentSlip->destination ?: ($locatorRecentSlip->type ?: 'Locator Slip'),
                                             'date' => $formatRange($locatorRecentSlip->date_covered),
                                             'status' => strtolower((string) $locatorRecentSlip->status) ?: 'pending',
                                             'url' => route('locator-slips.show', $locatorRecentSlip),
-                                        ] : null,
-                                    ])->filter(),
+                                        ] : [
+                                            'label' => 'Locator Slip',
+                                            'title' => 'No locator slip',
+                                            'date' => 'No application yet',
+                                            'status' => 'No record',
+                                            'url' => route('locator-slips.index'),
+                                        ],
+                                    ]),
                                     'right' => collect([
                                         $travelRecentOrder ? [
                                             'label' => 'Travel Authority',
@@ -60,15 +72,27 @@
                                             'date' => $formatRange($travelRecentOrder->travel_date_start, $travelRecentOrder->travel_date_end),
                                             'status' => strtolower((string) $travelRecentOrder->status) ?: 'pending',
                                             'url' => route('travel-orders.show', $travelRecentOrder),
-                                        ] : null,
+                                        ] : [
+                                            'label' => 'Travel Authority',
+                                            'title' => 'No travel authority',
+                                            'date' => 'No application yet',
+                                            'status' => 'No record',
+                                            'url' => route('travel-orders.index'),
+                                        ],
                                         $ctoRecentRequest ? [
                                             'label' => 'CTO',
                                             'title' => $ctoRecentRequest->type_label,
                                             'date' => $formatRange($ctoRecentRequest->date_start, $ctoRecentRequest->date_end),
                                             'status' => strtolower((string) $ctoRecentRequest->status) ?: 'pending',
                                             'url' => route('my-cto.show', $ctoRecentRequest),
-                                        ] : null,
-                                    ])->filter(),
+                                        ] : [
+                                            'label' => 'CTO',
+                                            'title' => 'No CTO application',
+                                            'date' => 'No application yet',
+                                            'status' => 'No record',
+                                            'url' => route('my-cto.index'),
+                                        ],
+                                    ]),
                                 ];
 
                                 $hasRecentItems = $recentItemGroups['left']->isNotEmpty() || $recentItemGroups['right']->isNotEmpty();
@@ -124,8 +148,12 @@
                                                                 <p class="mt-1 truncate text-xs font-semibold text-gray-400">{{ $approval['employee'] }} · {{ $approval['date'] }}</p>
                                                             </div>
                                                             <div class="flex shrink-0 items-center gap-2">
-                                                                <span class="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-amber-700">
-                                                                    {{ __('Pending') }}
+                                                                <span @class([
+                                                                    'rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest',
+                                                                    'border-green-100 bg-green-50 text-green-700' => in_array($approval['status'], ['verified', 'current'], true),
+                                                                    'border-amber-100 bg-amber-50 text-amber-700' => ! in_array($approval['status'], ['verified', 'current'], true),
+                                                                ])>
+                                                                    {{ __($approval['status']) }}
                                                                 </span>
                                                                 <a href="{{ $approval['url'] }}" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-900 transition hover:bg-blue-50 hover:text-blue-700" aria-label="{{ __('View') }}">
                                                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

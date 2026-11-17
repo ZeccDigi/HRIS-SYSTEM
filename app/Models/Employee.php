@@ -26,6 +26,9 @@ class Employee extends Model
         'account_role',
         'employment_status',
         'service_start_date',
+        'core_time_start_date',
+        'core_time_end_date',
+        'core_time_schedule',
         'remarks',
         'user_id',
         'rfid_number',
@@ -37,6 +40,9 @@ class Employee extends Model
     {
         return [
             'service_start_date' => 'date',
+            'core_time_start_date' => 'date',
+            'core_time_end_date' => 'date',
+            'core_time_schedule' => 'array',
         ];
     }
 
@@ -114,6 +120,11 @@ class Employee extends Model
     public function pdsSnapshots(): HasMany
     {
         return $this->hasMany(PdsSnapshot::class);
+    }
+
+    public function reportSnapshots(): HasMany
+    {
+        return $this->hasMany(EmployeeReportSnapshot::class);
     }
 
     public function leaveRequests()

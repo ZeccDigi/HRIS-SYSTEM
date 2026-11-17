@@ -22,19 +22,20 @@
         data-manage-travel-row="reports"
         data-search="{{ $searchText }}"
         data-type="{{ $order->travel_type }}"
+        data-status="{{ strtolower((string) $order->status) }}"
         data-filed="{{ $order->tar_submitted_at?->timestamp ?? $order->created_at?->timestamp ?? 0 }}"
     >
-        <td class="px-3 py-3 align-middle text-xs text-slate-600">{{ $order->tar_submitted_at?->format('M d, Y') ?? 'N/A' }}</td>
-        <td class="px-3 py-3 align-middle text-xs font-bold text-slate-900">{{ $order->ta_number }}</td>
-        <td class="px-3 py-3 align-middle text-xs font-semibold text-slate-900">{{ $employeeName }}</td>
-        <td class="px-3 py-3 align-middle text-xs text-slate-600">{{ $order->employee?->division_abbreviation ?: $order->employee?->division ?: 'N/A' }}</td>
-        <td class="px-3 py-3 align-middle text-xs text-slate-600">{{ $order->tar_deadline?->format('M d, Y') ?? 'N/A' }}</td>
-        <td class="px-3 py-3 align-middle">
+        <td class="truncate px-2 py-2.5 align-middle text-xs text-slate-600">{{ $order->tar_submitted_at?->format('M d, Y') ?? 'N/A' }}</td>
+        <td class="truncate px-2 py-2.5 align-middle text-xs font-bold text-slate-900">{{ $order->ta_number }}</td>
+        <td class="truncate px-2 py-2.5 align-middle text-xs font-semibold text-slate-900" title="{{ $employeeName }}">{{ $employeeName }}</td>
+        <td class="truncate px-2 py-2.5 align-middle text-xs text-slate-600" title="{{ $order->employee?->division_abbreviation ?: $order->employee?->division ?: 'N/A' }}">{{ $order->employee?->division_abbreviation ?: $order->employee?->division ?: 'N/A' }}</td>
+        <td class="truncate px-2 py-2.5 align-middle text-xs text-slate-600">{{ $order->tar_deadline?->format('M d, Y') ?? 'N/A' }}</td>
+        <td class="px-2 py-2.5 align-middle">
             <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider {{ $reviewStage === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : ($reviewStage === 'returned' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-700') }}">
                 {{ $stageLabels[$reviewStage] ?? ucfirst(str_replace('_', ' ', $reviewStage)) }}
             </span>
         </td>
-        <td class="px-3 py-3 text-center align-middle">
+        <td class="px-2 py-2.5 text-center align-middle">
             <a href="{{ route('travel-orders.ar.show', $order) }}" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition hover:bg-indigo-50" title="{{ __('Open and review report') }}" aria-label="{{ __('Open and review report') }}">
                 <i class="fa-solid fa-eye"></i>
             </a>

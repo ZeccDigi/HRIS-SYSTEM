@@ -117,8 +117,8 @@
     <tr class="transition-colors hover:bg-gray-50/70">
 
         {{-- Date Filed --}}
-        <td class="px-2 py-3 align-middle">
-            <div class="min-w-0 break-words text-sm font-medium leading-5 text-gray-700">
+        <td class="px-2 py-3 text-center align-middle">
+            <div class="min-w-0 break-words text-center text-sm font-medium leading-5 text-gray-700">
                 {{ \Carbon\Carbon::parse($leaf->date_filed)->format('M d, Y') }}
             </div>
         </td>
@@ -134,9 +134,9 @@
         </td>
 
         {{-- Leave Type --}}
-        <td class="px-2 py-3 align-middle">
+        <td class="px-2 py-3 text-left align-middle">
             <div
-                class="min-w-0 break-normal whitespace-normal text-sm font-bold leading-5 text-gray-900"
+                class="min-w-0 break-normal whitespace-normal text-left text-sm font-normal leading-5 text-gray-900"
                 title="{{ $leaveTypeName }}"
             >
                 {{ $leaveTypeName ?: __('N/A') }}
@@ -146,7 +146,7 @@
         
 
         {{-- HR: Leave Credit Certification --}}
-        <td class="px-2 py-3 text-center align-middle">
+        <td class="px-1 py-3 text-center align-middle">
             <div class="flex min-w-0 items-center justify-center">
                 <span
                     class="h-3 w-3 shrink-0 rounded-full {{ $approvalDotClass($hrStatus) }}"
@@ -156,7 +156,7 @@
         </td>
 
         {{-- Chief: Recommending Approval --}}
-        <td class="px-2 py-3 text-center align-middle">
+        <td class="px-1 py-3 text-center align-middle">
             <div class="flex min-w-0 items-center justify-center">
                 <span
                     class="h-3 w-3 shrink-0 rounded-full {{ $approvalDotClass($chiefStatus) }}"
@@ -166,7 +166,7 @@
         </td>
 
         {{-- Regional Director: Final Approval --}}
-        <td class="px-2 py-3 text-center align-middle">
+        <td class="px-1 py-3 text-center align-middle">
             <div class="flex min-w-0 items-center justify-center">
                 <span
                     class="h-3 w-3 shrink-0 rounded-full {{ $approvalDotClass($rdStatus) }}"

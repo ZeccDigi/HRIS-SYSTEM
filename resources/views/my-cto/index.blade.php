@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="title">{{ __('My Compensatory Time-Off') }}</x-slot>
 
-    <div class="p-3 sm:p-4 lg:p-5">
+    <div class="px-1 py-3 sm:px-2 lg:px-3">
         <div class="w-full">
             @if(session('success'))
                 <div class="mb-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-lg">
@@ -45,7 +45,8 @@
                     </div>
                 </div>
 
-                <div class="mb-4 border-b border-gray-200">
+                <section class="rounded-2xl border border-slate-100 bg-white p-2 shadow-sm sm:p-3">
+                <div class="mb-3 border-b border-gray-200">
                     <nav class="-mb-px flex space-x-8 overflow-x-auto" aria-label="{{ __('CTO tabs') }}">
                         <button
                             type="button"
@@ -90,7 +91,7 @@
                                 <div class="flex items-start gap-3">
                                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-xs font-black text-emerald-600">+</span>
                                     <div>
-                                        <p class="font-bold text-gray-900">{{ __('Earn CTO') }}</p>
+                                        <p class="font-bold text-gray-900">{{ __('Earn COC') }}</p>
                                         <p class="mt-0.5 text-xs text-gray-500">{{ __('File overtime or extra work rendered to earn credits.') }}</p>
                                     </div>
                                 </div>
@@ -124,13 +125,6 @@
                             <input id="my_cto_search" type="search" x-model="search" @input.debounce.200ms="applyFilters()" placeholder="{{ __('Search type, status, or approver...') }}" class="block h-9 w-full rounded-lg border-gray-300 pl-10 pr-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                         </div>
 
-                        <select x-model="type" @change="applyFilters()" class="block h-9 w-44 shrink-0 rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="">{{ __('All Types') }}</option>
-                            @foreach($typeOptions as $typeOption)
-                                <option value="{{ Str::lower($typeOption) }}">{{ $typeOption }}</option>
-                            @endforeach
-                        </select>
-
                         <select x-model="status" @change="applyFilters()" class="block h-9 w-40 shrink-0 rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             <option value="">{{ __('All Statuses') }}</option>
                             <option value="pending">{{ __('Pending') }}</option>
@@ -139,30 +133,37 @@
                             <option value="cancelled">{{ __('Cancelled') }}</option>
                         </select>
 
+                        <select x-model="month" @change="applyFilters()" class="block h-9 w-40 shrink-0 rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">{{ __('Months') }}</option>
+                            <option value="1">{{ __('January') }}</option><option value="2">{{ __('February') }}</option><option value="3">{{ __('March') }}</option><option value="4">{{ __('April') }}</option>
+                            <option value="5">{{ __('May') }}</option><option value="6">{{ __('June') }}</option><option value="7">{{ __('July') }}</option><option value="8">{{ __('August') }}</option>
+                            <option value="9">{{ __('September') }}</option><option value="10">{{ __('October') }}</option><option value="11">{{ __('November') }}</option><option value="12">{{ __('December') }}</option>
+                        </select>
+
                         <button type="button" @click="reset()" class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-xs font-bold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50">
                             {{ __('Reset') }}
                         </button>
                 </div>
 
                 <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
-                <div class="overflow-x-auto">
-                    <table class="min-w-[980px] w-full table-fixed text-left border-collapse">
+                <div class="w-full">
+                    <table class="w-full table-fixed border-collapse text-left">
                         <colgroup>
                             <col class="w-[15%]">
-                            <col class="w-[22%]">
+                            <col class="w-[15%]">
+                            <col class="w-[16%]">
                             <col class="w-[18%]">
-                            <col class="w-[18%]">
-                            <col class="w-[20%]">
-                            <col class="w-[7%]">
+                            <col class="w-[26%]">
+                            <col class="w-[10%]">
                         </colgroup>
                         <thead class="bg-slate-50">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Date Filed') }}</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Type') }}</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Human Resource') }}</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Chief') }}</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Regional Director') }}</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ __('Actions') }}</th>
+                                <th scope="col" class="px-3 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">{{ __('Date Filed') }}</th>
+                                <th scope="col" class="px-3 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">{{ __('Type') }}</th>
+                                <th scope="col" class="px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">{{ __('Human Resource') }}</th>
+                                <th scope="col" class="px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">{{ __('Chief') }}</th>
+                                <th scope="col" class="px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">{{ __('Regional Director') }}</th>
+                                <th scope="col" class="px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody id="myCtoRequestsTableBody" class="divide-y divide-gray-100 bg-white">
@@ -190,37 +191,37 @@
                                     data-status="{{ Str::lower($request->status) }}"
                                     data-year="{{ $request->created_at?->year ?? now()->year }}"
                                 >
-                                    <td class="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
+                                    <td class="px-3 py-3 text-sm text-gray-700 whitespace-nowrap">
                                         {{ $request->created_at?->format('M d, Y') }}
                                     </td>
-                                    <td class="px-6 py-3 text-sm font-bold text-gray-900 whitespace-nowrap">
-                                        <span class="font-bold text-gray-900">
+                                    <td class="px-3 py-3 text-sm text-gray-900">
+                                        <span class="font-medium leading-5 text-gray-900">
                                             {{ $request->type_label }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-3 align-middle">
-                                        <div class="flex items-center gap-2">
+                                    <td class="px-2 py-3 align-middle">
+                                        <div class="flex min-w-0 items-center justify-center gap-1.5">
                                             <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($request->hrstaff_status ?: 'pending') }}" title="{{ ucfirst($request->hrstaff_status ?: 'pending') }}"></span>
                                             <span class="min-w-0 truncate text-xs font-semibold text-gray-700">HR Admin</span>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-3 align-middle">
-                                        <div class="flex items-center gap-2">
+                                    <td class="px-2 py-3 align-middle">
+                                        <div class="flex min-w-0 items-center justify-center gap-1.5">
                                             <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($request->chief_status ?: 'pending') }}" title="{{ ucfirst($request->chief_status ?: 'pending') }}"></span>
                                             <span class="min-w-0 truncate text-xs font-semibold text-gray-700" title="{{ $request->chief ? trim($request->chief->firstname . ' ' . $request->chief->lastname) : 'Chief' }}">
                                                 {{ $request->chief ? trim($request->chief->firstname . ' ' . $request->chief->lastname) : 'Chief' }}
                                             </span>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-3 align-middle">
-                                        <div class="flex items-center gap-2">
+                                    <td class="px-2 py-3 align-middle">
+                                        <div class="flex min-w-0 items-center justify-center gap-1.5">
                                             <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($request->rd_status ?: 'pending') }}" title="{{ ucfirst($request->rd_status ?: 'pending') }}"></span>
                                             <span class="min-w-0 truncate text-xs font-semibold text-gray-700" title="{{ $request->regionalDirector ? trim($request->regionalDirector->firstname . ' ' . $request->regionalDirector->lastname) : 'Regional Director' }}">
                                                 {{ $request->regionalDirector ? trim($request->regionalDirector->firstname . ' ' . $request->regionalDirector->lastname) : 'Regional Director' }}
                                             </span>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-3 text-right whitespace-nowrap">
+                                    <td class="px-2 py-3 text-center whitespace-nowrap">
                                         <a href="{{ route('my-cto.show', $request) }}" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-indigo-700 transition-colors hover:bg-indigo-50 hover:text-indigo-900" title="{{ __('View details') }}" aria-label="{{ __('View details') }}">
                                             <i class="fa-solid fa-eye"></i>
                                         </a>
@@ -243,9 +244,15 @@
                         </tbody>
                     </table>
                 </div>
-                @include('partials.table-pagination', ['paginator' => $ctoRequests, 'label' => __('CTO requests')])
+                @include('partials.table-pagination', [
+                    'paginator' => $ctoRequests,
+                    'label' => __('CTO requests'),
+                    'perPageOptions' => [5, 10, 20, 50],
+                    'perPageSelectId' => 'my_cto_per_page',
+                ])
             </div>
             </div>
+            </section>
             </div>
         </div>
     </div>
@@ -381,7 +388,7 @@
             return {
                 tab: 'applications',
                 search: @js($search),
-                type: @js($type),
+                month: @js($month),
                 status: @js($status),
                 year: @js((string) $year),
                 rows: [],
@@ -396,8 +403,8 @@
                         url.searchParams.set('search', this.search.trim());
                     }
 
-                    if (this.type) {
-                        url.searchParams.set('type', this.type);
+                    if (this.month) {
+                        url.searchParams.set('month', this.month);
                     }
 
                     if (this.status) {

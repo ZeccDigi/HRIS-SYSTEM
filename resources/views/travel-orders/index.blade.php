@@ -113,28 +113,30 @@
             </div>
 
             <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <div>
-                    <table class="w-full table-fixed border-collapse text-left">
+                <div class="overflow-x-auto">
+                    <table class="w-full table-fixed border-collapse text-left" style="min-width: 860px;">
                         <colgroup>
-                            <col class="w-[13%]">
-                            <col class="w-[14%]">
-                            <col class="w-[13%]">
-                            <col class="w-[10%]">
-                            <col class="w-[10%]">
-                            <col class="w-[12%]">
                             <col class="w-[11%]">
-                            <col class="w-[17%]">
+                            <col class="w-[12%]">
+                            <col class="w-[12%]">
+                            <col class="w-[9%]">
+                            <col class="w-[9%]">
+                            <col class="w-[11%]">
+                            <col class="w-[11%]">
+                            <col style="width: 116px;">
+                            <col style="width: 148px;">
                         </colgroup>
                         <thead class="bg-slate-50">
                             <tr>
-                                <th class="px-2 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TA Stamp') }}</th>
-                                <th class="px-2 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Date of Travel') }}</th>
-                                <th class="px-2 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Destination') }}</th>
-                                <th class="px-2 py-3 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Records Officer') }}</th>
-                                <th class="px-2 py-3 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Regional Director') }}</th>
-                                <th class="px-2 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TAR Deadline') }}</th>
-                                <th class="px-2 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TAR Status') }}</th>
-                                <th class="px-2 py-3 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Actions') }}</th>
+                                <th class="px-1.5 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TA Stamp') }}</th>
+                                <th class="px-1.5 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Date of Travel') }}</th>
+                                <th class="px-1.5 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Destination') }}</th>
+                                <th class="px-1.5 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Records Officer') }}</th>
+                                <th class="px-1.5 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Regional Director') }}</th>
+                                <th class="px-1.5 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TA Status') }}</th>
+                                <th class="px-1.5 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TAR Deadline') }}</th>
+                                <th class="px-1.5 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TAR Status') }}</th>
+                                <th class="px-1.5 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 bg-white">
@@ -151,6 +153,10 @@
                                         $recordStatus = strtolower((string) ($order->recordofficer_status ?: 'pending'));
                                         $rdStatus = strtolower((string) ($order->rd_status ?: 'pending'));
                                         $mainStatus = strtolower((string) ($order->status ?: 'pending'));
+                                        $isTravelOrderOwner = $order->employee_id === auth()->user()->employee?->id;
+                                        $canSubmitTar = $isTravelOrderOwner
+                                            && $mainStatus === 'approved'
+                                            && ($order->tar_submitted_at === null || $order->tar_review_status === 'returned');
                                         $tarDeadline = $order->tar_deadline ?: optional($order->travel_date_end)->copy()?->addDays(5);
                                         $computedTarStatus = strtolower((string) ($order->tar_status ?: 'pending'));
 
@@ -175,6 +181,13 @@
                                         ])));
 
                                         $taNumber = $order->ta_number ?: 'TA-' . optional($order->created_at)->format('Y-m-d') . '-' . str_pad((string) $order->id, 3, '0', STR_PAD_LEFT);
+                                        $taNumberParts = explode('-', $taNumber);
+                                        $taNumberFirstLine = count($taNumberParts) >= 5
+                                            ? implode('-', array_slice($taNumberParts, 0, 2)).'-'
+                                            : $taNumber;
+                                        $taNumberSecondLine = count($taNumberParts) >= 5
+                                            ? implode('-', array_slice($taNumberParts, 2))
+                                            : null;
                                         $acknowledgementReportUrl = route('travel-orders.ar.show', $order);
                                         $dmwParticipantNames = collect([$order->employee])
                                             ->merge($order->companions)
@@ -221,26 +234,36 @@
                                         data-year="{{ $order->created_at?->year ?? $currentYear }}"
                                         data-month="{{ $order->travel_date_start?->format('m') ?? '' }}"
                                     >
-                                        <td class="px-2 py-2.5 align-middle text-xs font-bold text-gray-900 break-words">{{ $taNumber }}</td>
-                                        <td class="px-2 py-2.5 align-middle text-xs text-gray-700">
+                                        <td class="px-1.5 py-2 align-middle text-xs font-bold leading-4 text-gray-900">
+                                            <span class="block whitespace-nowrap">{{ $taNumberFirstLine }}</span>
+                                            @if($taNumberSecondLine)
+                                                <span class="block whitespace-nowrap">{{ $taNumberSecondLine }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-1.5 py-2 align-middle text-xs text-gray-700">
                                             <div class="leading-5">{{ $order->travel_date_start?->format('M d, Y') }}</div>
                                             @if($order->travel_date_end && $order->travel_date_end->ne($order->travel_date_start))
                                                 <div class="leading-5">{{ $order->travel_date_end->format('M d, Y') }}</div>
                                             @endif
                                         </td>
-                                        <td class="px-2 py-2.5 align-middle text-xs font-semibold text-gray-900 break-words">{{ $order->places_of_travel }}</td>
-                                        <td class="px-2 py-2.5 align-middle">
+                                        <td class="px-1.5 py-2 align-middle text-xs font-semibold text-gray-900 break-words">{{ $order->places_of_travel }}</td>
+                                        <td class="px-1.5 py-2 align-middle">
                                             <div class="flex justify-center">
                                                 <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($recordStatus) }}" title="Records Officer: {{ ucfirst($recordStatus) }}"></span>
                                             </div>
                                         </td>
-                                        <td class="px-2 py-2.5 align-middle">
+                                        <td class="px-1.5 py-2 align-middle">
                                             <div class="flex justify-center">
                                                 <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($rdStatus) }}" title="Regional Director: {{ ucfirst($rdStatus) }}"></span>
                                             </div>
                                         </td>
-                                        <td class="px-2 py-2.5 align-middle text-xs text-gray-700">{{ $tarDeadline?->format('M d, Y') ?? __('N/A') }}</td>
-                                        <td class="px-2 py-2.5 align-middle text-xs font-semibold">
+                                        <td class="px-1.5 py-2 align-middle text-xs font-semibold">
+                                            <span class="inline-flex rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wider {{ $statusClasses[$mainStatus] ?? 'border-gray-100 bg-gray-50 text-gray-700' }}">
+                                                {{ ucfirst($mainStatus) }}
+                                            </span>
+                                        </td>
+                                        <td class="px-1.5 py-2 align-middle text-xs text-gray-700">{{ $tarDeadline?->format('M d, Y') ?? __('N/A') }}</td>
+                                        <td class="px-1.5 py-2 text-center align-middle text-xs font-semibold">
                                             @if($computedTarStatus === 'submitted')
                                                 <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">
                                                     <i class="fa-solid fa-file-lines"></i>
@@ -254,14 +277,11 @@
                                             @elseif($computedTarStatus === 'not_applicable')
                                                 <span class="text-gray-400">—</span>
                                             @else
-                                                <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-slate-600">
-                                                    <i class="fa-regular fa-clock"></i>
-                                                    <span>{{ __('Pending') }}</span>
-                                                </span>
+                                                {{-- Keep the TAR status blank until the employee submits a report. --}}
                                             @endif
                                         </td>
-                                        <td class="px-2 py-2.5 text-center align-middle">
-                                            <div class="mx-auto grid w-fit grid-cols-2 place-items-center gap-x-2 gap-y-1">
+                                        <td class="px-1.5 py-2 text-center align-middle">
+                                            <div class="flex items-center justify-center gap-1">
                                                 <a href="{{ route('travel-orders.show', $order) }}" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition hover:bg-indigo-50 hover:text-indigo-900" title="{{ __('View') }}">
                                                     <i class="fa-solid fa-eye text-sm"></i>
                                                 </a>
@@ -273,8 +293,8 @@
                                                         <i class="fa-solid fa-file-circle-check text-sm"></i>
                                                     </a>
                                                 @endif
-                                                @if($tab === 'my' && $mainStatus === 'approved')
-                                                    <button type="button" @click='openTarModal(@js(route("travel-orders.submit-tar", $order)), @js($taNumber), @js($arDefaults))' class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900" title="{{ __('Submit TAR') }}" aria-label="{{ __('Submit TAR') }}">
+                                                @if($canSubmitTar)
+                                                    <button type="button" @click.stop.prevent="$dispatch('open-tar-submission', { action: @js(route('travel-orders.submit-tar', $order)), title: @js($taNumber), defaults: @js($arDefaults) })" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900" title="{{ $computedTarStatus === 'overdue' ? __('Upload overdue TAR') : __('Submit TAR') }}" aria-label="{{ __('Open TAR submission form') }}">
                                                         <i class="fa-solid fa-file-arrow-up text-sm"></i>
                                                     </button>
                                                 @endif
@@ -291,7 +311,12 @@
                         </tbody>
                     </table>
                 </div>
-                @include('partials.table-pagination', ['paginator' => $travelOrders, 'label' => __('travel authorities')])
+                @include('partials.table-pagination', [
+                    'paginator' => $travelOrders,
+                    'label' => __('travel authorities'),
+                    'perPageOptions' => [5, 10, 20, 50],
+                    'perPageSelectId' => 'my_travel_per_page',
+                ])
             </div>
             </section>
         </div>
@@ -355,12 +380,64 @@
             </div>
         </template>
 
-        <div x-cloak x-show="tarModalOpen" class="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-900/60 p-3 sm:p-5" @keydown.escape.window="closeTarModal()">
-            <div @click.outside="closeTarModal()" class="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <template x-teleport="body">
+        <div
+            x-data="{
+                tarModalOpen: false,
+                tarAction: '',
+                tarTitle: '',
+                tarForm: {
+                    activity: '', activity_date: '', venue: '', participants_present: '', dmw_participants: '',
+                    objectives: '', highlights: '', results: '', recommendations: '', commitments: '',
+                    attachments: [], other_attachment: '', remarks: ''
+                },
+                openTarModal(payload = {}) {
+                    const defaults = payload.defaults || {};
+                    this.tarAction = payload.action || '';
+                    this.tarTitle = payload.title || '';
+                    this.tarForm = {
+                        activity: defaults.activity || '',
+                        activity_date: defaults.activity_date || '',
+                        venue: defaults.venue || '',
+                        participants_present: defaults.participants_present || '',
+                        dmw_participants: defaults.dmw_participants || '',
+                        objectives: defaults.objectives || '',
+                        highlights: defaults.highlights || '',
+                        results: defaults.results || '',
+                        recommendations: defaults.recommendations || '',
+                        commitments: defaults.commitments || '',
+                        attachments: Array.isArray(defaults.attachments) ? defaults.attachments : [],
+                        other_attachment: defaults.other_attachment || '',
+                        remarks: defaults.remarks || ''
+                    };
+                    this.tarModalOpen = true;
+                    document.documentElement.classList.add('overflow-hidden');
+                    document.body.classList.add('overflow-hidden');
+                },
+                closeTarModal() {
+                    this.tarModalOpen = false;
+                    this.tarAction = '';
+                    this.tarTitle = '';
+                    document.documentElement.classList.remove('overflow-hidden');
+                    document.body.classList.remove('overflow-hidden');
+                }
+            }"
+            @open-tar-submission.window="openTarModal($event.detail)"
+            x-cloak
+            x-show="tarModalOpen"
+            class="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-5"
+            style="display: none;"
+            @keydown.escape.window="tarModalOpen && closeTarModal()"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="submit-tar-modal-title"
+        >
+            <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeTarModal()" aria-hidden="true"></div>
+            <div @click.stop class="relative z-10 flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
                 <div class="flex shrink-0 items-center justify-between border-b border-blue-950 bg-blue-900 px-5 py-4 text-white">
                     <div>
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200">{{ __('Travel Authority Report (TAR)') }}</p>
-                        <h2 class="mt-1 text-lg font-black">{{ __('Submit TAR') }}</h2>
+                        <h2 id="submit-tar-modal-title" class="mt-1 text-lg font-black">{{ __('Submit TAR') }}</h2>
                         <p class="mt-0.5 text-xs text-blue-100" x-text="tarTitle"></p>
                     </div>
                     <button type="button" @click="closeTarModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/15" aria-label="{{ __('Close') }}">
@@ -376,15 +453,16 @@
                             <div class="grid gap-4 md:grid-cols-3">
                                 <div class="md:col-span-2">
                                     <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Activity') }} <span class="text-red-500">*</span></label>
-                                    <input type="text" name="tar_activity" x-model="tarForm.activity" required maxlength="255" class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600">
+                                    <input type="text" name="tar_activity" x-model="tarForm.activity" readonly required maxlength="255" class="block w-full cursor-not-allowed rounded-lg border-slate-200 bg-slate-100 text-sm capitalize text-slate-700 focus:border-slate-200 focus:ring-0">
+                                    <p class="mt-1 text-[10px] font-semibold text-slate-400">{{ __('Automatically filled from the approved Travel Authority.') }}</p>
                                 </div>
                                 <div>
                                     <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Date') }} <span class="text-red-500">*</span></label>
-                                    <input type="date" name="tar_activity_date" x-model="tarForm.activity_date" required class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600">
+                                    <input type="date" name="tar_activity_date" x-model="tarForm.activity_date" readonly required class="block w-full cursor-not-allowed rounded-lg border-slate-200 bg-slate-100 text-sm text-slate-700 focus:border-slate-200 focus:ring-0">
                                 </div>
                                 <div class="md:col-span-3">
                                     <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Venue') }} <span class="text-red-500">*</span></label>
-                                    <input type="text" name="tar_venue" x-model="tarForm.venue" required maxlength="255" class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600">
+                                    <input type="text" name="tar_venue" x-model="tarForm.venue" readonly required maxlength="255" class="block w-full cursor-not-allowed rounded-lg border-slate-200 bg-slate-100 text-sm capitalize text-slate-700 focus:border-slate-200 focus:ring-0">
                                 </div>
                                 <div>
                                     <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Participants Present') }} <span class="text-red-500">*</span></label>
@@ -392,7 +470,7 @@
                                 </div>
                                 <div class="md:col-span-2">
                                     <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Participants from DMW') }} <span class="text-red-500">*</span></label>
-                                    <textarea name="tar_dmw_participants" x-model="tarForm.dmw_participants" rows="3" required class="block w-full rounded-lg border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600"></textarea>
+                                    <textarea name="tar_dmw_participants" x-model="tarForm.dmw_participants" rows="3" readonly required class="block w-full cursor-not-allowed rounded-lg border-slate-200 bg-slate-100 text-sm capitalize text-slate-700 focus:border-slate-200 focus:ring-0"></textarea>
                                 </div>
                             </div>
                         </section>
@@ -443,7 +521,14 @@
                         <section class="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2">
                             <div>
                                 <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Supporting PDF (optional)') }}</label>
-                                <input type="file" name="tar_attachment" accept="application/pdf,.pdf" class="block w-full rounded-lg border border-slate-300 bg-white text-sm shadow-sm file:mr-3 file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:font-semibold">
+                                <div x-data="{ attachmentName: '' }" class="flex min-h-11 items-center gap-3 rounded-lg border border-slate-300 bg-white px-3 py-2">
+                                    <input id="tar_attachment" type="file" name="tar_attachment" accept="application/pdf,.pdf" class="sr-only" @change="attachmentName = $event.target.files[0]?.name || ''">
+                                    <label for="tar_attachment" class="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black uppercase tracking-wider text-blue-900 transition hover:bg-blue-100">
+                                        <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
+                                        {{ __('Attach PDF') }}
+                                    </label>
+                                    <span class="min-w-0 truncate text-xs text-slate-500" x-text="attachmentName || @js(__('No file selected'))"></span>
+                                </div>
                             </div>
                             <div>
                                 <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Remarks (optional)') }}</label>
@@ -462,6 +547,7 @@
                 </form>
             </div>
         </div>
+        </template>
     </div>
 
         {{-- Create Travel Authority modal --}}
@@ -611,14 +697,6 @@
                     printUrl: '',
                     directPrintUrl: '',
                 },
-                tarModalOpen: false,
-                tarAction: '',
-                tarTitle: '',
-                tarForm: {
-                    activity: '', activity_date: '', venue: '', participants_present: '', dmw_participants: '',
-                    objectives: '', highlights: '', results: '', recommendations: '', commitments: '',
-                    attachments: [], other_attachment: '', remarks: '',
-                },
                 init() {
                     this.rows = Array.from(document.querySelectorAll('[data-ta-row]'));
                 },
@@ -682,35 +760,6 @@
                 },
                 toggleRemarks() {
                     this.showRemarks = !this.showRemarks;
-                },
-                openTarModal(action, title, defaults = {}) {
-                    this.tarAction = action;
-                    this.tarTitle = title;
-                    this.tarForm = {
-                        activity: defaults.activity || '',
-                        activity_date: defaults.activity_date || '',
-                        venue: defaults.venue || '',
-                        participants_present: defaults.participants_present || '',
-                        dmw_participants: defaults.dmw_participants || '',
-                        objectives: defaults.objectives || '',
-                        highlights: defaults.highlights || '',
-                        results: defaults.results || '',
-                        recommendations: defaults.recommendations || '',
-                        commitments: defaults.commitments || '',
-                        attachments: Array.isArray(defaults.attachments) ? defaults.attachments : [],
-                        other_attachment: defaults.other_attachment || '',
-                        remarks: defaults.remarks || '',
-                    };
-                    this.tarModalOpen = true;
-                    document.documentElement.classList.add('overflow-hidden');
-                    document.body.classList.add('overflow-hidden');
-                },
-                closeTarModal() {
-                    this.tarModalOpen = false;
-                    this.tarAction = '';
-                    this.tarTitle = '';
-                    document.documentElement.classList.remove('overflow-hidden');
-                    document.body.classList.remove('overflow-hidden');
                 },
             };
         }

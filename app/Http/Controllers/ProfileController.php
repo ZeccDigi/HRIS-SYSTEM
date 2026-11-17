@@ -30,6 +30,12 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
+        if ($request->user()->employee) {
+            $request->user()->employee->update([
+                'notification_email' => $request->validated('notification_email'),
+            ]);
+        }
+
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 

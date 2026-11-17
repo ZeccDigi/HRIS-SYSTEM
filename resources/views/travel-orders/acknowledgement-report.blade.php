@@ -24,9 +24,7 @@
     @endphp
     <div class="bg-slate-100 py-6">
         <div class="mx-auto mb-4 flex max-w-[210mm] flex-wrap items-center justify-between gap-3 px-3 sm:px-0">
-            <a href="{{ $isApprover ? route('hr.travel-orders.index', ['tab' => 'reports']) : route('travel-orders.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
-                <i class="fa-solid fa-arrow-left text-xs"></i>{{ __('Back') }}
-            </a>
+            <x-page-action href="{{ $isApprover ? route('hr.travel-orders.index', ['tab' => 'reports']) : route('travel-orders.index') }}" />
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('travel-orders.ar.print', $travelOrder) }}" target="_blank" rel="noopener" data-no-transition class="inline-flex items-center gap-2 rounded-lg bg-blue-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-blue-800"><i class="fa-solid fa-print"></i>{{ __('Print Report') }}</a>
             </div>
@@ -41,17 +39,17 @@
                 @endif
 
                 @if($travelOrder->tar_submitted_at)
-                    <section class="rounded-xl border border-slate-100 bg-white px-5 py-6 shadow-sm">
-                        <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 sm:gap-x-6">
+                    <section class="rounded-xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm">
+                        <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:gap-x-4">
                             @foreach($workflowSteps as $step)
                                 @php
                                     $isApprovedStep = $step['status'] === 'approved';
                                     $isReturnedStep = $step['status'] === 'returned';
                                     $isCurrentStep = $reviewStage === $step['stage'];
                                 @endphp
-                                <div class="flex items-center gap-3">
-                                    <span class="h-3.5 w-3.5 shrink-0 rounded-full {{ $isApprovedStep || $isCurrentStep ? 'bg-emerald-500' : ($isReturnedStep ? 'bg-red-500' : 'bg-slate-300') }}"></span>
-                                    <span class="text-sm font-bold text-slate-600">{{ $step['label'] }}</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="h-3 w-3 shrink-0 rounded-full {{ $isApprovedStep || $isCurrentStep ? 'bg-emerald-500' : ($isReturnedStep ? 'bg-red-500' : 'bg-slate-300') }}"></span>
+                                    <span class="text-xs font-bold text-slate-600 sm:text-sm">{{ $step['label'] }}</span>
                                 </div>
                                 @unless($loop->last)
                                     <i class="fa-solid fa-arrow-right text-xs text-slate-300"></i>

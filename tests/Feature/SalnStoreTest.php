@@ -26,7 +26,7 @@ test('saln create page loads for employee with prefilled declarant info', functi
     $this->actingAs($user)
         ->get(route('salns.create'))
         ->assertOk()
-        ->assertSee('File New SALN')
+        ->assertSee('SALN Update')
         ->assertSee('Reyes')
         ->assertSee('Maria');
 });

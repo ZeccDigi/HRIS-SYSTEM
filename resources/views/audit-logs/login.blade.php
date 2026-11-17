@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="title">{{ __('Audit Logs') }}</x-slot>
 
-    <div class="overflow-x-hidden py-12" x-data="{ 
+    <div class="overflow-x-hidden py-3 sm:py-4" x-data="{
         tab: '{{ request()->routeIs('audit-logs.activity') ? 'activity' : 'login' }}', 
         selectedAudit: null, 
         detailModalOpen: false,
@@ -66,24 +66,24 @@
             return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         }
     }">
-        <div class="mx-auto w-full max-w-7xl min-w-0 px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto w-full max-w-7xl min-w-0">
 
             <!-- Top Header Row (Tabs on Left, Custom Calendar Selector & Year Selector on Right) -->
-            <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div class="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 
                 <!-- Left: Navigation Tabs -->
                 <div class="max-w-full overflow-x-auto">
-                    <div class="inline-flex rounded-xl bg-white border border-gray-100 shadow-sm p-1">
+                    <div class="inline-flex rounded-xl border border-gray-100 bg-white p-1 shadow-sm">
                         <button type="button"
                                 @click="tab = 'login'"
-                                class="px-4 py-2 text-sm font-semibold rounded-lg transition"
-                                :class="tab === 'login' ? 'bg-indigo-100 text-indigo-700 font-bold' : 'text-gray-500 hover:text-gray-700'">
-                            {{ __('Login Audit') }}
+                                class="rounded-lg px-4 py-2 text-sm font-semibold transition"
+                                :class="tab === 'login' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'">
+                            {{ __('Logs Audit') }}
                         </button>
                         <button type="button"
                                 @click="tab = 'activity'"
-                                class="px-4 py-2 text-sm font-semibold rounded-lg transition"
-                                :class="tab === 'activity' ? 'bg-indigo-100 text-indigo-700 font-bold' : 'text-gray-500 hover:text-gray-700'">
+                                class="rounded-lg px-4 py-2 text-sm font-semibold transition"
+                                :class="tab === 'activity' ? 'bg-slate-200 text-slate-800' : 'text-gray-500 hover:text-gray-700'">
                             {{ __('Activity Audit') }}
                         </button>
                     </div>
@@ -208,7 +208,7 @@
 
             <!-- TAB 1: LOGIN AUDIT PANEL -->
             <div class="w-full max-w-full min-w-0 overflow-hidden bg-white shadow-sm sm:rounded-lg border border-gray-100" x-show="tab === 'login'">
-                <div class="min-w-0 p-6 text-gray-900">
+                <div class="min-w-0 p-4 text-gray-900">
                     
                     <!-- Search, Filter & Sort Bar -->
                     <form id="loginFilterForm" method="GET" action="{{ route('audit-logs.login') }}" class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/70 p-2 sm:flex-row sm:items-center">
@@ -260,63 +260,63 @@
                         <table class="min-w-full w-full table-fixed divide-y divide-gray-200">
                             <thead>
                                 <tr class="bg-gray-50">
-                                    <th class="w-[26%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('User') }}</th>
-                                    <th class="w-[12%] px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Role') }}</th>
-                                    <th class="w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Date') }}</th>
-                                    <th class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Time') }}</th>
-                                    <th class="w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Time Spent') }}</th>
-                                    <th class="w-[10%] px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Status') }}</th>
-                                    <th class="w-[10%] px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Actions') }}</th>
+                                    <th class="w-[25%] px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('User') }}</th>
+                                    <th class="w-[12%] px-3 py-2 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Role') }}</th>
+                                    <th class="w-[14%] px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Date') }}</th>
+                                    <th class="w-[15%] px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Time') }}</th>
+                                    <th class="w-[14%] px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Time Spent') }}</th>
+                                    <th class="w-[12%] px-3 py-2 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Status') }}</th>
+                                    <th class="w-[8%] px-3 py-2 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @forelse($audits as $audit)
                                     <tr class="hover:bg-gray-50 transition-colors duration-200">
-                                        <td class="px-4 py-4">
-                                            <div class="truncate text-sm font-medium text-gray-900">
+                                        <td class="px-3 py-2.5">
+                                            <div class="truncate text-xs font-semibold text-gray-900" title="{{ $audit->user_name ?: __('Unknown Account') }}">
                                                 {{ $audit->user_name ?: __('Unknown Account') }}
                                             </div>
-                                            <div class="truncate text-xs text-gray-400">
+                                            <div class="truncate text-[11px] text-gray-400" title="{{ $audit->user_email }}">
                                                 {{ $audit->user_email }}
                                             </div>
                                         </td>
-                                        <td class="px-4 py-4 text-center">
-                                            <span class="max-w-full truncate px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                        <td class="px-3 py-2.5 text-center">
+                                            <span class="max-w-full truncate px-2 inline-flex text-[10px] leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800" title="{{ strtoupper($audit->user_role ?: 'EMPLOYEE') }}">
                                                 {{ strtoupper($audit->user_role ?: 'EMPLOYEE') }}
                                             </span>
                                         </td>
-                                        <td class="px-4 py-4 text-sm text-gray-500">
-                                            {{ $audit->login_at ? $audit->login_at->format('M d, Y') : 'N/A' }}
+                                        <td class="px-3 py-2.5 text-xs text-gray-500">
+                                            {{ $audit->login_at ? $audit->login_at->format('M d, Y') : '-' }}
                                         </td>
-                                        <td class="px-4 py-4 text-sm text-gray-500">
-                                            {{ $audit->login_at ? $audit->login_at->format('h:i A') : 'N/A' }}
+                                        <td class="px-3 py-2.5 text-xs tabular-nums text-gray-500">
+                                            {{ $audit->login_at ? $audit->login_at->format('h:i:s') . '.00 ' . $audit->login_at->format('A') : '-' }}
                                         </td>
-                                        <td class="px-4 py-4 text-xs font-semibold text-slate-700">
+                                        <td class="px-3 py-2.5 text-xs font-semibold tabular-nums text-slate-700">
                                             @if($audit->status === 'successful')
-                                                <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-medium">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium" title="{{ __('Session duration from sign-in until sign-out') }}">
                                                     {{ $audit->duration }}
                                                 </span>
                                             @else
                                                 <span class="text-gray-400">-</span>
                                             @endif
                                         </td>
-                                        <td class="px-4 py-4 text-center">
+                                        <td class="px-3 py-2.5 text-center">
                                             @if($audit->status === 'successful')
-                                                <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                                                <span class="px-2 py-0.5 inline-flex text-[10px] leading-5 font-semibold rounded-full bg-emerald-100 text-emerald-800">
                                                     {{ __('Successful') }}
                                                 </span>
                                             @else
-                                                <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                <span class="px-2 py-0.5 inline-flex text-[10px] leading-5 font-semibold rounded-full bg-red-100 text-red-800">
                                                     {{ __('Failed') }}
                                                 </span>
                                             @endif
                                         </td>
-                                        <td class="px-4 py-4 text-right text-sm font-medium">
+                                        <td class="px-3 py-2.5 text-right text-sm font-medium">
                                             <div class="flex items-center justify-end">
                                                 <button
                                                     type="button"
                                                     @click="selectedAudit = @js($audit); detailModalOpen = true"
-                                                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-50 hover:text-blue-900 transition-colors duration-200"
+                                                    class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-50 hover:text-blue-900 transition-colors duration-200"
                                                     title="{{ __('View details') }}"
                                                     aria-label="{{ __('View details') }}"
                                                 >
@@ -332,7 +332,7 @@
                                                 <svg class="w-12 h-12 text-gray-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                                 </svg>
-                                                <p class="text-base font-medium text-gray-700">{{ __('No login audit records found.') }}</p>
+                                                <p class="text-base font-medium text-gray-700">{{ __('No log audit records found.') }}</p>
                                                 <p class="text-xs text-gray-400 mt-1">{{ __('Log into an employee account to generate real authentication audit records.') }}</p>
                                             </div>
                                         </td>
@@ -351,7 +351,11 @@
 
             <!-- TAB 2: ACTIVITY AUDIT PANEL -->
             <div class="w-full max-w-full min-w-0 overflow-hidden bg-white shadow-sm sm:rounded-lg border border-gray-100" x-show="tab === 'activity'" x-cloak>
-                <div class="min-w-0 p-6 text-gray-900">
+                <div class="min-w-0 p-4 text-gray-900">
+                    <div class="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900">
+                        <p class="font-bold">HR privacy guidance</p>
+                        <p class="mt-1">Use page-visit records only for legitimate HR, security, and operational review. Time shown is an approximate active-page duration: counting pauses when the tab is hidden or after {{ (int) ceil(config('activity-tracking.idle_seconds', 300) / 60) }} minutes without interaction. Page-visit records move to Archive after {{ (int) config('activity-tracking.retention_days', 365) }} days.</p>
+                    </div>
                     
                     <!-- Search, Filter & Sort Bar -->
                     <form id="activityFilterForm" method="GET" action="{{ route('audit-logs.activity') }}" class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/70 p-2 sm:flex-row sm:items-center">
@@ -369,17 +373,6 @@
                             <input id="act_search" name="search" type="search" value="{{ $search }}" placeholder="{{ __('Search activity, user, or action...') }}" onchange="this.form.submit()" onkeydown="if(event.key==='Enter') this.form.submit()" class="block h-9 w-full rounded-lg border-gray-300 pl-10 pr-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                         </div>
 
-                        <!-- Module Filter Selector -->
-                        <div class="sm:w-44 sm:shrink-0">
-                            <label for="module" class="sr-only">{{ __('Module') }}</label>
-                            <select id="module" name="module" onchange="this.form.submit()" class="block h-9 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">{{ __('All Modules') }}</option>
-                                @foreach($modules as $mod)
-                                    <option value="{{ $mod }}" {{ (string)$module === (string)$mod ? 'selected' : '' }}>{{ $mod }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
                         <!-- Role Filter Selector -->
                         <div class="sm:w-44 sm:shrink-0">
                             <label for="act_role" class="sr-only">{{ __('Role') }}</label>
@@ -388,6 +381,15 @@
                                 @foreach($roleOptions as $roleKey => $roleLabel)
                                     <option value="{{ $roleKey }}" {{ (string)$role === (string)$roleKey ? 'selected' : '' }}>{{ $roleLabel }}</option>
                                 @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Activity order selector -->
+                        <div class="sm:w-44 sm:shrink-0">
+                            <label for="activity_sort" class="sr-only">{{ __('Sort activities') }}</label>
+                            <select id="activity_sort" name="sort" onchange="this.form.submit()" class="block h-9 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="latest" {{ $sort === 'latest' ? 'selected' : '' }}>{{ __('Latest to Oldest') }}</option>
+                                <option value="oldest" {{ $sort === 'oldest' ? 'selected' : '' }}>{{ __('Oldest to Latest') }}</option>
                             </select>
                         </div>
 
@@ -404,37 +406,41 @@
                         <table class="min-w-full w-full table-fixed divide-y divide-gray-200">
                             <thead>
                                 <tr class="bg-gray-50">
-                                    <th class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('User') }}</th>
-                                    <th class="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Action / Event') }}</th>
-                                    <th class="w-[44%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Description') }}</th>
-                                    <th class="w-[10%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Date') }}</th>
-                                    <th class="w-[10%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Time') }}</th>
+                                    <th class="w-[20%] px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('User') }}</th>
+                                    <th class="w-[19%] px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Action / Event') }}</th>
+                                    <th class="w-[27%] px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Description') }}</th>
+                                    <th class="w-[12%] px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Date') }}</th>
+                                    <th class="w-[10%] px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Time') }}</th>
+                                    <th class="w-[12%] px-3 py-2 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{{ __('Time Spent') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @forelse($activityAudits as $act)
                                     <tr class="hover:bg-gray-50 transition-colors duration-200">
-                                        <td class="px-4 py-4 text-sm font-medium text-gray-900">
-                                            <div class="truncate text-sm font-medium text-gray-900">
+                                        <td class="px-3 py-2 text-xs font-medium text-gray-900">
+                                            <div class="truncate font-semibold text-gray-900" title="{{ $act->user_name ?: __('System') }}">
                                                 {{ $act->user_name ?: __('System') }}
                                             </div>
                                         </td>
-                                        <td class="px-4 py-4 text-sm font-medium text-gray-900">
-                                            <div class="truncate">{{ $act->action }}</div>
+                                        <td class="px-3 py-2 text-xs font-medium text-gray-900">
+                                            <div class="truncate" title="{{ $act->action }}">{{ $act->action }}</div>
                                         </td>
-                                        <td class="px-4 py-4 text-sm leading-snug text-gray-500">
-                                            <div class="line-clamp-2 break-words" title="{{ $act->description }}">{{ $act->description }}</div>
+                                        <td class="px-3 py-2 text-xs leading-snug text-gray-500">
+                                            <div class="truncate" title="{{ $act->description }}">{{ $act->description }}</div>
                                         </td>
-                                        <td class="px-4 py-4 text-sm text-gray-500">
-                                            {{ $act->created_at ? $act->created_at->format('M d, Y') : 'N/A' }}
+                                        <td class="px-3 py-2 text-xs text-gray-500">
+                                            {{ $act->created_at ? $act->created_at->format('M d, Y') : '-' }}
                                         </td>
-                                        <td class="px-4 py-4 text-sm text-gray-500">
-                                            {{ $act->created_at ? $act->created_at->format('h:i A') : 'N/A' }}
+                                        <td class="px-3 py-2 text-xs tabular-nums text-gray-500">
+                                            {{ $act->created_at ? $act->created_at->format('h:i:s') . '.00 ' . $act->created_at->format('A') : '-' }}
+                                        </td>
+                                        <td class="px-3 py-2 text-xs font-semibold tabular-nums text-slate-700">
+                                            {{ $act->page_duration }}
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-6 py-10 text-center text-gray-500">
+                                        <td colspan="6" class="px-6 py-10 text-center text-gray-500">
                                             <div class="flex flex-col items-center">
                                                 <svg class="w-12 h-12 text-gray-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

@@ -251,6 +251,10 @@
                         </x-slot>
                         {{ __('Audit Log') }}
                     </x-sidebar-link>
+                    <x-sidebar-link :href="route('archive.index')" :active="request()->routeIs('archive.*')">
+                        <x-slot name="icon"><i class="fa-solid fa-box-archive" aria-hidden="true"></i></x-slot>
+                        {{ __('Archive') }}
+                    </x-sidebar-link>
                 @endif
 
                 

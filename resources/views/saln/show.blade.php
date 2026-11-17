@@ -61,8 +61,8 @@
                         @endif
                     </div>
                     <div class="flex flex-wrap gap-3 sm:justify-end">
-                        @if($canManageSaln)
-                            <button type="button" onclick="window.print()" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#0038a8] bg-white px-5 text-[13px] font-extrabold uppercase leading-none tracking-[.12em] text-[#0038a8] shadow-sm transition hover:bg-blue-50">Print PDF</button>
+                        @if($canExportSaln ?? false)
+                            <a href="{{ route('salns.download', ['saln' => $saln, 'inline' => 1]) }}" target="_blank" rel="noopener noreferrer" data-no-transition class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#0038a8] bg-white px-5 text-[13px] font-extrabold uppercase leading-none tracking-[.12em] text-[#0038a8] shadow-sm transition hover:bg-blue-50">Print PDF</a>
                         @endif
                         @if($canExportSaln ?? true)
                             <a href="{{ route('salns.download', $saln) }}" data-no-transition class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-200 bg-white px-5 text-[13px] font-extrabold uppercase leading-none tracking-[.12em] text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-[#0038a8]">Download PDF</a>

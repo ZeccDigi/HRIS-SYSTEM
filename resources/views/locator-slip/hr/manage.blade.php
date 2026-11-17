@@ -115,69 +115,23 @@
                 >
             </div>
 
-            {{-- Locator type --}}
-            <div class="sm:w-44 sm:shrink-0">
-                <label
-                    for="locatorSlipType"
-                    class="sr-only"
-                >
-                    {{ __('Locator Type') }}
-                </label>
-
-                <select
-                    id="locatorSlipType"
-                    x-model="type"
-                    @change="submitFilters()"
-                    class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                >
-                    <option value="">
-                        {{ __('Types') }}
-                    </option>
-
-                    @foreach($locatorTypes as $locatorType)
-                        @php
-                            $filterType = $locatorType === 'Personal'
-                                ? 'Pass Slip'
-                                : $locatorType;
-                        @endphp
-
-                        <option value="{{ Str::lower($filterType) }}">
-                            {{ $filterType }}
-                        </option>
-                    @endforeach
+            {{-- Locator type filter --}}
+            <div class="sm:w-48 sm:shrink-0">
+                <label for="locatorSlipType" class="sr-only">{{ __('Locator Type') }}</label>
+                <select id="locatorSlipType" x-model="type" @change="submitFilters()" class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">{{ __('Types') }}</option>
+                    <option value="Pass Slip">{{ __('Pass Slip') }}</option>
+                    <option value="Official Business">{{ __('Official Business') }}</option>
                 </select>
             </div>
 
-            {{-- Status filter --}}
-            <div class="sm:w-48 sm:shrink-0">
-                <label
-                    for="locatorSlipStatus"
-                    class="sr-only"
-                >
-                    {{ __('Status') }}
-                </label>
-
-                <select
-                    id="locatorSlipStatus"
-                    x-model="status"
-                    @change="submitFilters()"
-                    class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                >
-                    <option value="">
-                        {{ __('Status') }}
-                    </option>
-
-                    <option value="pending">
-                        {{ __('Pending') }}
-                    </option>
-
-                    <option value="approved">
-                        {{ __('Approved') }}
-                    </option>
-
-                    <option value="rejected">
-                        {{ __('Rejected') }}
-                    </option>
+            <div class="sm:w-44 sm:shrink-0">
+                <label for="locatorSlipMonth" class="sr-only">{{ __('Month covered') }}</label>
+                <select id="locatorSlipMonth" x-model="month" @change="submitFilters()" class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">{{ __('Months') }}</option>
+                    <option value="1">{{ __('January') }}</option><option value="2">{{ __('February') }}</option><option value="3">{{ __('March') }}</option><option value="4">{{ __('April') }}</option>
+                    <option value="5">{{ __('May') }}</option><option value="6">{{ __('June') }}</option><option value="7">{{ __('July') }}</option><option value="8">{{ __('August') }}</option>
+                    <option value="9">{{ __('September') }}</option><option value="10">{{ __('October') }}</option><option value="11">{{ __('November') }}</option><option value="12">{{ __('December') }}</option>
                 </select>
             </div>
 
@@ -202,62 +156,62 @@
                 <div class="w-full overflow-x-auto">
                     <table class="w-full table-fixed divide-y divide-slate-200">
                         <colgroup>
-                            <col class="w-[17%]">
-                            <col class="w-[14%]">
-                            <col class="w-[11%]">
-                            <col class="w-[19%]">
-                            <col class="w-[18%]">
-                            <col class="w-[12%]">
-                            <col class="w-[9%]">
+                            <col style="width: 15%">
+                            <col style="width: 15%">
+                            <col style="width: 15%">
+                            <col style="width: 15%">
+                            <col style="width: 16%">
+                            <col style="width: 13%">
+                            <col style="width: 11%">
                         </colgroup>
 
                         <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                             <tr>
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Employee') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Date Covered') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Type') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Destination') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Approver') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Status') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-1 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Actions') }}
                                 </th>
@@ -377,9 +331,9 @@
                                     data-filed="{{ $slip->created_at?->timestamp ?? 0 }}"
                                 >
                                     {{-- Employee name only --}}
-                                    <td class="px-3 py-3 align-middle">
+                                    <td class="px-2 py-3 text-center align-middle">
                                         <div
-                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm font-bold leading-5 text-gray-900"
+                                            class="min-w-0 whitespace-normal break-words text-center [overflow-wrap:anywhere] text-sm font-bold leading-5 text-gray-900"
                                             title="{{ $employeeName }}"
                                         >
                                             {{ $employeeName ?: __('N/A') }}
@@ -387,7 +341,7 @@
                                     </td>
 
                                     {{-- Date Covered --}}
-                                    <td class="px-3 py-3 align-middle">
+                                    <td class="px-2 py-3 text-center align-middle">
                                         <div class="min-w-0 whitespace-normal break-words text-sm leading-5 text-gray-700">
                                             {{ $coveredDate
                                                 ? $coveredDate->format('M d, Y')
@@ -396,9 +350,9 @@
                                     </td>
 
                                     {{-- Type --}}
-                                    <td class="px-3 py-3 text-center align-middle">
+                                    <td class="px-2 py-3 text-left align-middle">
                                         <div
-                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm leading-5 text-gray-700"
+                                            class="min-w-0 whitespace-nowrap text-sm leading-5 text-gray-700"
                                             title="{{ $displayType }}"
                                         >
                                             {{ $displayType ?: __('N/A') }}
@@ -406,9 +360,9 @@
                                     </td>
 
                                     {{-- Destination --}}
-                                    <td class="px-3 py-3 align-middle">
+                                    <td class="px-2 py-3 align-middle">
                                         <div
-                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm leading-5 text-gray-700"
+                                            class="min-w-0 whitespace-normal break-words text-center [overflow-wrap:anywhere] text-sm leading-5 text-gray-700"
                                             title="{{ $slip->destination }}"
                                         >
                                             {{ $slip->destination ?: __('N/A') }}
@@ -416,7 +370,7 @@
                                     </td>
 
                                     {{-- Approver --}}
-                                    <td class="px-3 py-3 text-center align-middle">
+                                    <td class="px-2 py-3 text-center align-middle">
                                         <div class="inline-flex max-w-full items-center justify-center gap-2 text-left">
                                             <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass }}"></span>
                                             <span class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-xs font-semibold leading-4 text-gray-700">
@@ -426,7 +380,7 @@
                                     </td>
 
                                     {{-- Status --}}
-                                    <td class="px-3 py-3 text-center align-middle">
+                                    <td class="px-2 py-3 text-center align-middle">
                                         <span
                                             class="inline-flex max-w-full whitespace-normal break-words rounded-full border px-2.5 py-1 text-center text-[10px] font-semibold uppercase leading-4 {{ $statusClass }}"
                                         >
@@ -436,10 +390,10 @@
 
                                     {{-- Actions --}}
                                     <td
-                                        class="px-1 py-3 text-center align-middle"
+                                        class="px-2 py-3 text-center align-middle"
                                         onclick="event.stopPropagation()"
                                     >
-                                        <div class="mx-auto flex w-fit flex-wrap items-center justify-center gap-1">
+                                        <div class="mx-auto inline-flex w-fit flex-nowrap items-center justify-center gap-1 whitespace-nowrap">
                                             {{-- View --}}
                                             <a
                                                 href="{{ route('hr.locator-slips.show', $slip) }}"
@@ -495,7 +449,13 @@
                     </table>
                 </div>
 
-                {{-- Pagination temporarily disabled until the locator slip pagination flow is revisited. --}}
+                @include('partials.table-pagination', [
+                    'paginator' => $pendingLocatorSlips,
+                    'label' => __('locator slips'),
+                    'perPageOptions' => [5, 10, 20, 50],
+                    'perPageSelectId' => 'pending_locator_per_page',
+                    'perPage' => $perPage,
+                ])
             </div>
         </div>
 
@@ -508,62 +468,62 @@
                 <div class="w-full overflow-x-auto">
                     <table class="w-full table-fixed divide-y divide-slate-200">
                         <colgroup>
-                            <col class="w-[17%]">
-                            <col class="w-[14%]">
-                            <col class="w-[11%]">
-                            <col class="w-[19%]">
-                            <col class="w-[18%]">
-                            <col class="w-[12%]">
-                            <col class="w-[9%]">
+                            <col style="width: 15%">
+                            <col style="width: 15%">
+                            <col style="width: 15%">
+                            <col style="width: 15%">
+                            <col style="width: 16%">
+                            <col style="width: 13%">
+                            <col style="width: 11%">
                         </colgroup>
 
                         <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                             <tr>
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Employee') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Date Covered') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Type') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Destination') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Approver') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-3 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Status') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-1 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Actions') }}
                                 </th>
@@ -683,9 +643,9 @@
                                     data-filed="{{ $slip->created_at?->timestamp ?? 0 }}"
                                 >
                                     {{-- Employee name only --}}
-                                    <td class="px-3 py-3 align-middle">
+                                    <td class="px-2 py-3 text-center align-middle">
                                         <div
-                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm font-bold leading-5 text-gray-900"
+                                            class="min-w-0 whitespace-normal break-words text-center [overflow-wrap:anywhere] text-sm font-bold leading-5 text-gray-900"
                                             title="{{ $employeeName }}"
                                         >
                                             {{ $employeeName ?: __('N/A') }}
@@ -693,7 +653,7 @@
                                     </td>
 
                                     {{-- Date Covered --}}
-                                    <td class="px-3 py-3 align-middle">
+                                    <td class="px-2 py-3 text-center align-middle">
                                         <div class="min-w-0 whitespace-normal break-words text-sm leading-5 text-gray-700">
                                             {{ $coveredDate
                                                 ? $coveredDate->format('M d, Y')
@@ -702,9 +662,9 @@
                                     </td>
 
                                     {{-- Type --}}
-                                    <td class="px-3 py-3 text-center align-middle">
+                                    <td class="px-2 py-3 text-left align-middle">
                                         <div
-                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm leading-5 text-gray-700"
+                                            class="min-w-0 whitespace-nowrap text-sm leading-5 text-gray-700"
                                             title="{{ $displayType }}"
                                         >
                                             {{ $displayType ?: __('N/A') }}
@@ -712,9 +672,9 @@
                                     </td>
 
                                     {{-- Destination --}}
-                                    <td class="px-3 py-3 align-middle">
+                                    <td class="px-2 py-3 align-middle">
                                         <div
-                                            class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm leading-5 text-gray-700"
+                                            class="min-w-0 whitespace-normal break-words text-center [overflow-wrap:anywhere] text-sm leading-5 text-gray-700"
                                             title="{{ $slip->destination }}"
                                         >
                                             {{ $slip->destination ?: __('N/A') }}
@@ -722,7 +682,7 @@
                                     </td>
 
                                     {{-- Approver --}}
-                                    <td class="px-3 py-3 text-center align-middle">
+                                    <td class="px-2 py-3 text-center align-middle">
                                         <div class="inline-flex max-w-full items-center justify-center gap-2 text-left">
                                             <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass }}"></span>
                                             <span class="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-xs font-semibold leading-4 text-gray-700">
@@ -732,7 +692,7 @@
                                     </td>
 
                                     {{-- Status --}}
-                                    <td class="px-3 py-3 text-center align-middle">
+                                    <td class="px-2 py-3 text-center align-middle">
                                         <span
                                             class="inline-flex max-w-full whitespace-normal break-words rounded-full border px-2.5 py-1 text-center text-[10px] font-semibold uppercase leading-4 {{ $statusClass }}"
                                         >
@@ -742,10 +702,10 @@
 
                                     {{-- Actions --}}
                                     <td
-                                        class="px-1 py-3 text-center align-middle"
+                                        class="px-2 py-3 text-center align-middle"
                                         onclick="event.stopPropagation()"
                                     >
-                                        <div class="mx-auto grid w-fit grid-cols-2 place-items-center gap-1">
+                                        <div class="mx-auto inline-flex w-fit flex-nowrap items-center justify-center gap-1 whitespace-nowrap">
                                             <a
                                                 href="{{ route('hr.locator-slips.show', $slip) }}"
                                                 class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition-colors hover:bg-indigo-50 hover:text-indigo-900"
@@ -798,7 +758,13 @@
                     </table>
                 </div>
 
-                {{-- Pagination temporarily disabled until the locator slip pagination flow is revisited. --}}
+                @include('partials.table-pagination', [
+                    'paginator' => $allLocatorSlips,
+                    'label' => __('locator slips'),
+                    'perPageOptions' => [5, 10, 20, 50],
+                    'perPageSelectId' => 'all_locator_per_page',
+                    'perPage' => $perPage,
+                ])
             </div>
         </div>
 
@@ -935,9 +901,10 @@
                 tab: initialTab || 'pending',
 
                 search: @js($search),
+                month: @js($month),
                 type: @js($type),
-                status: @js($status),
                 year: @js((string) $year),
+                perPage: @js((string) $perPage),
 
                 pendingRows: [],
                 allRows: [],
@@ -951,7 +918,7 @@
                 previewData: {
                     title: '',
                     date: '',
-                    status: '',
+                    type: '',
                     remarks: '',
                     printUrl: '',
                     directPrintUrl: '',
@@ -987,16 +954,20 @@
                         url.searchParams.set('search', this.search.trim());
                     }
 
+                    if (this.month) {
+                        url.searchParams.set('month', this.month);
+                    }
+
                     if (this.type) {
                         url.searchParams.set('type', this.type);
                     }
 
-                    if (this.status) {
-                        url.searchParams.set('status', this.status);
-                    }
-
                     if (this.year) {
                         url.searchParams.set('year', this.year);
+                    }
+
+                    if (this.perPage) {
+                        url.searchParams.set('per_page', this.perPage);
                     }
 
                     window.location.href = url.toString();
@@ -1004,8 +975,8 @@
 
                 reset() {
                     this.search = '';
+                    this.month = '';
                     this.type = '';
-                    this.status = '';
                     this.year = String(currentYear);
 
                     window.location.href = @js(route('hr.locator-slips.index'));

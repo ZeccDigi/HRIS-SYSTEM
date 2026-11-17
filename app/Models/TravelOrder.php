@@ -77,6 +77,15 @@ class TravelOrder extends Model
         ];
     }
 
+    public function canBeEditedBy(?Employee $employee): bool
+    {
+        return $employee !== null
+            && (int) $this->employee_id === (int) $employee->id
+            && $this->status === 'pending'
+            && in_array($this->recordofficer_status, [null, 'pending'], true)
+            && $this->approved_by_recordofficer === null;
+    }
+
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);

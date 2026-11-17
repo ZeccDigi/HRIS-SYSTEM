@@ -4,6 +4,11 @@
     $lastPage = $paginator->lastPage();
     $pageStart = max(1, $currentPage - 2);
     $pageEnd = min($lastPage, $currentPage + 2);
+    $perPageParam = $perPageParam ?? 'per_page';
+    $perPageValue = (int) ($perPage ?? request($perPageParam, $paginator->perPage()));
+    $paginationQuery = collect(request()->query())
+        ->except([$paginator->getPageName(), $perPageParam]);
+    $paginationAction = $formAction ?? url()->current();
 @endphp
 
 @if($paginator->hasPages() || $paginator->total() > 0)
@@ -104,7 +109,30 @@
                 <div></div>
             @endif
 
-            <div class="hidden sm:block"></div>
+            @if(! empty($perPageOptions))
+                <form method="GET" action="{{ $paginationAction }}" class="flex items-center justify-start gap-2 sm:justify-end">
+                    @foreach($paginationQuery as $queryKey => $queryValue)
+                        @if(is_scalar($queryValue))
+                            <input type="hidden" name="{{ $queryKey }}" value="{{ $queryValue }}">
+                        @endif
+                    @endforeach
+                    <label for="{{ $perPageSelectId ?? 'table_per_page' }}" class="whitespace-nowrap text-xs font-semibold text-slate-600">
+                        {{ __('Show') }}
+                    </label>
+                    <select
+                        id="{{ $perPageSelectId ?? 'table_per_page' }}"
+                        name="{{ $perPageParam }}"
+                        onchange="this.form.submit()"
+                        class="block h-8 w-20 rounded-lg border-gray-300 bg-white py-1 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    >
+                        @foreach($perPageOptions as $pageSize)
+                            <option value="{{ $pageSize }}" @selected($perPageValue === (int) $pageSize)>{{ $pageSize }}</option>
+                        @endforeach
+                    </select>
+                </form>
+            @else
+                <div class="hidden sm:block"></div>
+            @endif
         </div>
     </div>
 @endif

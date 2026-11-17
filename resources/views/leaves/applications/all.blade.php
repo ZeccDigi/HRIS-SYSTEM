@@ -2,10 +2,9 @@
     <x-slot name="title">{{ __('Leave Records History') }}</x-slot>
 
     @php
-        $selectedLeaveTypeId = request(
-            'leave_type_id',
-            $leaveTypeId ?? ''
-        );
+        $currentYear = now()->year;
+        $selectedYear = $year ?? request('year', $currentYear);
+        $selectedMonth = $month ?? request('month', '');
     @endphp
 
     <div
@@ -13,6 +12,15 @@
         x-data="leaveApplicationPreviewPage()"
     >
         <div class="mx-auto w-full min-w-0">
+
+            <div class="mb-4 flex items-center justify-end gap-2">
+                <label for="all_leave_year" class="text-sm font-semibold text-gray-700">{{ __('Year') }}</label>
+                <select id="all_leave_year" name="year" form="leaveApplicationFilterForm" onchange="document.getElementById('leaveApplicationFilterForm').dispatchEvent(new Event('submit', { cancelable: true }))" class="h-10 w-28 rounded-lg border-gray-300 bg-white pl-4 pr-10 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    @for($yearOption = $currentYear; $yearOption >= $currentYear - 2; $yearOption--)
+                        <option value="{{ $yearOption }}" {{ (string) $selectedYear === (string) $yearOption ? 'selected' : '' }}>{{ $yearOption }}</option>
+                    @endfor
+                </select>
+            </div>
 
             {{-- Management Tabs --}}
             @include('leaves._manage-tabs')
@@ -25,6 +33,7 @@
                 data-filter-url="{{ route('leave-applications.all.filter') }}"
                 class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:flex-row sm:items-center"
             >
+                <input type="hidden" name="per_page" value="{{ request('per_page', 5) }}">
                 {{-- Search --}}
                 <div class="relative min-w-0 sm:flex-1">
                     <label
@@ -60,64 +69,47 @@
                     />
                 </div>
 
-                {{-- Status Filter --}}
-                <div class="sm:w-44 sm:shrink-0">
-                    <label
-                        for="status"
-                        class="sr-only"
-                    >
-                        {{ __('Status') }}
-                    </label>
-
-                    <select
-                        id="status"
-                        name="status"
-                        class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    >
-                        <option value="">
-                            {{ __('All Statuses') }}
-                        </option>
-
-                        @foreach([
-                            'pending' => 'Pending',
-                            'approved' => 'Approved',
-                            'rejected' => 'Rejected',
-                            'cancelled' => 'Cancelled',
-                        ] as $value => $label)
-                            <option
-                                value="{{ $value }}"
-                                {{ ($status ?? request('status')) === $value ? 'selected' : '' }}
-                            >
-                                {{ __($label) }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
                 {{-- Leave Type Filter --}}
-                <div class="sm:w-48 sm:shrink-0">
-                    <label
-                        for="leave_type_id"
-                        class="sr-only"
-                    >
-                        {{ __('Leave Types') }}
-                    </label>
-
+                <div class="sm:w-44 sm:shrink-0">
+                    <label for="leave_type_id" class="sr-only">{{ __('Leave Type') }}</label>
                     <select
                         id="leave_type_id"
                         name="leave_type_id"
                         class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     >
+                        <option value="">{{ __('Types') }}</option>
+                        @foreach($leaveTypes as $leaveType)
+                            <option value="{{ $leaveType->id }}" {{ (string) ($leaveTypeId ?? request('leave_type_id')) === (string) $leaveType->id ? 'selected' : '' }}>
+                                {{ $leaveType->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- Month Filter --}}
+                <div class="sm:w-48 sm:shrink-0">
+                    <label
+                        for="month"
+                        class="sr-only"
+                    >
+                        {{ __('Month') }}
+                    </label>
+
+                    <select
+                        id="month"
+                        name="month"
+                        class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    >
                         <option value="">
-                            {{ __('Leave Types') }}
+                            {{ __('All Months') }}
                         </option>
 
-                        @foreach(($leaveTypes ?? collect()) as $leaveType)
+                        @foreach(range(1, 12) as $monthNumber)
                             <option
-                                value="{{ $leaveType->id }}"
-                                {{ (string) $selectedLeaveTypeId === (string) $leaveType->id ? 'selected' : '' }}
+                                value="{{ $monthNumber }}"
+                                {{ (string) $selectedMonth === (string) $monthNumber ? 'selected' : '' }}
                             >
-                                {{ $leaveType->name }}
+                                {{ \Carbon\Carbon::create()->month($monthNumber)->format('F') }}
                             </option>
                         @endforeach
                     </select>
@@ -139,39 +131,48 @@
                 <div class="w-full min-w-0">
                     <table class="w-full table-fixed divide-y divide-slate-200">
                         <colgroup>
-                            <col class="w-[9%]">
-                            <col class="w-[15%]">
-                            <col class="w-[14%]">
-                            <col class="w-[13%]">
-                            <col class="w-[14%]">
-                            <col class="w-[13%]">
-                            <col class="w-[10%]">
+                            <col class="w-[11%]">
+                            <col class="w-[16%]">
+                            <col class="w-[17%]">
+                            <col class="w-[11%]">
                             <col class="w-[12%]">
+                            <col class="w-[10%]">
+                            <col class="w-[10%]">
+                            <col class="w-[13%]">
                         </colgroup>
                         <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                             <tr>
-                                <th class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
-                                    {{ __('Date Filed') }}
+                                <th class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
+                                    <span class="whitespace-nowrap">{{ __('Date Filed') }}</span>
                                 </th>
 
-                                <th class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
+                                <th class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
                                     {{ __('Name') }}
                                 </th>
 
-                                <th class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
-                                    {{ __('Leave Type') }}
+                                <th class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
+                                    <span class="whitespace-nowrap">{{ __('Leave Type') }}</span>
                                 </th>
 
                                 <th class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
-                                    {{ __('Leave Certification') }}
+                                    <span class="inline-flex w-full flex-col items-center">
+                                        <span>{{ __('Leave') }}</span>
+                                        <span>{{ __('Certification') }}</span>
+                                    </span>
                                 </th>
 
                                 <th class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
-                                    {{ __('Recommending Approval') }}
+                                    <span class="inline-flex w-full flex-col items-center">
+                                        <span>{{ __('Recommending') }}</span>
+                                        <span>{{ __('Approval') }}</span>
+                                    </span>
                                 </th>
 
                                 <th class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500">
-                                    {{ __('Approval') }}
+                                    <span class="inline-flex w-full flex-col items-center">
+                                        <span>{{ __('Final') }}</span>
+                                        <span>{{ __('Approval') }}</span>
+                                    </span>
                                 </th>
 
                                 {{-- Status is immediately before Actions --}}
@@ -197,6 +198,14 @@
                             ])
                         </tbody>
                     </table>
+                </div>
+                <div id="leaveApplicationPagination">
+                    @include('partials.table-pagination', [
+                        'paginator' => $leaves,
+                        'label' => __('leave requests'),
+                        'perPageOptions' => [5, 10, 20, 50],
+                        'perPageSelectId' => 'all_leave_per_page',
+                    ])
                 </div>
             </div>
         </div>

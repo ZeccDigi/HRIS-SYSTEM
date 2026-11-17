@@ -81,29 +81,11 @@
 
             {{-- Top actions --}}
             <div class="mb-5 flex items-center justify-between gap-3">
-                <a
-                    href="{{ $isApprover
-                        ? route('hr.travel-orders.index')
-                        : route('travel-orders.index') }}"
-                    class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-blue-900 shadow-sm transition hover:border-blue-200 hover:text-blue-800"
-                >
-                    <svg
-                        class="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M15 19l-7-7 7-7"
-                        />
-                    </svg>
+                <x-page-action href="{{ $isApprover ? route('hr.travel-orders.index') : route('travel-orders.index') }}" />
 
-                    {{ __('Back') }}
-                </a>
-
+                @if($travelOrder->canBeEditedBy(auth()->user()->employee))
+                    <x-page-action href="{{ route('travel-orders.edit', $travelOrder) }}" kind="edit" class="ml-auto" />
+                @endif
                 <a
                     href="{{ route('travel-orders.print', $travelOrder) }}"
                     target="_blank"
@@ -122,6 +104,7 @@
                 :payload="$trackedOrderPayload"
                 event="travel-selected"
                 empty="No travel authority to track yet."
+                compact
             />
 
             {{-- Full Travel Authority Form --}}

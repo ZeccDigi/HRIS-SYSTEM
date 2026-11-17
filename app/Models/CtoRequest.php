@@ -13,7 +13,10 @@ class CtoRequest extends Model
         'date_start',
         'date_end',
         'hours',
+        'verified_overtime_hours',
         'purpose',
+        'overtime_authority_reference',
+        'exception_justification',
         'attachment_path',
         'applicant_signature_path',
         'cto_balance_before',
@@ -25,6 +28,7 @@ class CtoRequest extends Model
         'approved_by_hrstaff',
         'hrstaff_status',
         'hrstaff_remarks',
+        'hr_verified_at',
         'approved_by_regionaldirector',
         'rd_status',
         'rd_remarks',
@@ -36,9 +40,20 @@ class CtoRequest extends Model
             'date_start' => 'date',
             'date_end' => 'date',
             'hours' => 'decimal:2',
+            'verified_overtime_hours' => 'decimal:2',
+            'hr_verified_at' => 'datetime',
             'cto_balance_before' => 'decimal:2',
             'cto_balance_after' => 'decimal:2',
         ];
+    }
+
+    public function canBeEditedBy(?Employee $employee): bool
+    {
+        return $employee !== null
+            && (int) $this->employee_id === (int) $employee->id
+            && $this->status === 'pending'
+            && in_array($this->hrstaff_status, [null, 'pending'], true)
+            && $this->approved_by_hrstaff === null;
     }
 
     public function employee(): BelongsTo
@@ -64,9 +79,16 @@ class CtoRequest extends Model
     public function getTypeLabelAttribute(): string
     {
         return match ($this->type) {
-            'earn' => 'Earn CTO',
+            'earn' => 'Earn COC',
             'use' => 'Use CTO',
             default => ucfirst($this->type),
         };
+    }
+
+    public function getReferenceAttribute(): string
+    {
+        $date = $this->date_start ?? $this->created_at;
+
+        return sprintf('CTO-%s-%04d', $date?->format('Y') ?? now()->format('Y'), $this->id);
     }
 }

@@ -1,60 +1,62 @@
 <?php
 
+use App\Models\Employee;
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 
-test('reset password link screen can be rendered', function () {
-    $response = $this->get('/forgot-password');
-
-    $response->assertStatus(200);
+test('password recovery screen can be rendered', function () {
+    $this->get('/forgot-password')->assertOk();
 });
 
-test('reset password link can be requested', function () {
-    Notification::fake();
+test('a password reset OTP is issued to an account recovery email', function () {
+    Mail::fake();
 
     $user = User::factory()->create();
+    Employee::factory()->for($user)->create([
+        'notification_email' => 'recovery@example.test',
+    ]);
 
-    $this->post('/forgot-password', ['email' => $user->email]);
+    $response = $this->post('/forgot-password', ['email' => $user->email]);
 
-    Notification::assertSentTo($user, ResetPassword::class);
+    $response->assertRedirect(route('password.otp.reset', ['email' => $user->email]));
+    $user->refresh();
+
+    expect($user->otp)->toHaveLength(6)
+        ->and($user->otp_expires_at)->not->toBeNull();
 });
 
-test('reset password screen can be rendered', function () {
-    Notification::fake();
+test('password can be reset with a valid recovery OTP', function () {
+    $user = User::factory()->create([
+        'otp' => '123456',
+        'otp_expires_at' => now()->addMinutes(10),
+    ]);
 
-    $user = User::factory()->create();
+    $response = $this->post('/reset-password-otp', [
+        'email' => $user->email,
+        'otp' => '123456',
+        'password' => 'new-secure-password',
+        'password_confirmation' => 'new-secure-password',
+    ]);
 
-    $this->post('/forgot-password', ['email' => $user->email]);
+    $response->assertRedirect(route('login'));
+    $user->refresh();
 
-    Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
-        $response = $this->get('/reset-password/'.$notification->token);
-
-        $response->assertStatus(200);
-
-        return true;
-    });
+    expect(Hash::check('new-secure-password', $user->password))->toBeTrue()
+        ->and($user->otp)->toBeNull()
+        ->and($user->otp_expires_at)->toBeNull();
 });
 
-test('password can be reset with valid token', function () {
-    Notification::fake();
+test('a missing recovery email is explained without issuing an OTP', function () {
+    Mail::fake();
 
     $user = User::factory()->create();
+    Employee::factory()->for($user)->create(['notification_email' => null]);
 
-    $this->post('/forgot-password', ['email' => $user->email]);
+    $this->from('/forgot-password')
+        ->post('/forgot-password', ['email' => $user->email])
+        ->assertRedirect('/forgot-password')
+        ->assertSessionHasErrors('email');
 
-    Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
-        $response = $this->post('/reset-password', [
-            'token' => $notification->token,
-            'email' => $user->email,
-            'password' => 'password',
-            'password_confirmation' => 'password',
-        ]);
-
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect(route('login'));
-
-        return true;
-    });
+    expect($user->fresh()->otp)->toBeNull();
 });

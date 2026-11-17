@@ -8,7 +8,9 @@ use App\Models\LocatorSlip;
 use App\Models\User;
 use App\Notifications\LocatorSlipNotification;
 use App\Notifications\LocatorSlipQrReadyNotification;
+use App\Services\LocatorSlipPdfExporter;
 use Carbon\Carbon;
+use Illuminate\Http\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -23,9 +25,13 @@ class LocatorSlipController extends Controller
     {
         $employee = Auth::user()->employee;
         $search = trim((string) $request->query('search', ''));
-        $type = (string) $request->query('type', '');
+        $month = (string) $request->query('month', '');
         $status = (string) $request->query('status', '');
         $year = (string) $request->query('year', now()->year);
+        $perPage = (int) $request->query('per_page', 5);
+        if (! in_array($perPage, [5, 10, 20, 50], true)) {
+            $perPage = 5;
+        }
 
         $employeeLocatorQuery = LocatorSlip::query()
             ->where('employee_id', $employee->id);
@@ -48,10 +54,10 @@ class LocatorSlipController extends Controller
         }
 
         $locatorSlips = $this->sortLocatorSlips(
-            $this->filterLocatorSlips($employeeLocatorQuery, $search, $type, $status, $year),
+            $this->filterLocatorSlips($employeeLocatorQuery, $search, $status, $year, $month),
             'latest'
         )
-            ->paginate(5)
+            ->paginate($perPage)
             ->withQueryString();
 
         $locatorSlips->getCollection()->transform(
@@ -74,7 +80,7 @@ class LocatorSlipController extends Controller
 
         $employeePosition = $employee?->position ?: 'N/A';
 
-        return view('locator-slip.index', compact('locatorSlips', 'latestRejectedRemark', 'employeeName', 'employeePosition', 'availableYears', 'search', 'type', 'status', 'year'));
+        return view('locator-slip.index', compact('locatorSlips', 'latestRejectedRemark', 'employeeName', 'employeePosition', 'availableYears', 'search', 'month', 'status', 'year', 'perPage'));
     }
 
     public function create()
@@ -138,20 +144,26 @@ class LocatorSlipController extends Controller
     public function manageIndex(Request $request)
     {
         $search = trim((string) $request->query('search', ''));
-        $type = $request->query('type', '');
+        $type = (string) $request->query('type', '');
+        $month = (string) $request->query('month', '');
         $status = $request->query('status', '');
         $sort = $request->query('sort', 'latest');
         $year = (string) $request->query('year', now()->year);
+        $perPage = (int) $request->query('per_page', 5);
+        if (! in_array($perPage, [5, 10, 20, 50], true)) {
+            $perPage = 5;
+        }
 
         $allLocatorSlips = $this->sortLocatorSlips($this->filterLocatorSlips(
-            $this->scopeLocatorSlipsForRole(LocatorSlip::with('employee')->whereIn('status', ['approved', 'rejected', 'approved by chief'])),
+            $this->scopeLocatorSlipsForRole(LocatorSlip::with('employee')),
             $search,
-            $type,
             $status,
-            $year
-        ), $sort)->get();
+            $year,
+            $month,
+            $type
+        ), $sort)->paginate($perPage, ['*'], 'all_page')->withQueryString();
 
-        $pendingLocatorSlips = $this->getPendingLocatorSlips($sort, $search, $type, $status, $year);
+        $pendingLocatorSlips = $this->getPendingLocatorSlips($sort, $search, $type, $status, $year, $month, $perPage);
 
         $tab = $request->query('tab', 'pending');
 
@@ -159,7 +171,6 @@ class LocatorSlipController extends Controller
             $tab = 'pending';
         }
 
-        $locatorTypes = collect(['Official Business', 'Pass Slip']);
         $availableYears = LocatorSlip::query()
             ->get(['date_covered', 'created_at'])
             ->map(function (LocatorSlip $slip) {
@@ -176,7 +187,7 @@ class LocatorSlipController extends Controller
             $availableYears->prepend(now()->year);
         }
 
-        return view('locator-slip.hr.manage', compact('allLocatorSlips', 'pendingLocatorSlips', 'tab', 'sort', 'search', 'type', 'status', 'year', 'locatorTypes', 'availableYears'));
+        return view('locator-slip.hr.manage', compact('allLocatorSlips', 'pendingLocatorSlips', 'tab', 'sort', 'search', 'type', 'month', 'status', 'year', 'perPage', 'availableYears'));
     }
 
     public function allIndex()
@@ -292,7 +303,11 @@ class LocatorSlipController extends Controller
         return view('locator-slip.show', compact('locatorSlip'));
     }
 
-    public function print(LocatorSlip $locatorSlip)
+    public function print(
+        Request $request,
+        LocatorSlip $locatorSlip,
+        LocatorSlipPdfExporter $exporter
+    ): Response
     {
         if (Auth::user()->employee?->id !== $locatorSlip->employee_id && ! in_array(strtolower(Auth::user()->role), ['admin', 'hrstaff', 'chief', 'regionaldirector'], true)) {
             abort(403);
@@ -306,23 +321,27 @@ class LocatorSlipController extends Controller
             abort(403);
         }
 
-        return view('locator-slip.print', compact('locatorSlip'));
+        if ($request->boolean('preview')) {
+            return response()->view('locator-slip.print', [
+                'locatorSlip' => $locatorSlip,
+                'previewMode' => true,
+                'pdfMode' => false,
+            ]);
+        }
+
+        return $exporter->stream($locatorSlip);
     }
 
     public function edit(LocatorSlip $locatorSlip)
     {
-        if (Auth::user()->employee->id !== $locatorSlip->employee_id) {
-            abort(403);
-        }
+        abort_unless($locatorSlip->canBeEditedBy(Auth::user()->employee), 403);
 
         return view('locator-slip.edit', compact('locatorSlip'));
     }
 
     public function update(Request $request, LocatorSlip $locatorSlip)
     {
-        if (Auth::user()->employee->id !== $locatorSlip->employee_id) {
-            abort(403);
-        }
+        abort_unless($locatorSlip->canBeEditedBy(Auth::user()->employee), 403);
 
         $request->validate([
             'date_covered' => 'required|date',
@@ -333,12 +352,11 @@ class LocatorSlipController extends Controller
 
         $this->validateCoveredDate($request->date_covered);
 
-        $locatorSlip->update([
-            'date_covered' => $request->date_covered,
-            'destination' => $request->destination,
-            'type' => $request->type,
-            'purpose' => $request->purpose,
-        ]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($locatorSlip, $request) {
+            $current = LocatorSlip::query()->lockForUpdate()->findOrFail($locatorSlip->id);
+            abort_unless($current->canBeEditedBy($request->user()->employee), 403);
+            $current->update($request->only(['date_covered', 'destination', 'type', 'purpose']));
+        });
 
         return redirect()->route('locator-slips.show', $locatorSlip)->with('message', 'Locator slip updated successfully.');
     }
@@ -401,7 +419,7 @@ class LocatorSlipController extends Controller
         ]);
     }
 
-    private function getPendingLocatorSlips(string $sort = 'latest', string $search = '', string $type = '', string $status = '', string $year = '')
+    private function getPendingLocatorSlips(string $sort = 'latest', string $search = '', string $type = '', string $status = '', string $year = '', string $month = '', int $perPage = 5)
     {
         $query = $this->scopeLocatorSlipsForRole(LocatorSlip::with('employee'));
         $query->where('status', 'pending');
@@ -410,8 +428,9 @@ class LocatorSlipController extends Controller
             $query->whereRaw('1 = 0');
         }
 
-        return $this->sortLocatorSlips($this->filterLocatorSlips($query, $search, $type, '', $year), $sort)
-            ->get();
+        return $this->sortLocatorSlips($this->filterLocatorSlips($query, $search, '', $year, $month, $type), $sort)
+            ->paginate($perPage, ['*'], 'pending_page')
+            ->withQueryString();
     }
 
     private function scopeLocatorSlipsForRole($query)
@@ -457,7 +476,7 @@ class LocatorSlipController extends Controller
         return trim((string) Auth::user()?->employee?->division);
     }
 
-    private function filterLocatorSlips($query, string $search, string $type, string $status, string $year = '')
+    private function filterLocatorSlips($query, string $search, string $status, string $year = '', string $month = '', string $type = '')
     {
         return $query
             ->when($search !== '', function ($query) use ($search) {
@@ -493,7 +512,8 @@ class LocatorSlipController extends Controller
             ->when($status === 'pending', fn ($query) => $query->where('status', 'pending'))
             ->when($status === 'approved', fn ($query) => $query->whereIn('status', ['approved', 'approved by chief']))
             ->when($status === 'rejected', fn ($query) => $query->where('status', 'rejected'))
-            ->when($year !== '', fn ($query) => $query->whereYear('date_covered', $year));
+            ->when($year !== '', fn ($query) => $query->whereYear('date_covered', $year))
+            ->when((int) $month >= 1 && (int) $month <= 12, fn ($query) => $query->whereMonth('date_covered', (int) $month));
     }
 
     private function sortLocatorSlips($query, string $sort)

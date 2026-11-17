@@ -59,13 +59,7 @@ class PasswordController extends Controller
      */
     public function update(Request $request): RedirectResponse|JsonResponse
     {
-        $user = $request->user();
-        $currentPasswordRules = $user->must_change_password
-            ? ['nullable']
-            : ['required', 'current_password'];
-
         $validated = $request->validateWithBag('updatePassword', [
-            'current_password' => $currentPasswordRules,
             'password' => ['required', Password::defaults(), 'confirmed'],
         ]);
 

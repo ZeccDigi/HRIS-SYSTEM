@@ -8,6 +8,7 @@ use App\Models\TravelOrder;
 use App\Models\User;
 use App\Notifications\TravelOrderNotification;
 use App\Services\TravelAuthorityPdfExporter;
+use App\Services\TravelAuthorityReportPdfExporter;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -38,6 +40,7 @@ class TravelOrderController extends Controller
         $status = (string) $request->query('status', '');
         $month = (string) $request->query('month', '');
         $year = (string) $request->query('year', now()->year);
+        $perPage = $this->perPage($request);
 
         $travelOrders = TravelOrder::with(['employee', 'companions', 'recordsOfficer', 'regionalDirector'])
             ->when($tab === 'my', fn ($query) => $query->where('employee_id', $employee->id))
@@ -71,7 +74,7 @@ class TravelOrderController extends Controller
             ->when($month !== '', fn ($query) => $query->whereMonth('travel_date_start', $month))
             ->when($year !== '', fn ($query) => $query->whereYear('created_at', $year))
             ->latest()
-            ->paginate(5)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('travel-orders.index', compact('travelOrders', 'tab', 'search', 'status', 'month', 'year'));
@@ -86,7 +89,27 @@ class TravelOrderController extends Controller
         return view('travel-orders.create', compact('employees'));
     }
 
+    public function edit(Request $request, TravelOrder $travelOrder): View
+    {
+        abort_unless($travelOrder->canBeEditedBy($request->user()->employee), 403);
+        $employees = Employee::where('id', '!=', $request->user()->employee->id)->orderBy('lastname')->get();
+
+        return view('travel-orders.create', compact('travelOrder', 'employees'));
+    }
+
+    public function update(Request $request, TravelOrder $travelOrder): RedirectResponse|Response
+    {
+        abort_unless($travelOrder->canBeEditedBy($request->user()->employee), 403);
+
+        return $this->saveRequest($request, $travelOrder);
+    }
+
     public function store(Request $request): RedirectResponse|Response
+    {
+        return $this->saveRequest($request);
+    }
+
+    private function saveRequest(Request $request, ?TravelOrder $existing = null): RedirectResponse|Response
     {
         $employee = auth()->user()->employee;
 
@@ -108,7 +131,35 @@ class TravelOrderController extends Controller
             'attachment' => 'nullable|file|mimes:pdf|max:5120',
         ]);
 
+        if (in_array($employee->id, $validated['companions'] ?? [], true)) {
+            throw ValidationException::withMessages([
+                'companions' => 'You cannot add yourself as a companion.',
+            ]);
+        }
+
         $this->validateTravelDates($validated['travel_date_start'], $validated['travel_date_end']);
+
+        if ($existing) {
+            DB::transaction(function () use ($existing, $employee, $validated, $request) {
+                $current = TravelOrder::query()->lockForUpdate()->findOrFail($existing->id);
+                abort_unless($current->canBeEditedBy($employee), 403);
+                $current->update([
+                    'travel_type' => $validated['travel_type'] ?? null,
+                    'travel_date_start' => $validated['travel_date_start'] ?? null,
+                    'travel_date_end' => $validated['travel_date_end'] ?? null,
+                    'places_of_travel' => $validated['places_of_travel'] ?? null,
+                    'purpose' => $validated['purpose'] ?? null,
+                    'notes_remarks' => $validated['notes_remarks'] ?? null,
+                    'driver_name' => $validated['driver_name'] ?? null,
+                    'vehicle_plate_no' => $validated['vehicle_plate_no'] ?? null,
+                    'tar_deadline' => Carbon::parse($validated['travel_date_end'])->addDays(5)->toDateString(),
+                    'attachment_path' => $request->file('attachment')?->store('travel-order-attachments', 'public') ?? $current->attachment_path,
+                ]);
+                $current->companions()->sync($validated['companions'] ?? []);
+            });
+
+            return redirect()->route('travel-orders.show', $existing)->with('success', 'Request updated successfully.');
+        }
 
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
@@ -117,7 +168,7 @@ class TravelOrderController extends Controller
 
         $travelOrder = DB::transaction(function () use ($employee, $validated, $attachmentPath) {
             $travelOrder = $employee->travelOrders()->create([
-                'ta_number' => $this->generateTravelAuthorityNumber(),
+                'ta_number' => 'TA-TEMP-'.Str::uuid(),
                 'travel_type' => $validated['travel_type'],
                 'travel_date_start' => $validated['travel_date_start'],
                 'travel_date_end' => $validated['travel_date_end'],
@@ -136,6 +187,10 @@ class TravelOrderController extends Controller
                 'chief_status' => 'pending',
                 'hrstaff_status' => 'pending',
             ]);
+
+            $travelOrder->forceFill([
+                'ta_number' => $this->generateTravelAuthorityNumber($travelOrder),
+            ])->save();
 
             if (! empty($validated['companions'])) {
                 $travelOrder->companions()->attach($validated['companions']);
@@ -194,13 +249,16 @@ class TravelOrderController extends Controller
 
         return view('travel-orders.pdf', [
             'travelOrder' => $travelOrder,
-            'dmwLogoPath' => asset('images/dmw.png'),
+            // Keep the browser preview identical to the generated PDF header.
+            'dmwLogoPath' => asset('images/official DMW.png'),
             'bagongPilipinasLogoPath' => asset('images/bagong-pilipinas-logo.png'),
             'regionalOffice' => 'REGIONAL OFFICE XI, DAVAO CITY',
             'requestingOffice' => 'Regional Office XI',
             'notesRemarks' => $travelOrder->notes_remarks ?: '',
             'driverName' => $travelOrder->driver_name ?: '',
             'vehiclePlateNo' => $travelOrder->vehicle_plate_no ?: '',
+            // Browser preview uses the public URL; the printable PDF receives the local path.
+            'requestingSignaturePath' => $travelOrder->employee?->effective_signature_url,
         ]);
     }
 
@@ -221,14 +279,17 @@ class TravelOrderController extends Controller
         return view('travel-orders.acknowledgement-report', compact('travelOrder', 'divisionHead'));
     }
 
-    public function printAcknowledgementReport(TravelOrder $travelOrder): View
+    public function printAcknowledgementReport(
+        TravelOrder $travelOrder,
+        TravelAuthorityReportPdfExporter $exporter
+    ): Response
     {
         $this->authorizeTravelOrderAccess($travelOrder);
         $travelOrder->loadMissing(['employee.user', 'companions', 'recordsOfficer', 'regionalDirector']);
 
         $divisionHead = $this->divisionHeadFor($travelOrder);
 
-        return view('travel-orders.acknowledgement-report-print', compact('travelOrder', 'divisionHead'));
+        return $exporter->stream($travelOrder, $divisionHead);
     }
 
     public function viewAcknowledgementReportFile(TravelOrder $travelOrder)
@@ -299,8 +360,11 @@ class TravelOrderController extends Controller
         $role = strtolower((string) auth()->user()->role);
         $employeeId = auth()->user()->employee?->id;
         $remarks = $validated['remarks'] ?? null;
+        $updated = false;
 
-        DB::transaction(function () use ($validated, $travelOrder, $role, $employeeId, $remarks) {
+        abort_unless($employeeId && in_array($role, ['recordofficer', 'regionaldirector'], true), 403);
+
+        DB::transaction(function () use ($validated, $travelOrder, $role, $employeeId, $remarks, &$updated) {
             if ($role === 'recordofficer') {
                 if (($travelOrder->recordofficer_status ?? 'pending') !== 'pending') {
                     return;
@@ -330,6 +394,8 @@ class TravelOrderController extends Controller
                         "Travel authority {$travelOrder->ta_number} is ready for Regional Director approval."
                     ));
                 }
+
+                $updated = true;
             }
 
             if ($role === 'regionaldirector') {
@@ -349,10 +415,16 @@ class TravelOrderController extends Controller
                         ? "Your travel authority to {$travelOrder->places_of_travel} has been approved by the Regional Director."
                         : "Your travel authority to {$travelOrder->places_of_travel} was rejected by the Regional Director."
                 ));
+
+                $updated = true;
             }
 
             $travelOrder->save();
         });
+
+        if (! $updated) {
+            return back()->with('error', 'This travel authority has already been processed or is not ready for your approval.');
+        }
 
         $message = $validated['status'] === 'approved'
             ? 'Travel authority updated successfully.'
@@ -380,12 +452,16 @@ class TravelOrderController extends Controller
             return back()->with('error', 'Only approved travel authorities can accept a TAR submission.');
         }
 
+        $reviewStage = (string) ($travelOrder->tar_review_status ?? '');
+        $isFirstSubmission = $travelOrder->tar_submitted_at === null;
+        $isReturnedForCorrection = $reviewStage === 'returned';
+
+        if (! $isFirstSubmission && ! $isReturnedForCorrection) {
+            return back()->with('error', 'This TAR has already been submitted and cannot be overwritten unless it is returned for correction.');
+        }
+
         $validated = $request->validate([
-            'tar_activity' => 'required|string|max:255',
-            'tar_activity_date' => 'required|date',
-            'tar_venue' => 'required|string|max:255',
             'tar_participants_present' => 'required|string|max:2000',
-            'tar_dmw_participants' => 'required|string|max:2000',
             'tar_objectives' => 'required|string|max:5000',
             'tar_highlights' => 'required|string|max:5000',
             'tar_results' => 'required|string|max:5000',
@@ -402,6 +478,19 @@ class TravelOrderController extends Controller
             'tar_attachment' => 'nullable|file|mimes:pdf|max:5120',
             'tar_remarks' => 'nullable|string|max:1000',
         ]);
+
+        $travelOrder->loadMissing(['employee', 'companions']);
+        $dmwParticipants = collect([$travelOrder->employee])
+            ->merge($travelOrder->companions)
+            ->filter()
+            ->map(fn ($participant) => trim(collect([
+                $participant->firstname,
+                $participant->middlename,
+                $participant->lastname,
+                $participant->suffix,
+            ])->filter()->implode(' ')))
+            ->filter()
+            ->implode(', ');
 
         $attachmentPath = $travelOrder->tar_attachment_path;
         if ($request->hasFile('tar_attachment')) {
@@ -428,11 +517,11 @@ class TravelOrderController extends Controller
             'tar_rd_remarks' => null,
             'tar_approved_at' => null,
             'tar_remarks' => $validated['tar_remarks'] ?? null,
-            'tar_activity' => $validated['tar_activity'],
-            'tar_activity_date' => $validated['tar_activity_date'],
-            'tar_venue' => $validated['tar_venue'],
+            'tar_activity' => $travelOrder->purpose,
+            'tar_activity_date' => $travelOrder->travel_date_end?->toDateString(),
+            'tar_venue' => $travelOrder->places_of_travel,
             'tar_participants_present' => $validated['tar_participants_present'],
-            'tar_dmw_participants' => $validated['tar_dmw_participants'],
+            'tar_dmw_participants' => $dmwParticipants,
             'tar_objectives' => $validated['tar_objectives'],
             'tar_highlights' => $validated['tar_highlights'],
             'tar_results' => $validated['tar_results'],
@@ -658,15 +747,17 @@ class TravelOrderController extends Controller
         }
     }
 
-    private function generateTravelAuthorityNumber(): string
+    private function generateTravelAuthorityNumber(TravelOrder $travelOrder): string
     {
-        $today = now();
-        $datePart = $today->format('Y-m-d');
+        $createdAt = $travelOrder->created_at ?? now();
 
-        $sequence = TravelOrder::query()
-            ->lockForUpdate()
-            ->count() + 1;
+        return sprintf('TA-%s-%03d', $createdAt->format('Y-m-d'), $travelOrder->getKey());
+    }
 
-        return sprintf('TA-%s-%03d', $datePart, $sequence);
+    private function perPage(Request $request): int
+    {
+        $perPage = (int) $request->query('per_page', 5);
+
+        return in_array($perPage, [5, 10, 20, 50], true) ? $perPage : 5;
     }
 }

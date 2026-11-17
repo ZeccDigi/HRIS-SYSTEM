@@ -6,7 +6,10 @@ use App\Listeners\AuditLogListener;
 use App\Models\Employee;
 use App\Models\User;
 use App\Notifications\CtoRequestNotification;
+use App\Services\CocOvertimeVerificationService;
+use App\Services\CtoPdfExporter;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Notification;
 use App\Models\CtoRequest;
 use Illuminate\Http\RedirectResponse;
@@ -27,16 +30,9 @@ class MyCtoController extends Controller
 
         $search = trim((string) $request->query('search', ''));
         $year = (string) $request->query('year', now()->year);
-        $type = (string) $request->query('type', '');
+        $month = (string) $request->query('month', '');
         $status = (string) $request->query('status', '');
-
-        $typeOptions = $employee->ctoRequests()
-            ->get()
-            ->pluck('type_label')
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
+        $perPage = $this->perPage($request);
 
         $ctoRequests = $employee->ctoRequests()
             ->with(['chief', 'hrstaff', 'regionalDirector'])
@@ -49,20 +45,14 @@ class MyCtoController extends Controller
                         ->orWhere('date_start', 'like', "%{$search}%");
                 });
             })
-            ->when($type !== '', function ($query) use ($type) {
-                if (str_contains($type, 'earn')) {
-                    $query->where('type', 'earn');
-                } elseif (str_contains($type, 'use')) {
-                    $query->where('type', 'use');
-                }
-            })
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($year !== '', fn ($query) => $query->whereYear('created_at', $year))
+            ->when((int) $month >= 1 && (int) $month <= 12, fn ($query) => $query->whereMonth('date_start', (int) $month))
             ->latest()
-            ->paginate(5)
+            ->paginate($perPage)
             ->withQueryString();
 
-        return view('my-cto.index', compact('employee', 'ctoRequests', 'typeOptions', 'search', 'year', 'type', 'status'));
+        return view('my-cto.index', compact('employee', 'ctoRequests', 'search', 'year', 'month', 'status'));
     }
 
     public function create(): View
@@ -75,7 +65,37 @@ class MyCtoController extends Controller
         return view('my-cto.create', compact('employee'));
     }
 
+    public function overtimeDetails(Request $request, CocOvertimeVerificationService $cocOvertime): JsonResponse
+    {
+        $employee = auth()->user()->employee;
+        abort_unless($employee, 404, 'Employee record not found.');
+
+        $validated = $request->validate(['date' => ['required', 'date']]);
+
+        return response()->json($cocOvertime->forEmployeeDate($employee, $validated['date']));
+    }
+
+    public function edit(Request $request, CtoRequest $ctoRequest): View
+    {
+        abort_unless($ctoRequest->canBeEditedBy($request->user()->employee), 403);
+        $employee = $request->user()->employee;
+
+        return view('my-cto.create', compact('ctoRequest', 'employee'));
+    }
+
+    public function update(Request $request, CtoRequest $ctoRequest): RedirectResponse|Response
+    {
+        abort_unless($ctoRequest->canBeEditedBy($request->user()->employee), 403);
+
+        return $this->saveRequest($request, $ctoRequest);
+    }
+
     public function store(Request $request): RedirectResponse|Response
+    {
+        return $this->saveRequest($request);
+    }
+
+    private function saveRequest(Request $request, ?CtoRequest $existing = null): RedirectResponse|Response
     {
         $employee = auth()->user()->employee;
         if (! $employee) {
@@ -85,18 +105,65 @@ class MyCtoController extends Controller
         $validated = $request->validate([
             'type' => 'required|in:earn,use',
             'date_start' => 'required|date',
-            'date_end' => 'required|date|after_or_equal:date_start',
-            'hours' => 'required|numeric|min:0.5|max:999',
+            'date_end' => 'nullable|date|after_or_equal:date_start',
+            'hours' => 'nullable|numeric|min:0.5|max:999',
             'purpose' => 'required|string',
+            'overtime_authority_reference' => 'nullable|string|max:255',
             'attachment' => 'nullable|file|mimes:pdf|max:5120',
         ]);
 
-        $this->validateCtoDates($validated['date_start'], $validated['date_end']);
+        if ($validated['type'] === 'earn') {
+            $overtimeDate = Carbon::parse($validated['date_start'])->startOfDay();
+
+            if ($overtimeDate->gt(now()->startOfDay())) {
+                throw ValidationException::withMessages([
+                    'date_start' => 'Choose the date on which overtime was actually rendered.',
+                ]);
+            }
+
+            $validated['date_end'] = $validated['date_start'];
+            // DTR time-out verification is intentionally disabled for the
+            // current manual Earn COC process. The employee supplies the
+            // rendered hours and the approval chain authorizes crediting.
+            if (! isset($validated['hours'])) {
+                throw ValidationException::withMessages(['hours' => 'Enter the number of hours rendered.']);
+            }
+        } else {
+            if (blank($validated['date_end'] ?? null)) {
+                $validated['date_end'] = $validated['date_start'];
+            }
+
+            $this->validateCtoDates($validated['date_start'], $validated['date_end']);
+
+            if (! isset($validated['hours'])) {
+                throw ValidationException::withMessages(['hours' => 'Enter the number of CTO hours to use.']);
+            }
+        }
 
         if ($validated['type'] === 'use' && $employee->cto_balance < $validated['hours']) {
             return back()->withInput()->withErrors([
                 'hours' => 'Insufficient CTO balance. Available: '.$employee->cto_balance.' hour(s).',
             ]);
+        }
+
+        if ($existing) {
+            DB::transaction(function () use ($existing, $employee, $validated, $request) {
+                $current = CtoRequest::query()->lockForUpdate()->findOrFail($existing->id);
+                abort_unless($current->canBeEditedBy($employee), 403);
+                $current->update([
+                    'type' => $validated['type'] ?? null,
+                    'date_start' => $validated['date_start'] ?? null,
+                    'date_end' => $validated['date_end'] ?? null,
+                    'hours' => $validated['hours'] ?? null,
+                    'purpose' => $validated['purpose'] ?? null,
+                    'overtime_authority_reference' => $validated['type'] === 'earn' ? ($validated['overtime_authority_reference'] ?? null) : null,
+                    'cto_balance_before' => $employee->cto_balance,
+                    'cto_balance_after' => $validated['type'] === 'use' ? (float) $employee->cto_balance - (float) $validated['hours'] : null,
+                    'attachment_path' => $request->file('attachment')?->store('cto-attachments', 'public') ?? $current->attachment_path,
+                ]);
+            });
+
+            return redirect()->route('my-cto.show', $existing)->with('success', 'Request updated successfully.');
         }
 
         $attachmentPath = null;
@@ -107,7 +174,7 @@ class MyCtoController extends Controller
         $ctoBalanceBefore = (float) $employee->cto_balance;
         $ctoBalanceAfter = $validated['type'] === 'use'
             ? max(0, $ctoBalanceBefore - (float) $validated['hours'])
-            : $ctoBalanceBefore + (float) $validated['hours'];
+            : null;
 
         $duplicatePendingCto = $employee->ctoRequests()
             ->where('type', $validated['type'])
@@ -140,6 +207,10 @@ class MyCtoController extends Controller
             'date_end' => $validated['date_end'],
             'hours' => $validated['hours'],
             'purpose' => $validated['purpose'],
+            'overtime_authority_reference' => $validated['type'] === 'earn'
+                ? ($validated['overtime_authority_reference'] ?? null)
+                : null,
+            'exception_justification' => null,
             'attachment_path' => $attachmentPath,
             'cto_balance_before' => $ctoBalanceBefore,
             'cto_balance_after' => $ctoBalanceAfter,
@@ -198,7 +269,7 @@ class MyCtoController extends Controller
         return view('my-cto.show', compact('ctoRequest'));
     }
 
-    public function print(CtoRequest $ctoRequest): View
+    public function print(Request $request, CtoRequest $ctoRequest, CtoPdfExporter $exporter): View|Response
     {
         $employee = auth()->user()->employee;
 
@@ -215,7 +286,19 @@ class MyCtoController extends Controller
             abort(403);
         }
 
-        return view('my-cto.print', compact('ctoRequest'));
+        if ($request->boolean('preview')) {
+            return view('my-cto.print-availment-new', [
+                'ctoRequest' => $ctoRequest,
+                'isPrintDocument' => false,
+                'dmwLogoPath' => asset('images/official DMW.png'),
+                'bagongPilipinasLogoPath' => asset('images/bagong-pilipinas-logo.png'),
+                'applicantSignaturePath' => $ctoRequest->applicant_signature_path
+                    ? asset('storage/'.$ctoRequest->applicant_signature_path)
+                    : $ctoRequest->employee?->effective_signature_url,
+            ]);
+        }
+
+        return $exporter->stream($ctoRequest);
     }
 
     private function chiefCanReviewEmployee(?Employee $employee): bool
@@ -241,5 +324,12 @@ class MyCtoController extends Controller
                 ]);
             }
         }
+    }
+
+    private function perPage(Request $request): int
+    {
+        $perPage = (int) $request->query('per_page', 5);
+
+        return in_array($perPage, [5, 10, 20, 50], true) ? $perPage : 5;
     }
 }

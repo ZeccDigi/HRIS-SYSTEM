@@ -32,6 +32,17 @@ class LocatorSlip extends Model
         ];
     }
 
+    public function canBeEditedBy(?Employee $employee): bool
+    {
+        return $employee !== null
+            && (int) $this->employee_id === (int) $employee->id
+            && $this->status === 'pending'
+            && in_array($this->chief_approval_status, [null, 'pending'], true)
+            && $this->approved_by_chief_id === null
+            && $this->out_scanned_at === null
+            && $this->time_from === null;
+    }
+
     public function employee()
     {
         return $this->belongsTo(Employee::class);

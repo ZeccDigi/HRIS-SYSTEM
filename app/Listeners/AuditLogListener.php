@@ -43,8 +43,6 @@ class AuditLogListener
             'session_id' => session()->getId(),
         ]);
 
-        // Also record in Activity Audit table
-        self::logActivity('User Login', 'Auth', 'User successfully authenticated into the system.', $user);
     }
 
     /**
@@ -86,16 +84,6 @@ class AuditLogListener
             'login_at' => now(),
         ]);
 
-        // Also record failed login activity
-        ActivityAudit::create([
-            'user_id' => $user?->id,
-            'user_name' => $userName ?: $email,
-            'user_role' => $userRole ?: 'Visitor',
-            'action' => 'Failed Login',
-            'module' => 'Auth',
-            'description' => "Failed authentication attempt for email: {$email}",
-            'ip_address' => $ip,
-        ]);
     }
 
     /**
@@ -117,7 +105,6 @@ class AuditLogListener
             $audit->update(['logout_at' => now()]);
         }
 
-        self::logActivity('User Logout', 'Auth', 'User logged out of the system session.', $event->user);
     }
 
     /**

@@ -8,6 +8,5 @@
 </head>
 <body>
     @include('travel-orders.partials.acknowledgement-report-document')
-    <script>window.addEventListener('load', () => window.print());</script>
 </body>
 </html>

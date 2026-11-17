@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="title">{{ __('My Leave Requests') }}</x-slot>
 
-    <div class="p-3 sm:p-4 lg:p-5">
+    <div class="px-1 py-3 sm:px-2 lg:px-3">
         <div class="w-full" x-data="myLeaveApplicationTable()" x-init="init()">
             @if(session('success'))
                 <div class="mb-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700">
@@ -37,6 +37,7 @@
                 </div>
             </div>
 
+            <section class="rounded-2xl border border-slate-100 bg-white p-2 shadow-sm sm:p-3">
             <div x-data="{ tab: 'applications' }">
                 <!-- Tabs Navigation -->
                 <div class="mb-4 border-b border-gray-200">
@@ -128,12 +129,12 @@
                         </div>
 
                         <div class="w-40 shrink-0">
-                            <label for="my_leave_type" class="sr-only">{{ __('Filter by leave type') }}</label>
-                            <select id="my_leave_type" x-model="leaveType" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">{{ __('Leave Types') }}</option>
-                                @foreach($leaveTypes as $type)
-                                    <option value="{{ Str::lower($type) }}">{{ $type }}</option>
-                                @endforeach
+                            <label for="my_leave_month" class="sr-only">{{ __('Filter by month') }}</label>
+                            <select id="my_leave_month" x-model="month" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">{{ __('Months') }}</option>
+                                <option value="1">{{ __('January') }}</option><option value="2">{{ __('February') }}</option><option value="3">{{ __('March') }}</option><option value="4">{{ __('April') }}</option>
+                                <option value="5">{{ __('May') }}</option><option value="6">{{ __('June') }}</option><option value="7">{{ __('July') }}</option><option value="8">{{ __('August') }}</option>
+                                <option value="9">{{ __('September') }}</option><option value="10">{{ __('October') }}</option><option value="11">{{ __('November') }}</option><option value="12">{{ __('December') }}</option>
                             </select>
                         </div>
                         
@@ -146,30 +147,39 @@
                         <div class="w-full overflow-x-auto lg:overflow-x-visible">
                              <table class="w-full table-fixed divide-y divide-gray-100">
                                 <colgroup>
-                                    <col class="w-[13%]">
-                                    <col class="w-[15%]">
-                                    <col class="w-[17%]">
-                                    <col class="w-[19%]">
+                                    <col class="w-[14%]">
                                     <col class="w-[18%]">
-                                    <col class="w-[10%]">
-                                    <col class="w-[8%]">
+                                    <col class="w-[14%]">
+                                    <col class="w-[15%]">
+                                    <col class="w-[13%]">
+                                    <col class="w-[12%]">
+                                    <col class="w-[14%]">
                                 </colgroup>
                                 <thead class="bg-slate-50">
                                     <tr>
-                                        <th scope="col" class="break-words px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
-                                            Date Filed
-                                        </th>
-                                        <th scope="col" class="break-words px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
-                                            Leave Type
-                                        </th>
-                                        <th scope="col" class="break-words px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
-                                            Leave Certification
+                                        <th scope="col" class="break-words px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
+                                            <span class="whitespace-nowrap">Date Filed</span>
                                         </th>
                                         <th scope="col" class="break-words px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
-                                            Recommending Approval
+                                            <span class="whitespace-nowrap">Leave Type</span>
+                                        </th>
+                                        <th scope="col" class="break-words px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
+                                            <span class="inline-flex w-full flex-col items-center">
+                                                <span>Leave</span>
+                                                <span>Certification</span>
+                                            </span>
                                         </th>
                                         <th scope="col" class="break-words px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
-                                            Approval
+                                            <span class="inline-flex w-full flex-col items-center">
+                                                <span>Recommending</span>
+                                                <span>Approval</span>
+                                            </span>
+                                        </th>
+                                        <th scope="col" class="break-words px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
+                                            <span class="inline-flex w-full flex-col items-center">
+                                                <span>Final</span>
+                                                <span>Approval</span>
+                                            </span>
                                         </th>
                                         <th scope="col" class="break-words px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500 whitespace-normal">
                                             Status
@@ -231,27 +241,27 @@
                                             data-date-filed="{{ \Carbon\Carbon::parse($leaf->date_filed)->timestamp }}"
                                             data-leave-start="{{ \Carbon\Carbon::parse($leaf->start_date)->timestamp }}"
                                         >
-                                            <td class="px-3 py-3 align-middle">
+                                            <td class="px-2 py-3 text-center align-middle">
                                                 <div class="break-words text-sm font-medium leading-5 text-gray-700 whitespace-normal">
                                                     {{ \Carbon\Carbon::parse($leaf->date_filed)->format('M d, Y') }}
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3 align-middle">
-                                                <div class="w-full min-w-0 text-left text-sm font-bold text-gray-900 break-normal whitespace-normal">
+                                            <td class="px-2 py-3 text-center align-middle">
+                                                <div class="w-full min-w-0 text-center text-sm font-normal text-gray-900 break-normal whitespace-normal">
                                                     <span class="block break-normal whitespace-normal">{{ $leaveTypeName }}</span>
                                                 </div>
                                             </td>
-                                            <td class="px-2 py-3 text-center align-middle">
+                                            <td class="px-1 py-3 text-center align-middle">
                                                 <div class="flex min-w-0 items-center justify-center">
                                                     <span class="h-3 w-3 shrink-0 rounded-full {{ $approvalDotClass($leaf->hrstaff_status ?: 'pending') }}" title="{{ __('Leave Certification') }}: {{ ucfirst($leaf->hrstaff_status ?: 'pending') }}"></span>
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3 text-center align-middle">
+                                            <td class="px-1 py-3 text-center align-middle">
                                                 <div class="flex min-w-0 items-center justify-center">
                                                     <span class="h-3 w-3 shrink-0 rounded-full {{ $approvalDotClass($leaf->chief_status ?: 'pending') }}" title="{{ __('Recommending Approval') }}: {{ ucfirst($leaf->chief_status ?: 'pending') }}"></span>
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3 text-center align-middle">
+                                            <td class="px-1 py-3 text-center align-middle">
                                                 <div class="flex min-w-0 items-center justify-center">
                                                     <span class="h-3 w-3 shrink-0 rounded-full {{ $approvalDotClass($leaf->rd_status ?: 'pending') }}" title="{{ __('Approval') }}: {{ ucfirst($leaf->rd_status ?: 'pending') }}"></span>
                                                 </div>
@@ -321,10 +331,16 @@
                                 </tbody>
                             </table>
                         </div>
-                        @include('partials.table-pagination', ['paginator' => $leaves, 'label' => __('leave requests')])
+                        @include('partials.table-pagination', [
+                            'paginator' => $leaves,
+                            'label' => __('leave requests'),
+                            'perPageOptions' => [5, 10, 20, 50],
+                            'perPageSelectId' => 'my_leave_per_page',
+                        ])
                     </div>
                 </div>
             </div>
+            </section>
 
             <template x-teleport="body">
                 <div
@@ -530,7 +546,7 @@
                 selectedId: initialSelectedId ? String(initialSelectedId) : '',
                 search: @js($search),
                 year: @js((string) $year),
-                leaveType: @js($leaveType),
+                month: @js($month),
                 status: @js($status),
                 rows: [],
                 noResults: false,
@@ -564,8 +580,8 @@
                         url.searchParams.set('year', this.year);
                     }
 
-                    if (this.leaveType) {
-                        url.searchParams.set('leave_type', this.leaveType);
+                    if (this.month) {
+                        url.searchParams.set('month', this.month);
                     }
 
                     if (this.status) {

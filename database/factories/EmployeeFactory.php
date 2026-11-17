@@ -29,7 +29,7 @@ class EmployeeFactory extends Factory
                 'Migrant Workers Processing Division',
                 'Finance and Administrative Division',
             ]),
-            'role' => $this->faker->randomElement(['EMPLOYEE', 'HRSTAFF', 'CHIEF', 'REGIONALDIRECTOR']),
+            'account_role' => $this->faker->randomElement(['EMPLOYEE', 'HRSTAFF', 'CHIEF', 'REGIONALDIRECTOR']),
             'user_id' => User::factory(),
         ];
     }

@@ -41,28 +41,28 @@
                     rawScans: []
                 }"
             >
-                <div class="no-print flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div class="max-w-xl">
+                <div class="no-print flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
                         <h1 class="text-2xl font-black tracking-tight text-slate-900">
-                            {{ __('Daily Attendance Monitoring') }}
+                            {{ __('Attendance Overview') }}
                         </h1>
                     </div>
 
-                    <div class="relative w-full max-w-sm lg:ml-auto lg:w-80" @click.outside="activePicker = false">
-                            <button
-                                id="attendance_date_picker"
-                                type="button"
-                                @click.stop="toggleDatePicker()"
-                                class="flex h-11 w-full items-center justify-between rounded-xl border border-gray-100 bg-gray-50/50 px-4 text-left text-sm font-bold text-gray-900 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                :class="activePicker ? 'border-indigo-500 ring-2 ring-indigo-500' : 'hover:border-indigo-200'"
-                            >
-                                <span x-text="formatDate(date)"></span>
-                                <svg class="h-5 w-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                            </button>
+                    <div class="relative w-full max-w-sm sm:w-80" @click.outside="activePicker = false">
+                        <button
+                            id="attendance_date_picker"
+                            type="button"
+                            @click.stop="toggleDatePicker()"
+                            class="flex h-11 w-full items-center justify-between rounded-xl border border-gray-100 bg-white px-4 text-left text-sm font-bold text-gray-900 shadow-sm transition hover:border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            :class="activePicker ? 'border-indigo-500 ring-2 ring-indigo-500' : 'hover:border-indigo-200'"
+                        >
+                            <span x-text="formatDate(date)"></span>
+                            <svg class="h-5 w-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </button>
 
-                            <div x-show="activePicker" x-transition x-cloak @click.stop class="absolute right-0 z-50 mt-2 w-full rounded-2xl border border-gray-100 bg-white p-4 shadow-2xl">
+                        <div x-show="activePicker" x-transition x-cloak @click.stop class="absolute right-0 z-50 mt-2 w-full rounded-2xl border border-gray-100 bg-white p-4 shadow-2xl">
                             <div class="mb-3 space-y-2">
                                 <select
                                     :value="String(calendarYear)"
@@ -118,12 +118,12 @@
                                     </div>
                                 </template>
                             </div>
-
                         </div>
                     </div>
                 </div>
 
-                <div class="no-print mt-4 border-b border-slate-200 bg-slate-50/70 p-3">
+
+                <div class="no-print mt-4">
                     <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
                         <div class="relative min-w-0 sm:flex-1">
                             <label for="attendance_search" class="sr-only">{{ __('Search attendance records') }}</label>
@@ -179,13 +179,13 @@
                         <table class="w-full table-fixed border-collapse text-left text-[11px] leading-tight">
                             <thead>
                                 <tr class="border-b border-slate-200 bg-slate-50 text-[9px] font-black uppercase tracking-wider text-slate-400">
-                                    <th class="w-[24%] px-3 py-2.5">Employee</th>
-                                    <th class="w-[22%] px-3 py-2.5">Department</th>
-                                    <th class="w-[13%] px-3 py-2.5">Position</th>
-                                    <th class="w-[8%] px-3 py-2.5">AM In</th>
-                                    <th class="w-[8%] px-3 py-2.5">AM Out</th>
-                                    <th class="w-[8%] px-3 py-2.5">PM In</th>
-                                    <th class="w-[8%] px-3 py-2.5">PM Out</th>
+                                    <th class="w-[16%] px-3 py-2.5">Employee</th>
+                                    <th class="w-[24%] px-3 py-2.5">Department</th>
+                                    <th class="w-[15%] px-3 py-2.5">Position</th>
+                                    <th class="w-[9%] px-3 py-2.5">AM In</th>
+                                    <th class="w-[9%] px-3 py-2.5">AM Out</th>
+                                    <th class="w-[9%] px-3 py-2.5">PM In</th>
+                                    <th class="w-[9%] px-3 py-2.5">PM Out</th>
                                     <th class="w-[9%] px-3 py-2.5 text-center">Actions</th>
                                 </tr>
                             </thead>
@@ -250,57 +250,36 @@
                                         data-employment-status="{{ Str::lower($employee->employment_status ?? 'n/a') }}"
                                     >
                                         <td class="px-3 py-2.5 align-top">
-                                            <div class="max-w-[10rem] whitespace-normal break-words">
+                                            <div class="whitespace-normal break-words">
                                                 <p class="text-[11px] font-bold leading-tight text-slate-900">{{ $displayName ?: 'N/A' }}</p>
                                                 <p class="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400">{{ $employee->employment_status ?: 'N/A' }}</p>
                                             </div>
                                         </td>
                                         <td class="px-3 py-2.5 align-top text-[11px] font-semibold text-slate-600">
-                                            <div class="max-w-[12rem] whitespace-normal break-words">{{ $employee->division ?: 'N/A' }}</div>
+                                            <div class="whitespace-normal break-words">{{ $employee->division ?: 'N/A' }}</div>
                                         </td>
                                         <td class="px-3 py-2.5 align-top text-[11px] font-semibold text-slate-600">
-                                            <div class="max-w-[11rem] whitespace-normal break-words">{{ $employee->position ?: 'N/A' }}</div>
+                                            <div class="whitespace-normal break-words">{{ $employee->position ?: 'N/A' }}</div>
                                         </td>
-                                        <td class="px-3 py-2.5 align-top text-[11px] font-bold whitespace-normal break-words {{ ! $item['time_in'] && $item['approved_absence'] ? 'text-blue-700' : 'text-slate-900' }}">
-                                            {{ $item['time_in'] ? \Carbon\Carbon::parse($item['time_in'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A') }}
+                                        <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['time_in'] && isset($item['slot_labels']['time_in']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">
+                                            @if($item['time_in']){{ \Carbon\Carbon::parse($item['time_in'])->format('h:i A') }}@elseif(isset($item['slot_labels']['time_in']))<x-dtr-reference :value="$item['slot_labels']['time_in']" />@else N/A @endif
                                         </td>
-                                        <td class="px-3 py-2.5 align-top text-[11px] font-bold whitespace-normal break-words {{ ! $item['am_out'] && $item['approved_absence'] ? 'text-blue-700' : 'text-slate-900' }}">{{ $item['am_out'] ? \Carbon\Carbon::parse($item['am_out'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A') }}</td>
-                                        <td class="px-3 py-2.5 align-top text-[11px] font-bold whitespace-normal break-words {{ ! $item['pm_in'] && $item['approved_absence'] ? 'text-blue-700' : 'text-slate-900' }}">{{ $item['pm_in'] ? \Carbon\Carbon::parse($item['pm_in'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A') }}</td>
-                                        <td class="px-3 py-2.5 align-top text-[11px] font-bold whitespace-normal break-words {{ ! $item['time_out'] && $item['approved_absence'] ? 'text-blue-700' : 'text-slate-900' }}">{{ $item['time_out'] ? \Carbon\Carbon::parse($item['time_out'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A') }}</td>
+                                        <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['am_out'] && isset($item['slot_labels']['am_out']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">@if($item['am_out']){{ \Carbon\Carbon::parse($item['am_out'])->format('h:i A') }}@elseif(isset($item['slot_labels']['am_out']))<x-dtr-reference :value="$item['slot_labels']['am_out']" />@else N/A @endif</td>
+                                        <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['pm_in'] && isset($item['slot_labels']['pm_in']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">@if($item['pm_in']){{ \Carbon\Carbon::parse($item['pm_in'])->format('h:i A') }}@elseif(isset($item['slot_labels']['pm_in']))<x-dtr-reference :value="$item['slot_labels']['pm_in']" />@else N/A @endif</td>
+                                        <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['time_out'] && isset($item['slot_labels']['time_out']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">@if($item['time_out']){{ \Carbon\Carbon::parse($item['time_out'])->format('h:i A') }}@elseif(isset($item['slot_labels']['time_out']))<x-dtr-reference :value="$item['slot_labels']['time_out']" />@else N/A @endif</td>
                                         <td class="px-3 py-2.5 text-center align-top">
-                                            <button
-                                                type="button"
-                                                data-scans="{{ json_encode($scans) }}"
-                                                data-name="{{ $displayName }}"
-                                                data-no="{{ $employeeNumber }}"
-                                                data-division="{{ $employee->division ?: 'N/A' }}"
-                                                data-position="{{ $employee->position ?: 'N/A' }}"
-                                                data-status="{{ $employee->employment_status ?: 'N/A' }}"
-                                                data-rfid="{{ $employee->rfid_number ?: 'N/A' }}"
-                                                data-attendance-status="{{ $item['status'] }}"
-                                                data-hours="{{ $item['hours_worked'] }} hrs"
-                                                data-late="{{ $item['late_minutes'] > 0 ? number_format($item['late_minutes'], 3) . ' min' : 'N/A' }}"
-                                                data-undertime="{{ $item['undertime_minutes'] > 0 ? number_format($item['undertime_minutes'], 3) . ' min' : 'N/A' }}"
-                                                data-remarks="{{ $item['remarks'] ?: 'N/A' }}"
-                                                @click="
-                                                    rawScans = JSON.parse($el.dataset.scans);
-                                                    selectedEmployeeName = $el.dataset.name;
-                                                    selectedEmployeeNo = $el.dataset.no;
-                                                    selectedDepartment = $el.dataset.division;
-                                                    selectedPosition = $el.dataset.position;
-                                                    selectedEmploymentStatus = $el.dataset.status;
-                                                    selectedRfid = $el.dataset.rfid;
-                                                    selectedStatus = $el.dataset.attendanceStatus;
-                                                    selectedHoursWorked = $el.dataset.hours;
-                                                    selectedLateMinutes = $el.dataset.late;
-                                                    selectedUndertimeMinutes = $el.dataset.undertime;
-                                                    selectedRemarks = $el.dataset.remarks;
-                                                    rawScansModalOpen = true;
-                                                "
-                                                class="rounded-lg bg-slate-100 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-700 transition hover:bg-slate-200"
+                                            <a
+                                                href="{{ route('dtr.employee', [
+                                                    'employee' => $employee,
+                                                    'month' => \Carbon\Carbon::parse($selectedDate)->month,
+                                                    'year' => \Carbon\Carbon::parse($selectedDate)->year,
+                                                ]) }}"
+                                                title="{{ __('View DTR') }}"
+                                                aria-label="{{ __('View DTR') }}"
+                                                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition hover:bg-indigo-50"
                                             >
-                                                {{ __('View') }}
-                                            </button>
+                                                <i class="fa-solid fa-eye text-sm" aria-hidden="true"></i>
+                                            </a>
                                         </td>
                                     </tr>
                                 @empty

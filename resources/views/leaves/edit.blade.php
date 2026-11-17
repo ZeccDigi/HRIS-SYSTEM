@@ -27,11 +27,14 @@
                             selectedId: '{{ old('leave_type_id', $leaf->leave_type_id) }}',
                             selectedName: '',
                             detailType: {{ Js::from(old('leave_detail_type', $leaf->leave_detail_type ?? '')) }},
+                            monetization: {{ Js::from((bool) old('monetization_requested', str_contains(strtolower((string) $leaf->reason), 'monetization'))) }},
                             types: {{ Js::from($leaveTypePicker) }},
                             get info() { return this.types[this.selectedId] || null; },
                             get normalizedName() { return (this.info?.name || '').toLowerCase(); },
+                            get isVacationLeave() { return this.normalizedName.includes('vacation'); },
                             get isVacationLike() { return this.normalizedName.includes('vacation') || this.normalizedName.includes('special privilege'); },
                             get isSickLeave() { return this.normalizedName.includes('sick'); },
+                            get canMonetize() { return this.isVacationLeave || this.isSickLeave; },
                             get isWomenLeave() { return this.normalizedName.includes('women'); },
                             get isStudyLeave() { return this.normalizedName.includes('study'); },
                             defaultDetailType() {
@@ -68,6 +71,7 @@
                                 this.open = false;
                                 this.applySelectedPolicy();
                                 this.ensureDetailType();
+                                if (!this.canMonetize) this.monetization = false;
                             },
                             clearSelectionIfSearching() {
                                 if (this.query !== this.selectedName) {
@@ -205,6 +209,15 @@
                                     </div>
                                 </div>
 
+                                <div x-show="canMonetize" class="mt-4 border-t border-indigo-100 pt-3">
+                                    <p class="text-xs font-semibold text-gray-600">{{ __('Other Purpose') }}</p>
+                                    <label class="mt-2 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold">
+                                        <input type="checkbox" name="monetization_requested" value="1" x-model="monetization" :disabled="!canMonetize">
+                                        {{ __('Monetization of Leave Credits') }}
+                                    </label>
+                                    <x-input-error class="mt-2" :messages="$errors->get('monetization_requested')" />
+                                </div>
+
                                 <x-input-error class="mt-2" :messages="$errors->get('leave_detail_type')" />
                                 <x-input-error class="mt-2" :messages="$errors->get('leave_detail')" />
                             </div>
@@ -251,13 +264,6 @@
                                 <label class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold"><input type="radio" name="commutation_requested" value="1" {{ (string) $commutation === '1' ? 'checked' : '' }}> {{ __('Requested') }}</label>
                             </div>
                             <x-input-error class="mt-2" :messages="$errors->get('commutation_requested')" />
-                        </div>
-
-                        <!-- Reason -->
-                        <div>
-                            <x-input-label for="reason" :value="__('Reason for Leave')" class="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] mb-2" />
-                            <textarea id="reason" name="reason" class="mt-1 block w-full border-gray-100 focus:border-indigo-500 focus:ring-indigo-500 rounded-xl shadow-sm text-sm font-bold py-3 px-4 bg-gray-50/50" rows="5" required>{{ old('reason', $leaf->reason) }}</textarea>
-                            <x-input-error class="mt-2" :messages="$errors->get('reason')" />
                         </div>
 
                         <div class="flex items-center justify-end gap-6 pt-6 border-t border-gray-50">

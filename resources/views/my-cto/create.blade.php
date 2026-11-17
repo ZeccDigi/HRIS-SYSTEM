@@ -47,7 +47,7 @@
             }
         </style>
     @endif
-    <x-slot name="title">{{ __('File CTO Request') }}</x-slot>
+    <x-slot name="title">{{ isset($ctoRequest) ? __('Edit CTO Request') : __('File CTO Request') }}</x-slot>
 
     <div class="py-12 modal-form-shell">
         <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
@@ -56,15 +56,16 @@
                 <p class="text-sm text-gray-500 mb-8">Available balance: <span class="font-bold text-indigo-600">{{ number_format($employee->cto_balance, 1) }} hour(s)</span></p>
 
                 <form
-                    action="{{ route('my-cto.store', request()->boolean('modal') ? ['modal' => 1] : []) }}"
+                    action="{{ isset($ctoRequest) ? route('my-cto.update', $ctoRequest) : (route('my-cto.store', request()->boolean('modal') ? ['modal' => 1] : [])) }}"
                     method="POST"
                     enctype="multipart/form-data"
                     class="space-y-6"
-                    x-data="ctoRequestForm('{{ old('type', 'earn') }}', '{{ old('date_start') }}', '{{ old('date_end') }}', '{{ now()->toDateString() }}')"
+                    x-data="ctoRequestForm('{{ old('type', ($ctoRequest ?? null)?->type ?? 'use') }}', '{{ old('date_start', ($ctoRequest ?? null)?->date_start?->toDateString()) }}', '{{ old('date_end', ($ctoRequest ?? null)?->date_end?->toDateString()) }}', '{{ now()->toDateString() }}')"
                     x-init="init()"
                     @submit="submitting = true"
                 >
                     @csrf
+                    @isset($ctoRequest) @method('PUT') @endisset
                     @if(request()->boolean('modal'))
                         <input type="hidden" name="modal" value="1">
                     @endif
@@ -73,26 +74,35 @@
                     <div>
                         <label for="type" class="block text-sm font-bold text-gray-700 mb-1">{{ __('Request Type') }} <span class="text-red-500">*</span></label>
                         <select id="type" name="type" x-model="type" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" required>
-                            <option value="earn">Earn CTO - Overtime / Extra Work</option>
-                            <option value="use">Use CTO - Apply Time Off</option>
+                            <option value="use" @selected(old('type', ($ctoRequest ?? null)?->type ?? 'use') === 'use')>Use CTO - Apply Time Off</option>
+                            <option value="earn" @selected(old('type', ($ctoRequest ?? null)?->type) === 'earn')>Earn COC - Overtime / Extra Work</option>
                         </select>
                         @error('type') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                     </div>
 
                     {{-- Dates --}}
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <template x-if="type === 'earn'">
+                    <div>
+                        <x-weekday-date-picker field="date_start" :label="__('Overtime Date')" model="dateStart" />
+                        <input type="hidden" name="date_end" :value="dateStart">
+                        <p class="mt-2 text-xs leading-5 text-slate-500">Choose the date you rendered overtime. Earn COC is based on the actual PM time-out in your DTR.</p>
+                    </div>
+                    </template>
+
+                    <template x-if="type === 'use'">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <x-weekday-date-picker field="date_start" :label="__('Date From')" model="dateStart" />
                         <x-weekday-date-picker field="date_end" :label="__('Date To')" model="dateEnd" />
                     </div>
+                    </template>
 
-                    {{-- Hours --}}
                     <div>
                         <label for="hours" class="block text-sm font-bold text-gray-700 mb-1">
                             <span x-show="type === 'earn'">Hours Rendered</span>
                             <span x-show="type === 'use'">Hours to Use</span>
                             <span class="text-red-500">*</span>
                         </label>
-                        <input type="number" id="hours" name="hours" value="{{ old('hours') }}" step="0.5" min="0.5" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="e.g. 8" required>
+                        <input type="number" id="hours" name="hours" value="{{ old('hours', ($ctoRequest ?? null)?->hours) }}" step="0.5" min="0.5" required class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" x-bind:placeholder="type === 'earn' ? 'e.g. 3' : 'e.g. 8'">
                         @error('hours') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                     </div>
 
@@ -103,8 +113,14 @@
                             <span x-show="type === 'use'">Purpose / Reason</span>
                             <span class="text-red-500">*</span>
                         </label>
-                        <textarea id="purpose" name="purpose" rows="4" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="Provide details..." required>{{ old('purpose') }}</textarea>
+                        <textarea id="purpose" name="purpose" rows="4" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="Provide details..." required>{{ old('purpose', ($ctoRequest ?? null)?->purpose) }}</textarea>
                         @error('purpose') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div x-show="type === 'earn'" x-cloak>
+                        <label for="overtime_authority_reference" class="mb-1 block text-sm font-bold text-gray-700">Overtime Memo / Authority Reference</label>
+                        <input id="overtime_authority_reference" name="overtime_authority_reference" value="{{ old('overtime_authority_reference', ($ctoRequest ?? null)?->overtime_authority_reference) }}" type="text" class="block w-full rounded-xl border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="e.g. Office Order No. 2026-014 or memo title">
+                        <p class="mt-1 text-xs text-slate-500">Add the memo or office-order reference when one was issued.</p>
                     </div>
 
                     {{-- Attach File --}}
@@ -171,7 +187,7 @@
         x-bind:disabled="submitting"
         class="rounded-xl bg-indigo-600 px-8 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-200 transition-all hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
     >
-        <span x-show="!submitting">{{ __('Submit Request') }}</span>
+        <span x-show="!submitting">{{ isset($ctoRequest) ? __('Save Changes') : __('Submit Request') }}</span>
         <span x-show="submitting" x-cloak>{{ __('Submitting...') }}</span>
     </button>
 </div>
@@ -244,6 +260,10 @@
                 isDisabled(value, field) {
                     const date = this.toDate(value);
                     const day = date.getDay();
+
+                    if (this.type === 'earn') {
+                        return value > this.minDate;
+                    }
 
                     if (value < this.minDate || day === 0 || day === 6) return true;
 

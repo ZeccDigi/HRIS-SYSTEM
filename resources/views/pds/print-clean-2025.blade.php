@@ -44,7 +44,7 @@
 <body>
 <div class="toolbar">
     <a href="{{ route('pds.index') }}">Back</a>
-    <button type="button" onclick="window.print()">Print PDS</button>
+    <a href="{{ route('pds.download', ['print' => 1]) }}" target="_blank" rel="noopener noreferrer">Print PDS</a>
 </div>
 {{-- PAGE 1 --}}
 <div class="page">

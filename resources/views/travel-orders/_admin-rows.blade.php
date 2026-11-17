@@ -139,26 +139,27 @@
         data-manage-travel-row="{{ $rowSection }}"
         data-search="{{ $searchText }}"
         data-type="{{ $order->travel_type }}"
+        data-status="{{ strtolower((string) $order->status) }}"
         data-employee="{{ strtolower($employeeName) }}"
         data-filed="{{ $order->created_at?->timestamp ?? 0 }}"
     >
         {{-- Date filed --}}
-        <td class="px-3 py-3 align-top text-xs text-gray-700">
+        <td class="px-2 py-2.5 align-top text-xs text-gray-700">
             {{ $order->created_at?->format('M d, Y') ?? __('N/A') }}
         </td>
 
         {{-- TA stamp --}}
-        <td class="break-words px-3 py-3 align-top text-xs font-bold text-gray-900">
+        <td class="break-words px-2 py-2.5 align-top text-xs font-bold text-gray-900">
             {{ $taNumber }}
         </td>
 
         {{-- Employee --}}
-        <td class="break-words px-3 py-3 align-top text-xs font-semibold text-gray-900">
+        <td class="break-words px-2 py-2.5 align-top text-xs font-semibold text-gray-900">
             {{ $employeeName ?: __('N/A') }}
         </td>
 
         {{-- Date of travel --}}
-        <td class="px-3 py-3 align-top text-xs text-gray-700">
+        <td class="px-2 py-2.5 align-top text-xs text-gray-700">
             <div>
                 {{ $order->travel_date_start?->format('M d, Y') ?? __('N/A') }}
             </div>
@@ -175,13 +176,13 @@
         </td>
 
         {{-- Destination --}}
-        <td class="break-words px-3 py-3 align-top text-xs font-semibold text-gray-900">
+        <td class="break-words px-2 py-2.5 align-top text-xs font-semibold text-gray-900">
             {{ $order->places_of_travel ?: __('N/A') }}
         </td>
 
         {{-- Record officer --}}
         {{-- Record officer status --}}
-<td class="px-3 py-3 align-top">
+<td class="px-2 py-2.5 align-top">
     <div class="flex justify-center">
         <span
             class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full
@@ -196,7 +197,7 @@
 </td>
 
         {{-- Regional director status --}}
-<td class="px-3 py-3 align-top">
+<td class="px-2 py-2.5 align-top">
     <div class="flex justify-center">
         <span
             class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full
@@ -210,7 +211,7 @@
     </div>
 </td>
         {{-- Main status --}}
-        <td class="px-3 py-3 align-top">
+        <td class="px-2 py-2.5 align-top">
             <span
                 class="inline-flex rounded-full border px-2 py-1 text-[11px] font-bold uppercase
                     {{ $statusClasses[$mainStatus]
@@ -221,12 +222,12 @@
         </td>
 
         {{-- TAR deadline --}}
-        <td class="px-3 py-3 align-top text-xs text-gray-700">
+        <td class="px-2 py-2.5 align-top text-xs text-gray-700">
             {{ $tarDeadline?->format('M d, Y') ?? __('N/A') }}
         </td>
 
         {{-- AR status --}}
-        <td class="px-3 py-3 align-top text-xs font-semibold">
+        <td class="px-2 py-2.5 align-top text-xs font-semibold">
             @if($computedTarStatus === 'submitted')
                 <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">
                     <i class="fa-solid fa-file-lines"></i>
@@ -248,8 +249,8 @@
         </td>
 
         {{-- Actions --}}
-        <td class="px-3 py-3 text-center align-top">
-            <div class="mx-auto grid w-fit grid-cols-2 place-items-center gap-x-2 gap-y-1">
+        <td class="px-2 py-2.5 text-center align-top">
+            <div class="mx-auto grid w-[104px] grid-cols-3 place-items-center gap-1 whitespace-nowrap">
                 <a
                     href="{{ route('travel-orders.show', $order) }}"
                     class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition hover:bg-indigo-50 hover:text-indigo-900"
@@ -285,6 +286,8 @@
                     >
                         <i class="fa-solid fa-file-circle-check text-sm"></i>
                     </a>
+                @else
+                    <span class="h-8 w-8" aria-hidden="true"></span>
                 @endif
 
             </div>

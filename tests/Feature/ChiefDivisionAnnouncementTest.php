@@ -50,7 +50,7 @@ test('chief announcements are office orders delivered only to their division', f
         ->get(route('announcements.view'))
         ->assertOk()
         ->assertSee('Processing Division Schedule')
-        ->assertSee('MWProcD - Division Chief');
+        ->assertSee('Chief User');
 
     $this->actingAs($otherDivisionEmployee)
         ->get(route('announcements.view'))

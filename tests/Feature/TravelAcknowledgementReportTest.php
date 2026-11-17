@@ -24,6 +24,7 @@ function travelReportEmployee(string $firstName = 'Anna', string $role = 'employ
 }
 
 test('employee submits structured post activity report and views the official form', function () {
+    $this->travelTo(\Carbon\Carbon::parse('2026-11-17 09:00:00', 'Asia/Manila'));
     Notification::fake();
     Storage::fake('public');
     [$user, $employee] = travelReportEmployee();
@@ -43,12 +44,17 @@ test('employee submits structured post activity report and views the official fo
         'tar_status' => 'pending',
     ]);
 
+    $this->actingAs($user)->get(route('travel-orders.index'))
+        ->assertOk()
+        ->assertSee('Overdue')
+        ->assertSee('Upload overdue TAR');
+
     $response = $this->actingAs($user)->post(route('travel-orders.submit-tar', $travelOrder), [
-        'tar_activity' => 'Regional Coordination Workshop',
-        'tar_activity_date' => '2026-11-05',
-        'tar_venue' => 'DMW Regional Office XI',
+        'tar_activity' => 'Tampered activity value',
+        'tar_activity_date' => '2026-12-31',
+        'tar_venue' => 'Tampered venue value',
         'tar_participants_present' => 'Twenty regional representatives',
-        'tar_dmw_participants' => 'Anna Garcia and DMW XI staff',
+        'tar_dmw_participants' => 'Tampered participant value',
         'tar_objectives' => 'Align regional implementation procedures.',
         'tar_highlights' => 'The group reviewed the implementation timeline.',
         'tar_results' => 'A common implementation plan was adopted.',
@@ -65,7 +71,10 @@ test('employee submits structured post activity report and views the official fo
     $travelOrder->refresh();
     expect($travelOrder->tar_status)->toBe('submitted')
         ->and($travelOrder->tar_review_status)->toBe('pending_hr')
-        ->and($travelOrder->tar_activity)->toBe('Regional Coordination Workshop')
+        ->and($travelOrder->tar_activity)->toBe('Regional coordination meeting')
+        ->and($travelOrder->tar_activity_date?->toDateString())->toBe('2026-11-05')
+        ->and($travelOrder->tar_venue)->toBe('Davao City')
+        ->and($travelOrder->tar_dmw_participants)->toBe('Anna Garcia')
         ->and($travelOrder->tar_attachments)->toBe(['photo_documentation', 'program_flow', 'others'])
         ->and($travelOrder->tar_other_attachment)->toBe('Signed attendance sheet');
 
@@ -73,11 +82,104 @@ test('employee submits structured post activity report and views the official fo
         ->get(route('travel-orders.ar.show', $travelOrder))
         ->assertOk()
         ->assertSee('TRAVEL AUTHORITY REPORT (TAR)')
-        ->assertSee('Regional Coordination Workshop')
+        ->assertSee('Regional Coordination Meeting')
         ->assertSee('Align regional implementation procedures.')
         ->assertSee('Signed attendance sheet')
         ->assertSee('Supporting Document')
         ->assertSee(route('travel-orders.ar.file', $travelOrder), false);
+});
+
+test('submitted TAR cannot be overwritten unless returned for correction', function () {
+    Notification::fake();
+    [$user, $employee] = travelReportEmployee('Protected Report');
+
+    $travelOrder = TravelOrder::create([
+        'employee_id' => $employee->id,
+        'ta_number' => 'TA-2026-11-05-101',
+        'travel_type' => 'local',
+        'travel_date_start' => '2026-11-05',
+        'travel_date_end' => '2026-11-06',
+        'places_of_travel' => 'Davao City',
+        'purpose' => 'Protected activity',
+        'status' => 'approved',
+        'tar_status' => 'submitted',
+        'tar_submitted_at' => now(),
+        'tar_review_status' => 'pending_hr',
+        'tar_objectives' => 'Original objective',
+    ]);
+
+    $this->actingAs($user)->post(route('travel-orders.submit-tar', $travelOrder), [
+        'tar_participants_present' => 'Participants',
+        'tar_objectives' => 'Overwritten objective',
+        'tar_highlights' => 'Highlights',
+        'tar_results' => 'Results',
+        'tar_recommendations' => 'Recommendations',
+        'tar_commitments' => 'Commitments',
+    ])->assertSessionHas('error');
+
+    expect($travelOrder->refresh()->tar_objectives)->toBe('Original objective');
+});
+
+test('returned TAR can be corrected and resubmitted', function () {
+    Notification::fake();
+    [$user, $employee] = travelReportEmployee('Returned Report');
+
+    $travelOrder = TravelOrder::create([
+        'employee_id' => $employee->id,
+        'ta_number' => 'TA-2026-11-05-102',
+        'travel_type' => 'local',
+        'travel_date_start' => '2026-11-05',
+        'travel_date_end' => '2026-11-06',
+        'places_of_travel' => 'Davao City',
+        'purpose' => 'Corrected activity',
+        'status' => 'approved',
+        'tar_status' => 'submitted',
+        'tar_submitted_at' => now()->subDay(),
+        'tar_review_status' => 'returned',
+        'tar_hr_status' => 'returned',
+    ]);
+
+    $this->actingAs($user)->post(route('travel-orders.submit-tar', $travelOrder), [
+        'tar_participants_present' => 'Participants',
+        'tar_objectives' => 'Corrected objective',
+        'tar_highlights' => 'Corrected highlights',
+        'tar_results' => 'Corrected results',
+        'tar_recommendations' => 'Corrected recommendations',
+        'tar_commitments' => 'Corrected commitments',
+    ])->assertRedirect(route('travel-orders.index'));
+
+    $travelOrder->refresh();
+    expect($travelOrder->tar_review_status)->toBe('pending_hr')
+        ->and($travelOrder->tar_hr_status)->toBe('pending')
+        ->and($travelOrder->tar_objectives)->toBe('Corrected objective');
+});
+
+test('regional director cannot approve TA before record officer review', function () {
+    Notification::fake();
+    [$employeeUser, $employee] = travelReportEmployee('TA Owner');
+    [$rdUser] = travelReportEmployee('Early Director', 'regionaldirector');
+
+    $travelOrder = TravelOrder::create([
+        'employee_id' => $employee->id,
+        'ta_number' => 'TA-2026-11-05-103',
+        'travel_type' => 'local',
+        'travel_date_start' => '2026-11-05',
+        'travel_date_end' => '2026-11-06',
+        'places_of_travel' => 'Davao City',
+        'purpose' => 'Approval order test',
+        'status' => 'pending',
+        'recordofficer_status' => 'pending',
+        'rd_status' => 'pending',
+    ]);
+
+    $this->actingAs($rdUser)->put(route('travel-orders.update-status', $travelOrder), [
+        'status' => 'approved',
+    ])->assertSessionHas('error');
+
+    $travelOrder->refresh();
+    expect($travelOrder->status)->toBe('pending')
+        ->and($travelOrder->rd_status)->toBe('pending')
+        ->and($travelOrder->approved_by_regionaldirector)->toBeNull();
 });
 
 test('post activity report follows hr division chief and regional director approval', function () {

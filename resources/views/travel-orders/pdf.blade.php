@@ -3,22 +3,22 @@
     $employeeName = trim(($employee?->firstname ?? '') . ' ' . ($employee?->middlename ? strtoupper(substr($employee->middlename, 0, 1)).'. ' : '') . ($employee?->lastname ?? ''));
     $employeePosition = $employee?->position ?: '';
     $companions = $travelOrder->companions ?? collect();
-    $nameLines = collect([trim($employeeName), trim($employeePosition)])
+    // The employee list on the TA form contains names only. Positions remain
+    // in the Requesting Party signature section below.
+    $nameLines = collect([trim($employeeName)])
         ->filter()
         ->values();
 
     foreach ($companions as $companion) {
         $companionName = trim(($companion->firstname ?? '') . ' ' . ($companion->middlename ? strtoupper(substr($companion->middlename, 0, 1)).'. ' : '') . ($companion->lastname ?? ''));
         $nameLines->push(trim($companionName));
-        if ($companion->position) {
-            $nameLines->push(trim($companion->position));
-        }
     }
 
     $travelDate = $travelOrder->travel_date_start->isSameDay($travelOrder->travel_date_end)
         ? $travelOrder->travel_date_start->format('d F Y')
         : $travelOrder->travel_date_start->format('d F Y') . ' - ' . $travelOrder->travel_date_end->format('d F Y');
     $requestingPartyName = strtoupper($employeeName ?: '');
+    $requestingSignaturePath = $requestingSignaturePath ?? $employee?->effective_signature_url;
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -62,27 +62,27 @@
         }
 
         .ta-logo-cell {
-            width: 28mm;
+            width: 30mm;
             text-align: center;
         }
 
         .ta-logo {
-            max-width: 25mm;
+            /* Match the locator slip's official seal + tagline treatment. */
+            width: 25mm;
             max-height: 25mm;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
         }
 
         .ta-logo-right {
-            max-width: 29mm;
-            max-height: 25mm;
-        }
-
-        .ta-logo-caption {
-            margin-top: 1mm;
-            color: #0038a8;
-            font-size: 6.6pt;
-            font-weight: 700;
-            letter-spacing: .3pt;
-            text-align: center;
+            /* The Bagong Pilipinas mark is visually denser, so its box is
+               slightly smaller just as it is on the locator slip. */
+            width: 20.5mm;
+            max-height: 20.5mm;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
         }
 
         .ta-agency {
@@ -131,7 +131,7 @@
         }
 
         .ta-form {
-            width: 160mm;
+            width: 170mm;
             margin: 0 auto;
             border-collapse: collapse;
             table-layout: fixed;
@@ -144,9 +144,9 @@
         }
 
         .ta-col-date {
-            width: 18mm !important;
-            min-width: 18mm !important;
-            max-width: 18mm !important;
+            width: 28mm !important;
+            min-width: 28mm !important;
+            max-width: 28mm !important;
         }
 
         .ta-col-activity {
@@ -243,6 +243,18 @@
             text-transform: uppercase;
         }
 
+        .ta-signature-image {
+            display: block;
+            width: 50mm;
+            height: 15mm;
+            margin: 0.5mm auto 0;
+            object-fit: contain;
+        }
+
+        .ta-signature--with-image {
+            margin-top: 0;
+        }
+
         .ta-position {
             font-size: 10.8pt;
             font-weight: 400;
@@ -279,7 +291,6 @@
                     @if($dmwLogoPath)
                         <img class="ta-logo" src="{{ $dmwLogoPath }}" alt="">
                     @endif
-                    <div class="ta-logo-caption">TAHANAN NG OFW</div>
                 </td>
                 <td class="ta-agency">
                     <div class="ta-republic">Republic of the Philippines</div>
@@ -291,7 +302,6 @@
                     @if($bagongPilipinasLogoPath)
                         <img class="ta-logo-right" src="{{ $bagongPilipinasLogoPath }}" alt="">
                     @endif
-                    <div class="ta-logo-caption">BAGONG PILIPINAS</div>
                 </td>
             </tr>
         </table>
@@ -301,7 +311,7 @@
         <table class="ta-form">
             <colgroup>
                 <col class="ta-col-name" style="width:90mm">
-                <col class="ta-col-date" style="width:18mm">
+                <col class="ta-col-date" style="width:28mm">
                 <col class="ta-col-activity" style="width:27mm">
                 <col class="ta-col-address" style="width:25mm">
             </colgroup>
@@ -310,9 +320,9 @@
             </tr>
             <tr class="ta-column-head">
                 <th class="ta-col-name" style="width:90mm">Name of Regional Office<br>Employee/s:</th>
-                <th class="ta-col-date" style="width:18mm">Date of Travel</th>
+                <th class="ta-col-date" style="width:28mm">Date of Travel</th>
                 <th class="ta-col-activity" style="width:27mm">Activity</th>
-                <th class="ta-col-address" style="width:25mm">Address/Venue</th>
+                <th class="ta-col-address" style="width:25mm">Address/<br>Venue</th>
             </tr>
             <tr class="ta-main-row">
                 <td class="ta-value ta-col-name" style="width:90mm">
@@ -320,7 +330,7 @@
                         {{ $line }}@if(! $loop->last)<br>@endif
                     @endforeach
                 </td>
-                <td class="ta-value ta-date-value ta-col-date" style="width:18mm">{{ $travelDate }}</td>
+                <td class="ta-value ta-date-value ta-col-date" style="width:28mm">{{ $travelDate }}</td>
                 <td class="ta-value ta-col-activity" style="width:27mm">{{ $travelOrder->purpose }}</td>
                 <td class="ta-value ta-col-address" style="width:25mm">{{ $travelOrder->places_of_travel }}</td>
             </tr>
@@ -348,7 +358,10 @@
             <tr class="ta-requesting">
                 <td colspan="4">
                     <div class="ta-requesting-title">Requesting Party:</div>
-                    <div class="ta-signature">{{ $requestingPartyName }}</div>
+                    @if($requestingSignaturePath)
+                        <img src="{{ $requestingSignaturePath }}" alt="Employee e-signature" class="ta-signature-image">
+                    @endif
+                    <div class="ta-signature {{ $requestingSignaturePath ? 'ta-signature--with-image' : '' }}">{{ $requestingPartyName }}</div>
                     <div class="ta-position">{{ $employeePosition }}</div>
                 </td>
             </tr>

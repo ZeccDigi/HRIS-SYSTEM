@@ -3,14 +3,21 @@
 
     @php
         $user = auth()->user();
-        $employee = $user->employee;
-        $isAdministrativeDtr = ! ($isPersonal ?? false) && in_array(strtolower($user->role ?? ''), ['admin', 'hrstaff', 'chief', 'regionaldirector'], true);
+        $employee = $dtrEmployee ?? $user->employee;
+        $isEmployeeReview = ! $isPersonal && $dtrEmployee;
+        $monthSelectionRoute = $isEmployeeReview
+            ? route('dtr.employee', $employee)
+            : route('my-dtr.index');
+        $printDtrRoute = $isEmployeeReview
+            ? route('dtr.employee.print', ['employee' => $employee, 'month' => $selectedMonth, 'year' => $selectedYear])
+            : route('my-dtr.print', ['month' => $selectedMonth, 'year' => $selectedYear]);
+        $isDataVisible = ! ($isPersonal ?? false) || ($dtrMonthReleased ?? false);
         $months = [
             1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
             5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
             9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
         ];
-        $startYear = now()->year - 3;
+        $startYear = $firstDtrYear;
         $endYear = now()->year + 1;
         $selectedDate = \Carbon\Carbon::create((int) $selectedYear, (int) $selectedMonth, 1);
         $calendarDays = collect(range(1, $selectedDate->daysInMonth))->map(fn ($day) => $selectedDate->copy()->day($day));
@@ -115,6 +122,65 @@
 
             return number_format($minutes / 60, 2);
         };
+        $monthlyActualMinutes = collect($dtrRecords ?? [])->sum(fn ($record) => $actualWorkedMinutes($record));
+        $monthlyOvertimeMinutes = collect($dtrRecords ?? [])->sum(fn ($record) => max(0, $actualWorkedMinutes($record) - 480));
+        $monthlyOfficialMinutes = $calendarDays->sum(function ($day) use ($recordsByDate, $attendanceEventsByDate, $actualWorkedMinutes) {
+            if ($day->isWeekend()) {
+                return 0;
+            }
+
+            $record = $recordsByDate->get($day->format('Y-m-d'), collect())->first();
+            $workedMinutes = min(480, $actualWorkedMinutes($record));
+
+            return $attendanceEventsByDate->has($day->format('Y-m-d'))
+                ? max(480, $workedMinutes)
+                : $workedMinutes;
+        });
+        $monthlyLateMinutes = $calendarDays->sum(function ($day) use ($recordsByDate, $attendanceEventsByDate, $lateMinutesForRecord) {
+            if ($day->isWeekend() || $attendanceEventsByDate->has($day->format('Y-m-d'))) {
+                return 0;
+            }
+
+            return $lateMinutesForRecord($recordsByDate->get($day->format('Y-m-d'), collect())->first());
+        });
+        $monthlyUndertimeMinutes = $calendarDays->sum(function ($day) use ($recordsByDate, $attendanceEventsByDate, $undertimeMinutesForRecord) {
+            if ($day->isWeekend() || $attendanceEventsByDate->has($day->format('Y-m-d'))) {
+                return 0;
+            }
+
+            return $undertimeMinutesForRecord($recordsByDate->get($day->format('Y-m-d'), collect())->first());
+        });
+        $monthlyDaysPresent = collect($dtrRecords ?? [])->filter(fn ($record) => $record->time_in || $record->am_out || $record->pm_in || $record->time_out)->count();
+        $monthlyTotalWorkedMinutes = $monthlyOfficialMinutes + $monthlyOvertimeMinutes;
+        $monthlyDeductionMinutes = $monthlyLateMinutes + $monthlyUndertimeMinutes;
+        $monthlyEquivalentDays = $monthlyTotalWorkedMinutes / 480;
+        $formatSummaryHours = fn ($minutes) => $isDataVisible ? number_format(max(0, $minutes) / 60, 2) : '';
+        $coreTimeSchedule = collect($employee?->core_time_schedule ?? []);
+        $coreTimeDayLabels = [
+            'monday' => 'Mon',
+            'tuesday' => 'Tue',
+            'wednesday' => 'Wed',
+            'thursday' => 'Thu',
+            'friday' => 'Fri',
+        ];
+        $formatCoreTime = fn ($time) => $time ? \Carbon\Carbon::createFromFormat('H:i', $time)->format('h:i A') : null;
+        $coreTimeLines = collect($coreTimeDayLabels)->map(function ($label, $dayKey) use ($coreTimeSchedule, $formatCoreTime) {
+            $schedule = $coreTimeSchedule->get($dayKey, []);
+            $amStart = $formatCoreTime(data_get($schedule, 'am_start'));
+            $amEnd = $formatCoreTime(data_get($schedule, 'am_end'));
+            $pmStart = $formatCoreTime(data_get($schedule, 'pm_start'));
+            $pmEnd = $formatCoreTime(data_get($schedule, 'pm_end'));
+            $periods = collect([
+                $amStart && $amEnd ? $amStart.' - '.$amEnd : null,
+                $pmStart && $pmEnd ? $pmStart.' - '.$pmEnd : null,
+            ])->filter()->implode(' | ');
+
+            return $periods ? $label.' '.$periods : null;
+        })->filter()->values();
+        $coreTimePeriod = collect([
+            $employee?->core_time_start_date?->format('M. d, Y'),
+            $employee?->core_time_end_date?->format('M. d, Y'),
+        ])->filter()->implode(' to ');
     @endphp
 
     <style>
@@ -242,6 +308,24 @@
             padding-left: 0.25rem !important;
             padding-right: 0.25rem !important;
             text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .dtr-screen-table td.dtr-reference-cell {
+            overflow: visible;
+            text-overflow: clip;
+            white-space: normal;
+        }
+
+        .dtr-reference-value {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            max-width: 100%;
+            font-size: 8px;
+            font-weight: 700;
+            line-height: 1.05;
             white-space: nowrap;
         }
 
@@ -390,18 +474,7 @@
             @endif
 
             <div class="dtr-screen-only px-1 sm:px-0">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                        <h1 class="text-xl font-bold text-slate-900">
-                            {{ __('My Daily Time Record') }}
-                        </h1>
-                        <p class="mt-1 text-sm text-slate-500">
-                            {{ __('Review and print your monthly DTR.') }}
-                        </p>
-                    </div>
-                </div>
-
-                <form method="GET" action="{{ route('my-dtr.index') }}" class="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center">
+                <form method="GET" action="{{ $monthSelectionRoute }}" class="flex flex-col gap-4 lg:flex-row lg:items-center">
                     <div class="grid flex-1 gap-4 sm:grid-cols-2">
                         <label class="relative block">
                             <span class="absolute -top-2 left-3 bg-white px-1 text-xs text-slate-500">Month</span>
@@ -426,9 +499,9 @@
                         <button type="submit" style="background-color: #2b428f;" class="min-w-28 rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow">
                             {{ __('Select') }}
                         </button>
-                        <button type="button" onclick="window.print()" style="background-color: #2b428f;" class="min-w-28 rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow">
+                        <a href="{{ $printDtrRoute }}" target="_blank" rel="noopener" style="background-color: #2b428f;" class="inline-flex min-w-28 items-center justify-center rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow">
                             {{ __('Print') }}
-                        </button>
+                        </a>
                     </div>
                 </form>
             </div>
@@ -495,6 +568,7 @@
                                             $record = $recordsByDate->get($day->format('Y-m-d'), collect())->first();
                                             $isWeekend = $day->isWeekend();
                                             $approvedEvent = $attendanceEventsByDate->get($day->format('Y-m-d'));
+                                            $slotLabels = $approvedEvent['slot_labels'] ?? [];
                                             $hours = $record ? $recordHours($record) : '';
                                             $lateMinutes = $record && ! $approvedEvent ? $lateMinutesForRecord($record) : 0;
                                             $remarks = $approvedEvent['remarks'] ?? ($record ? $statusText($record) : ($isWeekend ? 'Weekend' : ''));
@@ -502,71 +576,78 @@
                                         <tr class="hover:bg-slate-50">
                                             <td class="border border-slate-300 px-2 py-1">{{ $day->day }}</td>
                                             <td class="border border-slate-300 px-2 py-1">{{ $day->format('D') }}</td>
-                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->time_in && $approvedEvent ? 'font-semibold text-blue-700' : '' }}">{{ $record?->time_in ? $formatTime($record->time_in) : ($approvedEvent['status'] ?? '') }}</td>
-                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->am_out && $approvedEvent ? 'font-semibold text-blue-700' : '' }}">{{ $record?->am_out ? $formatTime($record->am_out) : ($approvedEvent['status'] ?? '') }}</td>
-                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->pm_in && $approvedEvent ? 'font-semibold text-blue-700' : '' }}">{{ $record?->pm_in ? $formatTime($record->pm_in) : ($approvedEvent['status'] ?? '') }}</td>
-                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->time_out && $approvedEvent ? 'font-semibold text-blue-700' : '' }}">{{ $record?->time_out ? $formatTime($record->time_out) : ($approvedEvent['status'] ?? '') }}</td>
+                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->time_in && isset($slotLabels['time_in']) ? 'dtr-reference-cell text-blue-700' : '' }}">@if($record?->time_in){{ $formatTime($record->time_in) }}@elseif(isset($slotLabels['time_in']))<x-dtr-reference :value="$slotLabels['time_in']" />@endif</td>
+                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->am_out && isset($slotLabels['am_out']) ? 'dtr-reference-cell text-blue-700' : '' }}">@if($record?->am_out){{ $formatTime($record->am_out) }}@elseif(isset($slotLabels['am_out']))<x-dtr-reference :value="$slotLabels['am_out']" />@endif</td>
+                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->pm_in && isset($slotLabels['pm_in']) ? 'dtr-reference-cell text-blue-700' : '' }}">@if($record?->pm_in){{ $formatTime($record->pm_in) }}@elseif(isset($slotLabels['pm_in']))<x-dtr-reference :value="$slotLabels['pm_in']" />@endif</td>
+                                            <td class="border border-slate-300 px-2 py-1 {{ ! $record?->time_out && isset($slotLabels['time_out']) ? 'dtr-reference-cell text-blue-700' : '' }}">@if($record?->time_out){{ $formatTime($record->time_out) }}@elseif(isset($slotLabels['time_out']))<x-dtr-reference :value="$slotLabels['time_out']" />@endif</td>
                                             <td class="border border-slate-300 px-2 py-1"></td>
                                             <td class="border border-slate-300 px-2 py-1"></td>
                                             <td class="border border-slate-300 px-2 py-1">{{ $hours }}</td>
-                                            <td class="border border-slate-300 px-2 py-1">{{ $isWeekend ? '' : '8.00' }}</td>
+                                            <td class="border border-slate-300 px-2 py-1">{{ ! $isDataVisible || $isWeekend ? '' : '8.00' }}</td>
                                             <td class="border border-slate-300 px-2 py-1"></td>
                                             <td class="border border-slate-300 px-2 py-1">{{ $lateMinutes > 0 ? number_format($lateMinutes, 3) . ' min' : '' }}</td>
                                             <td class="border border-slate-300 px-2 py-1"></td>
-                                            <td class="border border-slate-300 px-2 py-1 text-left">{{ $remarks }}</td>
+                                            <td class="border border-slate-300 px-2 py-1 text-left">{{ $isDataVisible ? $remarks : '' }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                             </table>
                         </div>
 
-                        <div class="dtr-late-summary mt-8 rounded-lg border border-slate-300 bg-slate-50 p-4">
-                            <div class="flex items-start justify-between gap-4">
-                                <div>
-                                    <h4 class="text-sm font-bold uppercase tracking-wide text-slate-900">
-                                        Late Dates Summary
-                                    </h4>
-                                    <p class="mt-1 text-xs text-slate-600">
-                                        This section helps the employee and HR quickly review dates with late attendance for the selected month.
-                                    </p>
-                                </div>
+                        <div class="dtr-late-summary mt-8 overflow-x-auto">
+                            <table class="w-full min-w-[760px] border-collapse text-xs text-slate-800">
+                                <tbody>
+                                    <tr>
+                                        <th colspan="4" class="border border-slate-300 bg-slate-100 px-3 py-2 text-center text-sm font-bold">Attendance Summary</th>
+                                    </tr>
+                                    <tr>
+                                        <td class="w-[30%] border border-slate-300 px-3 py-2 text-center">Actual Hours Worked (AHW)</td>
+                                        <td class="w-[20%] border border-slate-300 px-3 py-2 text-center font-bold">{{ $formatSummaryHours($monthlyActualMinutes) }}</td>
+                                        <td class="w-[30%] border border-slate-300 px-3 py-2 text-center">Late (LT)</td>
+                                        <td class="w-[20%] border border-slate-300 px-3 py-2 text-center font-bold">{{ $formatSummaryHours($monthlyLateMinutes) }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="border border-slate-300 px-3 py-2 text-center">Official Hours Worked (OHW)</td>
+                                        <td class="border border-slate-300 px-3 py-2 text-center font-bold">{{ $formatSummaryHours($monthlyOfficialMinutes) }}</td>
+                                        <td class="border border-slate-300 px-3 py-2 text-center">Undertime (UT)</td>
+                                        <td class="border border-slate-300 px-3 py-2 text-center font-bold">{{ $formatSummaryHours($monthlyUndertimeMinutes) }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="border border-slate-300 px-3 py-2 text-center">Overtime (OT)</td>
+                                        <td class="border border-slate-300 px-3 py-2 text-center font-bold">{{ $formatSummaryHours($monthlyOvertimeMinutes) }}</td>
+                                        <td class="border border-slate-300 px-3 py-2 text-center">Days Present (DP)</td>
+                                        <td class="border border-slate-300 px-3 py-2 text-center font-bold">{{ $isDataVisible ? $monthlyDaysPresent : '' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="4" class="border border-slate-300 bg-slate-100 px-3 py-2 text-center text-sm font-bold">Final Computation</th>
+                                    </tr>
+                                    <tr>
+                                        <td class="border border-slate-300 px-3 py-2 text-center">Total Hours Worked (OHW + OT)</td>
+                                        <td class="border border-slate-300 px-3 py-2 text-center font-bold">{{ $formatSummaryHours($monthlyTotalWorkedMinutes) }}</td>
+                                        <td class="border border-slate-300 px-3 py-2 text-center">Total Deductions (LT + UT)</td>
+                                        <td class="border border-slate-300 px-3 py-2 text-center font-bold">{{ $formatSummaryHours($monthlyDeductionMinutes) }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3" class="border border-slate-300 px-3 py-2 text-center">Equivalent Days Present</td>
+                                        <td class="border border-slate-300 px-3 py-2 text-center font-bold">{{ $isDataVisible ? number_format($monthlyEquivalentDays, 2) : '' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="border border-slate-300 px-3 py-2 text-left">Remarks</th>
+                                        <td colspan="3" class="border border-slate-300 px-3 py-2">&nbsp;</td>
+                                    </tr>
+                                </tbody>
+                            </table>
 
-                                <span class="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">
-                                    {{ $lateRecords->count() }} late day(s)
-                                </span>
-                            </div>
-
-                            <div class="mt-3 overflow-x-auto">
-                                <table class="w-full border-collapse text-xs">
-                                    <thead>
-                                        <tr class="bg-white text-left text-slate-600">
-                                            <th class="border border-slate-300 px-2 py-2">Date</th>
-                                            <th class="border border-slate-300 px-2 py-2">Day</th>
-                                            <th class="border border-slate-300 px-2 py-2">Time In</th>
-                                            <th class="border border-slate-300 px-2 py-2">Late</th>
-                                            <th class="border border-slate-300 px-2 py-2">Remarks</th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody>
-                                        @forelse($lateRecords as $lateRecord)
-                                            @php $lateDate = \Carbon\Carbon::parse($lateRecord->date); @endphp
-                                            <tr class="bg-white">
-                                                <td class="border border-slate-300 px-2 py-1">{{ $lateDate->format('M d, Y') }}</td>
-                                                <td class="border border-slate-300 px-2 py-1">{{ $lateDate->format('D') }}</td>
-                                                <td class="border border-slate-300 px-2 py-1">{{ $formatTime($lateRecord->time_in) ?: 'N/A' }}</td>
-                                                <td class="border border-slate-300 px-2 py-1">{{ number_format($lateMinutesForRecord($lateRecord), 3) }} min</td>
-                                                <td class="border border-slate-300 px-2 py-1">{{ $lateRecord->status ?: 'Late arrival' }}</td>
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="5" class="border border-slate-300 px-2 py-3 text-center text-slate-500">
-                                                    No late records for this selected month.
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
+                            <div class="mt-5 text-xs leading-6 text-slate-800">
+                                <p>
+                                    <span class="font-bold">Approved Core Time:</span>
+                                    {{ $coreTimePeriod ?: 'No effective period assigned' }}
+                                </p>
+                                @if($coreTimeLines->isNotEmpty())
+                                    <p>{{ $coreTimeLines->implode('; ') }}</p>
+                                @else
+                                    <p class="text-slate-500">No weekday core-time schedule assigned.</p>
+                                @endif
                             </div>
                         </div>
 
@@ -668,13 +749,14 @@
                                                     @php
                                                         $record = $dayRow['record'];
                                                         $approvedEvent = $dayRow['approved_event'];
+                                                        $slotLabels = $approvedEvent['slot_labels'] ?? [];
                                                     @endphp
                                                     <tr>
                                                         <td>{{ $dayRow['day_number'] }}</td>
-                                                        <td>{{ $record?->time_in ? $formatTime($record->time_in) : ($approvedEvent['print_label'] ?? '') }}</td>
-                                                        <td>{{ $record?->am_out ? $formatTime($record->am_out) : ($approvedEvent['print_label'] ?? '') }}</td>
-                                                        <td>{{ $record?->pm_in ? $formatTime($record->pm_in) : ($approvedEvent['print_label'] ?? '') }}</td>
-                                                        <td>{{ $record?->time_out ? $formatTime($record->time_out) : ($approvedEvent['print_label'] ?? '') }}</td>
+                                                        <td @if(! $record?->time_in && isset($slotLabels['time_in'])) style="font-size:4.8pt; line-height:1.05; overflow-wrap:anywhere; word-break:break-word;" @endif>{{ $record?->time_in ? $formatTime($record->time_in) : ($slotLabels['time_in'] ?? '') }}</td>
+                                                        <td @if(! $record?->am_out && isset($slotLabels['am_out'])) style="font-size:4.8pt; line-height:1.05; overflow-wrap:anywhere; word-break:break-word;" @endif>{{ $record?->am_out ? $formatTime($record->am_out) : ($slotLabels['am_out'] ?? '') }}</td>
+                                                        <td @if(! $record?->pm_in && isset($slotLabels['pm_in'])) style="font-size:4.8pt; line-height:1.05; overflow-wrap:anywhere; word-break:break-word;" @endif>{{ $record?->pm_in ? $formatTime($record->pm_in) : ($slotLabels['pm_in'] ?? '') }}</td>
+                                                        <td @if(! $record?->time_out && isset($slotLabels['time_out'])) style="font-size:4.8pt; line-height:1.05; overflow-wrap:anywhere; word-break:break-word;" @endif>{{ $record?->time_out ? $formatTime($record->time_out) : ($slotLabels['time_out'] ?? '') }}</td>
                                                         <td>{{ $dayRow['undertime_hours'] }}</td>
                                                         <td>{{ $dayRow['undertime_minutes'] }}</td>
                                                     </tr>

@@ -31,13 +31,13 @@
     @endphp
 
     <div
-        class="py-10 sm:py-12"
+        class="px-1 py-3 sm:px-2 lg:px-3"
         x-data="{
             openAnnouncement: {{ $shouldOpenCreateModal ? 'true' : 'false' }}
         }"
         @keydown.escape.window="openAnnouncement = false"
     >
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="w-full">
 
             {{-- Success message --}}
             @if(session('success'))
@@ -99,10 +99,10 @@
 
             {{-- Year and New Announcement button --}}
             <div class="flex items-center justify-end gap-3">
-                <div class="w-32">
+                <div class="flex items-center gap-2">
                     <label
                         for="announcementYear"
-                        class="sr-only"
+                        class="text-sm font-semibold text-gray-700"
                     >
                         {{ __('Year') }}
                     </label>
@@ -111,7 +111,7 @@
                         form="announcementFilterForm"
                         id="announcementYear"
                         name="year"
-                        class="block h-10 w-full rounded-lg border-gray-300 bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        class="block h-10 w-28 rounded-lg border-gray-300 bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     >
                         @foreach($availableYears as $yearOption)
                             <option
@@ -151,7 +151,7 @@
             </div>
 
             {{-- Announcement tabs --}}
-            <div class="mt-10 border-b border-gray-200">
+            <div class="mt-4 border-b border-gray-200">
                 <div class="flex gap-8 overflow-x-auto">
                     <a
                         href="{{ route('announcements.index', array_filter([
@@ -202,8 +202,9 @@
                 method="GET"
                 action="{{ route('announcements.index') }}"
                 data-filter-url="{{ route('announcements.filter') }}"
-                class="mt-8 flex flex-col gap-2 sm:flex-row sm:items-center"
+                class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center"
             >
+                <input type="hidden" name="per_page" value="{{ request('per_page', 5) }}">
                 <input
                     type="hidden"
                     id="announcementMine"
@@ -334,7 +335,7 @@
             {{-- Announcement results --}}
             <div
                 id="announcementResults"
-                class="mt-8 transition-opacity duration-200"
+                class="mt-3 transition-opacity duration-200"
             >
                 @include('announcements.partials.results', [
                     'announcements' => $announcements,

@@ -4,14 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Imports\AttendanceImport;
 use App\Models\DtrRecord;
+use App\Models\CtoRequest;
+use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\LeaveRequest;
+use App\Models\LocatorSlip;
 use App\Models\TravelOrder;
+use App\Services\DtrPdfExporter;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -27,11 +32,50 @@ class DtrController extends Controller
         return $this->dtrView($request, true);
     }
 
-    private function dtrView(Request $request, bool $personalOnly): View
+    public function employeeDtr(Request $request, Employee $employee): View
+    {
+        return $this->dtrView($request, false, $employee);
+    }
+
+    public function printMyDtr(Request $request, DtrPdfExporter $exporter): Response
+    {
+        $dtrView = $this->dtrView($request, true);
+        $data = $dtrView->getData();
+
+        return $exporter->stream(
+            $data,
+            (int) $data['selectedMonth'],
+            (int) $data['selectedYear']
+        );
+    }
+
+    public function printEmployeeDtr(
+        Request $request,
+        Employee $employee,
+        DtrPdfExporter $exporter
+    ): Response {
+        $dtrView = $this->dtrView($request, false, $employee);
+        $data = $dtrView->getData();
+
+        return $exporter->stream(
+            $data,
+            (int) $data['selectedMonth'],
+            (int) $data['selectedYear']
+        );
+    }
+
+
+    private function dtrView(
+        Request $request,
+        bool $personalOnly,
+        ?Employee $selectedEmployee = null
+    ): View
     {
         $userRole = strtoupper(auth()->user()->role);
         $adminRoles = ['ADMIN', 'HRSTAFF', 'CHIEF', 'REGIONALDIRECTOR'];
-        $isAdministrativeDtr = ! $personalOnly && in_array($userRole, $adminRoles, true);
+        $isAdministrativeDtr = ! $personalOnly
+            && $selectedEmployee === null
+            && in_array($userRole, $adminRoles, true);
 
         if ($isAdministrativeDtr) {
             $selectedDate = $request->query('date', now()->format('Y-m-d'));
@@ -80,6 +124,7 @@ class DtrController extends Controller
                 ->distinct()
                 ->orderBy('employment_status')
                 ->pluck('employment_status');
+
 
             $dtrRecords = DtrRecord::whereDate('date', $selectedDate)->get()->groupBy('employee_id');
             $approvedEvents = $this->approvedAttendanceEvents(
@@ -150,6 +195,7 @@ class DtrController extends Controller
                     'status' => $status,
                     'remarks' => $remarks,
                     'approved_absence' => $approvedEvent !== null,
+                    'slot_labels' => $approvedEvent['slot_labels'] ?? [],
                     'hours_worked' => $hoursWorked,
                     'late_minutes' => $lateMinutes,
                     'undertime_minutes' => $undertimeMinutes,
@@ -195,8 +241,8 @@ class DtrController extends Controller
                             $employee->division ?? 'N/A',
                             $employee->position ?? 'N/A',
                             $employee->employment_status ?? 'N/A',
-                            $item['time_in'] ? Carbon::parse($item['time_in'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A'),
-                            $item['time_out'] ? Carbon::parse($item['time_out'])->format('h:i A') : ($item['approved_absence'] ? $item['status'] : 'N/A'),
+                            $item['time_in'] ? Carbon::parse($item['time_in'])->format('h:i A') : ($item['slot_labels']['time_in'] ?? 'N/A'),
+                            $item['time_out'] ? Carbon::parse($item['time_out'])->format('h:i A') : ($item['slot_labels']['time_out'] ?? 'N/A'),
                             $item['hours_worked'],
                             number_format((float) ($item['late_minutes'] ?: 0), 3, '.', ''),
                             number_format((float) ($item['undertime_minutes'] ?: 0), 3, '.', ''),
@@ -226,29 +272,32 @@ class DtrController extends Controller
             ));
         }
 
-        $selectedMonth = (int) $request->query('month', now()->month);
-        $selectedYear = (int) $request->query('year', now()->year);
-        $selectedMonth = $selectedMonth >= 1 && $selectedMonth <= 12 ? $selectedMonth : now()->month;
-        $selectedYear = $selectedYear >= 2000 && $selectedYear <= 2100 ? $selectedYear : now()->year;
+        $today = now('Asia/Manila');
+        $selectedMonth = (int) $request->query('month', $today->month);
+        $selectedYear = (int) $request->query('year', $today->year);
+        $selectedMonth = $selectedMonth >= 1 && $selectedMonth <= 12 ? $selectedMonth : $today->month;
+        $selectedYear = $selectedYear >= 2000 && $selectedYear <= 2100 ? $selectedYear : $today->year;
 
-        $query = DtrRecord::with('employee')
-            ->whereMonth('date', $selectedMonth)
-            ->whereYear('date', $selectedYear);
+        $selectedDate = Carbon::create($selectedYear, $selectedMonth, 1, 0, 0, 0, 'Asia/Manila');
+        $dtrMonthReleased = $selectedDate->lt($today->copy()->startOfMonth());
+        $isPersonal = $selectedEmployee === null;
+        $showAttendance = ! $isPersonal || $dtrMonthReleased;
+        $employee = $selectedEmployee ?? $request->user()->employee;
+        $oldestDtrDate = $employee
+            ? DtrRecord::where('employee_id', $employee->id)
+                ->when($isPersonal, fn ($query) => $query->where('date', '<', $today->copy()->startOfMonth()->toDateString()))
+                ->min('date')
+            : null;
+        $firstDtrYear = min($today->year - 3, $selectedYear, $oldestDtrDate ? Carbon::parse($oldestDtrDate)->year : $today->year);
 
-        if ($personalOnly || ! in_array($userRole, $adminRoles, true)) {
-            $employee = auth()->user()->employee;
-
-            if ($employee) {
-                $query->where('employee_id', $employee->id);
-            } else {
-                $query->where('employee_id', 0);
-            }
-        }
-
-        $dtrRecords = $query->orderBy('date')->orderBy('time_in')->get();
+        $dtrRecords = $showAttendance && $employee
+            ? DtrRecord::where('employee_id', $employee->id)
+                ->whereBetween('date', [$selectedDate->toDateString(), $selectedDate->copy()->endOfMonth()->toDateString()])
+                ->orderBy('date')->orderBy('time_in')->get()
+            : collect();
 
         $attendanceEventsByDate = collect();
-        if (isset($employee) && $employee) {
+        if ($employee && $showAttendance) {
             $monthStart = Carbon::create($selectedYear, $selectedMonth, 1)->startOfDay();
             $monthEnd = $monthStart->copy()->endOfMonth();
             $attendanceEventsByDate = $this->approvedAttendanceEvents($monthStart, $monthEnd, [$employee->id])
@@ -263,7 +312,6 @@ class DtrController extends Controller
             ->filter(fn ($record) => $this->lateMinutes($record) > 0)
             ->values();
 
-        $selectedDate = Carbon::create($selectedYear, $selectedMonth, 1);
         $period = $selectedDate->format('F j') . ' to ' . $selectedDate->copy()->endOfMonth()->format('j, Y');
         $dtrSummary = [
             'month' => $selectedDate->format('F'),
@@ -274,10 +322,11 @@ class DtrController extends Controller
             'late' => $lateRecords->count(),
             'absent' => $dtrRecords->where('status', 'Absent')->count(),
             'actual_hours' => number_format($actualMinutes / 60, 2),
-            'employee_no' => auth()->user()->employee?->id ?? 'N/A',
+            'employee_no' => $employee?->employee_no
+                ?? ($employee?->id ? 'EMP-'.str_pad((string) $employee->id, 4, '0', STR_PAD_LEFT) : 'N/A'),
         ];
 
-        $isPersonal = $personalOnly;
+        $dtrEmployee = $employee ?? null;
 
         return view('dtr.index', compact(
             'dtrRecords',
@@ -286,12 +335,16 @@ class DtrController extends Controller
             'selectedYear',
             'dtrSummary',
             'lateRecords',
-            'attendanceEventsByDate'
+            'attendanceEventsByDate',
+            'dtrEmployee',
+            'dtrMonthReleased',
+            'firstDtrYear'
         ));
     }
 
+
     /**
-     * Return approved leave and travel-authority events keyed by employee ID and date.
+     * Return approved leave, travel-authority, locator-slip, and Use CTO events keyed by employee ID and date.
      * Biometric punches remain untouched; these values are presentation-only DTR remarks.
      */
     private function approvedAttendanceEvents(Carbon $start, Carbon $end, array $employeeIds): Collection
@@ -315,7 +368,7 @@ class DtrController extends Controller
             ->get();
 
         foreach ($leaves as $leave) {
-            $leaveLabel = $this->leaveDtrLabel($leave->leaveType?->name);
+            $leaveReference = $this->leaveReferenceNumber($leave);
             $rangeStart = Carbon::parse($leave->start_date)->max($start);
             $rangeEnd = Carbon::parse($leave->end_date)->min($end);
 
@@ -329,9 +382,9 @@ class DtrController extends Controller
                     $events,
                     (int) $leave->employee_id,
                     $dateKey,
-                    $leaveLabel,
-                    $leaveLabel,
-                    strtoupper($leaveLabel)
+                    $leaveReference,
+                    'Leave',
+                    $leaveReference
                 );
             }
         }
@@ -348,6 +401,8 @@ class DtrController extends Controller
             ->get();
 
         foreach ($travelOrders as $travelOrder) {
+            $travelReference = $travelOrder->ta_number
+                ?: sprintf('TA-%s-%03d', Carbon::parse($travelOrder->created_at ?? $travelOrder->travel_date_start)->format('Y-m-d'), $travelOrder->id);
             $coveredEmployeeIds = collect([(int) $travelOrder->employee_id])
                 ->merge($travelOrder->companions->pluck('id')->map(fn ($id) => (int) $id))
                 ->intersect($employeeIds)
@@ -361,38 +416,121 @@ class DtrController extends Controller
                         $events,
                         $employeeId,
                         $date->toDateString(),
+                        $travelReference,
                         'TA',
-                        'TA',
-                        'TA'
+                        $travelReference
                     );
                 }
+            }
+        }
+
+        $locatorSlips = LocatorSlip::query()
+            ->where('status', 'approved')
+            ->whereIn('employee_id', $employeeIds)
+            ->whereBetween('date_covered', [$start->toDateString(), $end->toDateString()])
+            ->get();
+
+        foreach ($locatorSlips as $locatorSlip) {
+            // A locator slip affects the DTR only after the employee's QR OUT
+            // scan is confirmed. The return QR IN scan is useful when available,
+            // but a missed return scan does not invalidate an approved slip.
+            // Without the OUT scan, the slip must not fill DTR slots or remarks.
+            if (! $locatorSlip->time_from || ! $locatorSlip->out_scanned_at) {
+                continue;
+            }
+
+            $locatorType = $locatorSlip->type === 'Official Business'
+                ? 'Official Business'
+                : 'Pass Slip';
+
+            $this->addAttendanceEvent(
+                $events,
+                (int) $locatorSlip->employee_id,
+                Carbon::parse($locatorSlip->date_covered)->toDateString(),
+                $locatorType,
+                $locatorType,
+                $locatorType,
+                $this->locatorSlipSlotLabels($locatorSlip, $locatorType)
+            );
+        }
+
+        // An approved Use CTO application fills only missing DTR slots. Actual
+        // biometric punches remain visible and the approved CTO reference is
+        // retained in the DTR remarks for auditability.
+        $ctoRequests = CtoRequest::query()
+            ->where('type', 'use')
+            ->where('status', 'approved')
+            ->whereIn('employee_id', $employeeIds)
+            ->whereDate('date_start', '<=', $end->toDateString())
+            ->whereDate('date_end', '>=', $start->toDateString())
+            ->get();
+
+        foreach ($ctoRequests as $ctoRequest) {
+            $rangeStart = Carbon::parse($ctoRequest->date_start)->max($start);
+            $rangeEnd = Carbon::parse($ctoRequest->date_end)->min($end);
+            $reference = $ctoRequest->reference;
+
+            foreach (CarbonPeriod::create($rangeStart, $rangeEnd) as $date) {
+                if ($date->isWeekend() || $holidayDates->has($date->toDateString())) {
+                    continue;
+                }
+
+                $this->addAttendanceEvent(
+                    $events,
+                    (int) $ctoRequest->employee_id,
+                    $date->toDateString(),
+                    'Use CTO',
+                    $reference,
+                    $reference
+                );
             }
         }
 
         return $events;
     }
 
-    private function leaveDtrLabel(?string $leaveType): string
+    private function leaveReferenceNumber(LeaveRequest $leave): string
     {
-        $abbreviation = match ($leaveType) {
-            'Vacation Leave' => 'VL',
-            'Mandatory/Force Leave' => 'MFL',
-            'Sick Leave' => 'SL',
-            'Maternity Leave' => 'ML',
-            'Paternity Leave' => 'PL',
-            'Special Privilege Leave' => 'SPL',
-            'Solo Parent Leave' => 'Solo PL',
-            'Study Leave' => 'Study L',
-            'VAWC Leave' => 'VAWC',
-            'Rehabilitation Leave' => 'RL',
-            'Special Leave Benefits for Women' => 'SLBW',
-            'Special Emergency (Calamity) Leave' => 'SECL',
-            'Adoption Leave' => 'AL',
-            'Wellness Leave' => 'WL',
-            default => 'Approved',
-        };
+        $referenceDate = $leave->date_filed ?? $leave->created_at ?? $leave->start_date;
 
-        return $abbreviation . ' Leave';
+        return sprintf('LR-%s-%04d', Carbon::parse($referenceDate)->format('Y'), $leave->id);
+    }
+
+    private function locatorSlipReferenceNumber(LocatorSlip $locatorSlip): string
+    {
+        return sprintf(
+            'LS-%s-%04d',
+            Carbon::parse($locatorSlip->date_covered ?? $locatorSlip->created_at)->format('Y'),
+            $locatorSlip->id
+        );
+    }
+
+    private function locatorSlipSlotLabels(LocatorSlip $locatorSlip, string $reference): array
+    {
+        if (! $locatorSlip->time_from || ! $locatorSlip->time_to) {
+            return array_fill_keys(['time_in', 'am_out', 'pm_in', 'time_out'], $reference);
+        }
+
+        $from = Carbon::parse($locatorSlip->time_from);
+        $to = Carbon::parse($locatorSlip->time_to);
+        $fromMinutes = ($from->hour * 60) + $from->minute;
+        $toMinutes = ($to->hour * 60) + $to->minute;
+
+        if ($toMinutes < $fromMinutes) {
+            $toMinutes += 24 * 60;
+        }
+
+        $slotMinutes = [
+            'time_in' => 8 * 60,
+            'am_out' => 12 * 60,
+            'pm_in' => 13 * 60,
+            'time_out' => 17 * 60,
+        ];
+
+        return collect($slotMinutes)
+            ->filter(fn (int $minutes) => $minutes >= $fromMinutes && $minutes <= $toMinutes)
+            ->mapWithKeys(fn (int $minutes, string $slot) => [$slot => $reference])
+            ->all();
     }
 
     private function addAttendanceEvent(
@@ -401,25 +539,36 @@ class DtrController extends Controller
         string $date,
         string $status,
         string $remarks,
-        string $printLabel
+        string $printLabel,
+        ?array $slotLabels = null
     ): void {
         $key = $employeeId . '|' . $date;
         $existing = $events->get($key);
+        $slotLabels ??= array_fill_keys(['time_in', 'am_out', 'pm_in', 'time_out'], $printLabel);
 
         if (! $existing) {
             $events->put($key, [
                 'status' => $status,
                 'remarks' => $remarks,
                 'print_label' => $printLabel,
+                'slot_labels' => $slotLabels,
             ]);
 
             return;
+        }
+
+        $mergedSlotLabels = $existing['slot_labels'] ?? [];
+        foreach ($slotLabels as $slot => $label) {
+            $mergedSlotLabels[$slot] = isset($mergedSlotLabels[$slot])
+                ? $mergedSlotLabels[$slot] . ' / ' . $label
+                : $label;
         }
 
         $events->put($key, [
             'status' => $existing['status'] . ' / ' . $status,
             'remarks' => $existing['remarks'] . '; ' . $remarks,
             'print_label' => $existing['print_label'] . ' / ' . $printLabel,
+            'slot_labels' => $mergedSlotLabels,
         ]);
     }
 

@@ -32,7 +32,7 @@
                     if ($isHR && $leaveApplication->hrstaff_status === 'pending') {
                         $isMyTurn = true;
                     } elseif ($isChief && $leaveApplication->chief_status === 'pending') {
-                        if (in_array($leaveApplication->hrstaff_status, ['approved', 'rejected'], true)) {
+                        if ($leaveApplication->hrstaff_status === 'approved') {
                             $isMyTurn = true;
                         } else {
                             $waitingMessage = 'Waiting for HR Admin verification.';
@@ -48,18 +48,13 @@
             @endphp
 
             <div class="mb-5 flex items-center justify-between gap-3">
-                <a href="{{ $backRoute }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    {{ __('Back') }}
-                </a>
+                <x-page-action href="{{ $backRoute }}" />
                 <button type="button" onclick="printLeaveForm()" class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700">
                     {{ __('Print Leave Form') }}
                 </button>
             </div>
 
-            <x-approval-tracker :payload="$trackedLeavePayload" event="leave-selected" empty="No leave approval process to track yet." />
+            <x-approval-tracker :payload="$trackedLeavePayload" event="leave-selected" empty="No leave approval process to track yet." compact />
 
             {{-- Full Leave Form Preview --}}
             <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
@@ -139,9 +134,11 @@
                             ></textarea>
 
                             <div class="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                <p class="text-xs text-gray-400">
-                                    {{ __('Remarks are required when rejecting the application.') }}
-                                </p>
+                                @unless($isHR)
+                                    <p class="text-xs text-gray-400">
+                                        {{ __('Remarks are required when rejecting the application.') }}
+                                    </p>
+                                @endunless
 
                                 <span
                                     id="leaveRemarksError"
@@ -152,16 +149,18 @@
 
                         {{-- Action Buttons --}}
                         <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                            <button
-                                type="submit"
-                                id="leaveRejectButton"
-                                name="status"
-                                value="rejected"
-                                class="inline-flex min-w-44 items-center justify-center rounded-xl border border-red-300 bg-white px-6 py-3 text-xs font-black uppercase tracking-widest text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2"
-                            >
-                                <i class="fa-solid fa-xmark mr-2"></i>
-                                {{ __('Reject Request') }}
-                            </button>
+                            @unless($isHR)
+                                <button
+                                    type="submit"
+                                    id="leaveRejectButton"
+                                    name="status"
+                                    value="rejected"
+                                    class="inline-flex min-w-44 items-center justify-center rounded-xl border border-red-300 bg-white px-6 py-3 text-xs font-black uppercase tracking-widest text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2"
+                                >
+                                    <i class="fa-solid fa-xmark mr-2"></i>
+                                    {{ __('Reject Request') }}
+                                </button>
+                            @endunless
 
                             <button
                                 type="submit"
@@ -329,6 +328,7 @@
             const errorSpan = document.getElementById('leaveRemarksError');
             const approveButton = document.getElementById('leaveApproveButton');
             const rejectButton = document.getElementById('leaveRejectButton');
+            const isHrReview = @js($isHR);
             const decisionModal = document.getElementById('leaveDecisionModal');
             const decisionBackdrop = document.getElementById('leaveDecisionModalBackdrop');
             const decisionTitle = document.getElementById('leaveDecisionModalTitle');
@@ -377,19 +377,21 @@
 
                 if (decisionTitle) {
                     decisionTitle.textContent = action === 'approved'
-                        ? 'Approve this leave application?'
+                        ? (isHrReview ? 'Verify this leave application?' : 'Approve this leave application?')
                         : 'Reject this leave application?';
                 }
 
                 if (decisionDescription) {
                     decisionDescription.textContent = action === 'approved'
-                        ? 'Approving will move this request to the next step\nor mark it as fully approved.'
+                        ? (isHrReview
+                            ? 'Verifying will record the leave-credit certification\nand forward the application to the Division Chief.'
+                            : 'Approving will move this request to the next step\nor mark it as fully approved.')
                         : 'Rejecting will mark this request as rejected.';
                 }
 
                 if (decisionConfirmButton) {
                     decisionConfirmButton.textContent = action === 'approved'
-                        ? 'Approve'
+                        ? (isHrReview ? 'Verify' : 'Approve')
                         : 'Reject';
                 }
 

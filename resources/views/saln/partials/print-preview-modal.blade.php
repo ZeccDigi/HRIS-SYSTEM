@@ -22,7 +22,7 @@
 
                 <div class="flex justify-end gap-3">
                     <a href="{{ route('salns.download', $saln) }}" data-no-transition class="rounded-lg bg-gray-800 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-gray-700">{{ __('Download') }}</a>
-                    <button type="button" @click="window.print()" class="rounded-lg bg-[#0038a8] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-[#002f8f]">{{ __('Print') }}</button>
+                    <a href="{{ route('salns.download', ['saln' => $saln, 'inline' => 1]) }}" target="_blank" rel="noopener noreferrer" data-no-transition class="rounded-lg bg-[#0038a8] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-[#002f8f]">{{ __('Print') }}</a>
                 </div>
             @else
                 <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500">

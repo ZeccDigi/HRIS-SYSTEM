@@ -430,9 +430,17 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
                         @endforeach
                     </select>
                 </form>
-                <button type="button" onclick="window.print()" class="pds-primary">
+                <a
+                    href="{{ $isHrPreview
+                        ? route('employees.pds.download', ['employee' => $employee->getKey(), 'year' => $selectedYear])
+                        : route('pds.download', ['year' => $selectedYear, 'print' => 1]) }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-no-transition
+                    class="pds-primary"
+                >
                     Print PDF
-                </button>
+                </a>
                 @unless($isHrPreview)
                     <a href="{{ route('pds.download', ['year' => $selectedYear]) }}" data-no-transition class="pds-secondary">Download PDF</a>
                 @endunless

@@ -28,7 +28,7 @@ class CtoController extends Controller
 
         $allCtoRequests = $this->sortCtoRequests($this->filterCtoRequests(
             tap(
-                CtoRequest::with(['employee', 'chief', 'hrstaff', 'regionalDirector'])->whereIn('status', ['approved', 'rejected']),
+                CtoRequest::with(['employee', 'chief', 'hrstaff', 'regionalDirector']),
                 fn ($query) => $isChief ? $this->scopeToChiefDivision($query) : null
             ),
             $search,
@@ -42,12 +42,12 @@ class CtoController extends Controller
                 ->when($isHR && !$isAdmin, fn ($query) => $query->where('hrstaff_status', 'pending'))
                 ->when($isChief, function ($query) {
                     $query
-                        ->whereIn('hrstaff_status', ['approved', 'rejected'])
+                        ->where('hrstaff_status', 'approved')
                         ->where('chief_status', 'pending');
                     $this->scopeToChiefDivision($query);
                 })
                 ->when($isRegionalDirector, fn ($query) => $query
-                    ->whereIn('hrstaff_status', ['approved', 'rejected'])
+                    ->where('hrstaff_status', 'approved')
                     ->where('chief_status', 'approved')
                     ->where('rd_status', 'pending')),
             $search,
@@ -119,17 +119,19 @@ class CtoController extends Controller
 
         $remarks = $validated['remarks'] ?? null;
         $wasFullyApproved = $ctoRequest->status === 'approved';
-
+        // DTR time-out verification is intentionally disabled for the current
+        // manual Earn COC policy. HR approval proceeds using the filed hours.
         DB::transaction(function () use ($validated, $ctoRequest, $role, $employeeId, $isHR, $remarks, $wasFullyApproved) {
             if ($validated['status'] === 'rejected') {
                 if ($isHR) {
                     $ctoRequest->hrstaff_status = 'rejected';
                     $ctoRequest->approved_by_hrstaff = $employeeId;
                     $ctoRequest->hrstaff_remarks = $remarks;
-                    
-                    // Notify only the chief assigned to the employee's division.
-                    $nextLevelUsers = $this->chiefUsersForEmployee($ctoRequest->employee);
-                    Notification::send($nextLevelUsers, new CtoRequestNotification($ctoRequest, 'cto_rejected', 'CTO request rejected by HR.'));
+                    $ctoRequest->status = 'rejected';
+
+                    if ($ctoRequest->employee?->user) {
+                        $ctoRequest->employee->user->notify(new CtoRequestNotification($ctoRequest, 'cto_rejected', 'Your CTO request was rejected during HR verification.'));
+                    }
                 } else {
                     $ctoRequest->status = 'rejected';
                     if ($role === 'chief') {
@@ -172,17 +174,14 @@ class CtoController extends Controller
                     $ctoRequest->status = 'approved';
 
                     if (! $wasFullyApproved && $ctoRequest->employee) {
-                        $newBalance = $ctoRequest->cto_balance_after;
-
-                        if ($newBalance === null) {
-                            $currentBalance = (float) $ctoRequest->employee->cto_balance;
-                            $hours = (float) $ctoRequest->hours;
-                            $newBalance = $ctoRequest->type === 'use'
-                                ? max(0, $currentBalance - $hours)
-                                : $currentBalance + $hours;
-                        }
+                        $currentBalance = (float) $ctoRequest->employee->cto_balance;
+                        $hours = (float) $ctoRequest->hours;
+                        $newBalance = $ctoRequest->type === 'use'
+                            ? max(0, $currentBalance - $hours)
+                            : $currentBalance + $hours;
 
                         $ctoRequest->employee->update(['cto_balance' => $newBalance]);
+                        $ctoRequest->cto_balance_after = $newBalance;
                     }
 
                     if ($ctoRequest->employee?->user) {

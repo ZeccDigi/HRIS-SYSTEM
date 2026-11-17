@@ -3,6 +3,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('leaveApplicationFilterForm');
             const tableBody = document.getElementById('leaveApplicationTableBody');
+            const pagination = document.getElementById('leaveApplicationPagination');
 
             if (!form || !tableBody) {
                 return;
@@ -27,6 +28,9 @@
 
                     const data = await response.json();
                     tableBody.innerHTML = data.html;
+                    if (pagination && typeof data.pagination === 'string') {
+                        pagination.innerHTML = data.pagination;
+                    }
                     if (window.Alpine) {
                         window.Alpine.initTree(tableBody);
                     }

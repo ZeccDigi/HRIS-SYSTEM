@@ -24,30 +24,38 @@ class LeaveApplicationController extends Controller
         $role = strtolower(auth()->user()->role ?? '');
         $search = trim((string) $request->query('search', ''));
         $leaveTypeId = $request->query('leave_type_id', '');
+        $month = (string) $request->query('month', '');
         $sort = $request->query('sort', 'date_filed_desc');
+        $perPage = $this->perPage($request);
         $query = $this->pendingLeaveApplicationsQuery($role);
 
+        $this->applyMonthFilter($query, $month);
         $this->applyFilters($query, $search, $leaveTypeId);
         $this->applySort($query, $sort);
 
-        $leaves = $query->get();
+        $leaves = $query->paginate($perPage)->withPath(route('leave-applications.index'))->withQueryString();
         $leaveTypes = LeaveType::where('is_active', true)->orderBy('name')->get();
 
-        return view('leaves.applications.index', compact('leaves', 'leaveTypes', 'search', 'leaveTypeId', 'sort'));
+        return view('leaves.applications.index', compact('leaves', 'leaveTypes', 'search', 'leaveTypeId', 'month', 'sort'));
     }
 
     public function filter(Request $request)
     {
         $search = trim((string) $request->query('search', ''));
         $leaveTypeId = $request->query('leave_type_id', '');
+        $month = (string) $request->query('month', '');
         $sort = $request->query('sort', 'date_filed_desc');
+        $perPage = $this->perPage($request);
         $role = strtolower(auth()->user()->role ?? '');
         $query = $this->pendingLeaveApplicationsQuery($role);
 
+        $this->applyMonthFilter($query, $month);
         $this->applyFilters($query, $search, $leaveTypeId);
         $this->applySort($query, $sort);
 
-        $leaves = $query->get();
+        $leaves = $query->paginate($perPage)
+            ->withPath(route('leave-applications.index'))
+            ->withQueryString();
         $actionMode = ($role === 'admin') ? 'view' : 'review';
 
         return response()->json([
@@ -56,7 +64,14 @@ class LeaveApplicationController extends Controller
                 'actionMode' => $actionMode,
                 'emptyMessage' => __('No pending leave applications found.'),
             ])->render(),
-            'count' => $leaves->count(),
+            'count' => $leaves->total(),
+            'pagination' => view('partials.table-pagination', [
+                'paginator' => $leaves,
+                'label' => __('leave requests'),
+                'perPageOptions' => [5, 10, 20, 50],
+                'perPageSelectId' => 'pending_leave_per_page',
+                'formAction' => route('leave-applications.index'),
+            ])->render(),
         ]);
     }
 
@@ -68,8 +83,11 @@ class LeaveApplicationController extends Controller
         $role = strtolower(auth()->user()->role ?? '');
         $search = trim((string) $request->query('search', ''));
         $leaveTypeId = $request->query('leave_type_id', '');
+        $month = (string) $request->query('month', '');
         $status = $request->query('status', '');
         $sort = $request->query('sort', 'date_filed_desc');
+        $year = (string) $request->query('year', now()->year);
+        $perPage = $this->perPage($request);
 
         $query = LeaveRequest::with(['employee', 'leaveType'])
             ->when(in_array($status, ['pending', 'approved', 'rejected', 'cancelled'], true), fn ($query) => $query->where('status', $status));
@@ -78,13 +96,16 @@ class LeaveApplicationController extends Controller
             $this->scopeToChiefDivision($query);
         }
 
+        $query->when($year !== '', fn ($query) => $query->whereYear('created_at', $year));
+        $this->applyMonthFilter($query, $month);
+
         $this->applyFilters($query, $search, $leaveTypeId);
         $this->applySort($query, $sort);
 
-        $leaves = $query->get();
+        $leaves = $query->paginate($perPage)->withPath(route('leave-applications.all'))->withQueryString();
         $leaveTypes = LeaveType::where('is_active', true)->orderBy('name')->get();
 
-        return view('leaves.applications.all', compact('leaves', 'leaveTypes', 'search', 'leaveTypeId', 'status', 'sort'));
+        return view('leaves.applications.all', compact('leaves', 'leaveTypes', 'search', 'leaveTypeId', 'month', 'status', 'sort', 'year'));
     }
 
     public function allFilter(Request $request)
@@ -92,8 +113,11 @@ class LeaveApplicationController extends Controller
         $role = strtolower(auth()->user()->role ?? '');
         $search = trim((string) $request->query('search', ''));
         $leaveTypeId = $request->query('leave_type_id', '');
+        $month = (string) $request->query('month', '');
         $status = $request->query('status', '');
         $sort = $request->query('sort', 'date_filed_desc');
+        $year = (string) $request->query('year', now()->year);
+        $perPage = $this->perPage($request);
 
         $query = LeaveRequest::with(['employee', 'leaveType'])
             ->when(in_array($status, ['pending', 'approved', 'rejected', 'cancelled'], true), fn ($query) => $query->where('status', $status));
@@ -102,10 +126,15 @@ class LeaveApplicationController extends Controller
             $this->scopeToChiefDivision($query);
         }
 
+        $query->when($year !== '', fn ($query) => $query->whereYear('created_at', $year));
+        $this->applyMonthFilter($query, $month);
+
         $this->applyFilters($query, $search, $leaveTypeId);
         $this->applySort($query, $sort);
 
-        $leaves = $query->get();
+        $leaves = $query->paginate($perPage)
+            ->withPath(route('leave-applications.all'))
+            ->withQueryString();
 
         return response()->json([
             'html' => view('leaves.applications._rows', [
@@ -113,7 +142,14 @@ class LeaveApplicationController extends Controller
                 'actionMode' => 'view',
                 'emptyMessage' => __('No leave records found.'),
             ])->render(),
-            'count' => $leaves->count(),
+            'count' => $leaves->total(),
+            'pagination' => view('partials.table-pagination', [
+                'paginator' => $leaves,
+                'label' => __('leave requests'),
+                'perPageOptions' => [5, 10, 20, 50],
+                'perPageSelectId' => 'all_leave_per_page',
+                'formAction' => route('leave-applications.all'),
+            ])->render(),
         ]);
     }
 
@@ -128,10 +164,10 @@ class LeaveApplicationController extends Controller
         } elseif ($role === 'hrstaff') {
             $query->where('hrstaff_status', 'pending');
         } elseif ($role === 'chief') {
-            $query->whereIn('hrstaff_status', ['approved', 'rejected'])->where('chief_status', 'pending');
+            $query->where('hrstaff_status', 'approved')->where('chief_status', 'pending');
             $this->scopeToChiefDivision($query);
         } elseif ($role === 'regionaldirector') {
-            $query->whereIn('hrstaff_status', ['approved', 'rejected'])->where('chief_status', 'approved')->where('rd_status', 'pending');
+            $query->where('hrstaff_status', 'approved')->where('chief_status', 'approved')->where('rd_status', 'pending');
         } else {
             $query->where('id', '<', 0);
         }
@@ -157,6 +193,15 @@ class LeaveApplicationController extends Controller
                 });
             })
             ->when($leaveTypeId !== '', fn ($query) => $query->where('leave_type_id', $leaveTypeId));
+    }
+
+    private function applyMonthFilter($query, string $month): void
+    {
+        $monthNumber = (int) $month;
+
+        if ($monthNumber >= 1 && $monthNumber <= 12) {
+            $query->whereMonth('created_at', $monthNumber);
+        }
     }
 
     private function applySort($query, string $sort): void
@@ -235,29 +280,25 @@ class LeaveApplicationController extends Controller
             'remarks' => 'nullable|string',
         ]);
 
+        // HR certifies leave credits. The Division Chief and Regional Director
+        // retain the decision to reject an application.
+        if ($isHR && $validated['status'] !== 'approved') {
+            return redirect()->back()->with('error', __('HR can only verify leave applications. Please add any concern in the remarks.'));
+        }
+
         $remarks = $validated['remarks'] ?? null;
 
         DB::transaction(function () use ($validated, $leaveApplication, $role, $employeeId, $isHR, $remarks) {
             if ($validated['status'] === 'rejected') {
-                if ($isHR) {
-                    $leaveApplication->hrstaff_status = 'rejected';
-                    $leaveApplication->approved_by_hrstaff = $employeeId;
-                    $leaveApplication->hrstaff_remarks = $remarks;
-                    
-                    // Notify only the chief assigned to the employee's division.
-                    $nextLevelUsers = $this->chiefUsersForEmployee($leaveApplication->employee);
-                    Notification::send($nextLevelUsers, new LeaveRequestNotification($leaveApplication));
-                } else {
-                    $leaveApplication->status = 'rejected';
-                    if ($role === 'chief') {
-                        $leaveApplication->chief_status = 'rejected';
-                        $leaveApplication->approved_by_chief = $employeeId;
-                        $leaveApplication->chief_remarks = $remarks;
-                    } elseif ($role === 'regionaldirector') {
-                        $leaveApplication->rd_status = 'rejected';
-                        $leaveApplication->approved_by_regionaldirector = $employeeId;
-                        $leaveApplication->rd_remarks = $remarks;
-                    }
+                $leaveApplication->status = 'rejected';
+                if ($role === 'chief') {
+                    $leaveApplication->chief_status = 'rejected';
+                    $leaveApplication->approved_by_chief = $employeeId;
+                    $leaveApplication->chief_remarks = $remarks;
+                } elseif ($role === 'regionaldirector') {
+                    $leaveApplication->rd_status = 'rejected';
+                    $leaveApplication->approved_by_regionaldirector = $employeeId;
+                    $leaveApplication->rd_remarks = $remarks;
                 }
             } else { // approved/verified
                 if ($isHR) {
@@ -356,5 +397,12 @@ class LeaveApplicationController extends Controller
     private function currentChiefDivision(): string
     {
         return trim((string) auth()->user()?->employee?->division);
+    }
+
+    private function perPage(Request $request): int
+    {
+        $perPage = (int) $request->query('per_page', 5);
+
+        return in_array($perPage, [5, 10, 20, 50], true) ? $perPage : 5;
     }
 }

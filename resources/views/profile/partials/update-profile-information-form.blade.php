@@ -26,9 +26,19 @@
 
         @if($user->employee)
             <div>
-                <x-input-label :value="__('Recovery / OTP Email')" />
-                <x-text-input type="text" class="mt-1 block w-full bg-gray-50 border-gray-100 text-gray-500" :value="$user->employee->notification_email ?: __('No recovery email registered')" disabled />
-                <p class="mt-1 text-xs text-gray-500">{{ __("Password reset OTPs and account notices are sent here. Contact HR if this email needs to be changed.") }}</p>
+                <x-input-label for="notification_email" :value="__('Recovery / OTP Email')" />
+                <x-text-input
+                    id="notification_email"
+                    name="notification_email"
+                    type="email"
+                    class="mt-1 block w-full"
+                    :value="old('notification_email', $user->employee->notification_email)"
+                    placeholder="name@example.com"
+                    autocomplete="email"
+                    required
+                />
+                <p class="mt-1 text-xs text-gray-500">{{ __('Password reset OTPs and account notices are sent here.') }}</p>
+                <x-input-error class="mt-2" :messages="$errors->get('notification_email')" />
             </div>
 
             <div>
@@ -40,7 +50,6 @@
         <div>
             <x-input-label for="hris_username" :value="__('HRIS Username')" />
             <x-text-input id="hris_username" type="text" class="mt-1 block w-full bg-gray-50 text-gray-500" :value="$user->email" disabled />
-            <p class="mt-1 text-xs text-gray-500">{{ __("This is your HRIS sign-in username. It is not an email inbox.") }}</p>
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div>

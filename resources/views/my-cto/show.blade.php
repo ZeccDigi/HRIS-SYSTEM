@@ -46,20 +46,53 @@
             @endphp
 
             <div class="mb-5 flex items-center justify-between gap-3">
-                <a href="{{ $isApprover ? route('hr.cto.index') : route('my-cto.index') }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    {{ __('Back') }}
-                </a>
-                <button type="button" onclick="printCtoForm()" class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700">
+                <x-page-action href="{{ $isApprover ? route('hr.cto.index') : route('my-cto.index') }}" />
+                @if($ctoRequest->canBeEditedBy(auth()->user()->employee))
+                    <x-page-action href="{{ route('my-cto.edit', $ctoRequest) }}" kind="edit" class="ml-auto" />
+                @endif
+                <a href="{{ route('my-cto.print', $ctoRequest) }}" target="_blank" rel="noopener" data-no-transition class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700">
                     {{ __('Print CTO') }}
-                </button>
+                </a>
             </div>
 
-            <x-approval-tracker :payload="$trackedCtoPayload" event="cto-selected" empty="No CTO request to track yet." />
+            <x-approval-tracker :payload="$trackedCtoPayload" event="cto-selected" empty="No CTO request to track yet." compact />
 
-            {{-- Attachment --}}
+            {{-- CTO form preview --}}
+            <section class="mt-8 rounded-[2rem] border border-gray-100 bg-white p-3 shadow-sm sm:p-5">
+                <div class="mx-auto w-full max-w-[1100px] overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                    <iframe
+                        id="ctoPreviewFrame"
+                        src="{{ route('my-cto.print', [
+                            'ctoRequest' => $ctoRequest->id,
+                            'preview' => 1
+                        ]) }}"
+                        class="block w-full border-0 bg-white"
+                        style="height: 1px;"
+                        scrolling="no"
+                        title="{{ __('CTO form print preview') }}"
+                    ></iframe>
+                </div>
+            </section>
+
+            @if($ctoRequest->type === 'earn')
+                <section class="mt-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600">{{ __('Earn COC Request Details') }}</p>
+                    <dl class="mt-4 space-y-4">
+                        <div>
+                            <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('Description of Work Rendered') }}</dt>
+                            <dd class="mt-1 whitespace-pre-line text-sm leading-6 text-slate-800">{{ $ctoRequest->purpose }}</dd>
+                        </div>
+                        @if($ctoRequest->overtime_authority_reference)
+                            <div class="border-t border-slate-100 pt-4">
+                                <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('Overtime Memo / Authority Reference') }}</dt>
+                                <dd class="mt-1 text-sm text-slate-800">{{ $ctoRequest->overtime_authority_reference }}</dd>
+                            </div>
+                        @endif
+                    </dl>
+                </section>
+            @endif
+
+            {{-- Attachment shown below the form and Earn COC request details. --}}
             @if($ctoRequest->attachment_path)
                 <section class="mt-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -67,12 +100,10 @@
                             <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">
                                 {{ __('Attached File') }}
                             </span>
-
                             <p class="mt-1 text-sm font-semibold text-gray-700">
                                 {{ __('Supporting document submitted with this CTO request.') }}
                             </p>
                         </div>
-
                         <a
                             href="{{ asset('storage/' . $ctoRequest->attachment_path) }}"
                             target="_blank"
@@ -86,26 +117,8 @@
                 </section>
             @endif
 
-            {{-- Full CTO Form --}}
-            <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-                <div class="bg-slate-100 px-3 pb-3 pt-6 sm:px-5 sm:pb-5 sm:pt-8">
-                    <div class="mx-auto w-full max-w-[1100px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                        <iframe
-                            id="ctoPreviewFrame"
-                            src="{{ route('my-cto.print', [
-                                'ctoRequest' => $ctoRequest->id,
-                                'preview' => 1
-                            ]) }}"
-                            class="block w-full border-0 bg-white"
-                            style="height: 1300px;"
-                            scrolling="no"
-                            title="{{ __('CTO form print preview') }}"
-                        ></iframe>
-                    </div>
-                </div>
-            </section>
-
-            {{-- Review Action Below Form --}}
+            {{-- Review action appears only to the current approver. --}}
+            @if($isMyTurn)
             <section class="mt-6 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-7">
                 @if($isMyTurn)
                     <div class="mb-6 flex flex-col gap-3 border-b border-gray-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
@@ -285,6 +298,7 @@
                     </div>
                 @endif
             </section>
+            @endif
 
             @if($ctoRequest->hrstaff_remarks || $ctoRequest->chief_remarks || $ctoRequest->rd_remarks)
                 <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
@@ -371,6 +385,7 @@
 
                     const html = iframeDocument.documentElement;
                     const body = iframeDocument.body;
+                    const paper = iframeDocument.getElementById('cto-preview-sheet');
 
                     if (html) {
                         html.style.overflow = 'hidden';
@@ -381,16 +396,14 @@
                         body.style.margin = '0';
                     }
 
-                    const fullHeight = Math.max(
-                        body?.scrollHeight || 0,
-                        body?.offsetHeight || 0,
-                        html?.clientHeight || 0,
-                        html?.scrollHeight || 0,
-                        html?.offsetHeight || 0,
-                        1300
+                    const fullHeight = Math.ceil(
+                        paper?.getBoundingClientRect().height ||
+                        body?.scrollHeight ||
+                        html?.scrollHeight ||
+                        0
                     );
 
-                    iframe.style.height = `${fullHeight + 10}px`;
+                    iframe.style.height = `${fullHeight + 2}px`;
                 } catch (error) {
                     console.warn(
                         'Unable to resize the CTO preview.',

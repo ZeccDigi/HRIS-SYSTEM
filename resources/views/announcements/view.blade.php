@@ -49,14 +49,13 @@
                 })
                 ->all();
 
-        $availableYears = range(
-            now()->year,
-            now()->year - 3
-        );
+        $availableYears = isset($years) && $years->isNotEmpty()
+            ? $years->all()
+            : range(now()->year, now()->year - 3);
     @endphp
 
-    <div class="py-10 sm:py-12">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="px-1 py-3 sm:px-2 lg:px-3">
+        <div class="w-full">
 
             {{-- Year selector --}}
             <div class="flex items-center justify-end">
@@ -91,8 +90,9 @@
                 id="publicAnnouncementFilterForm"
                 method="GET"
                 action="{{ route('announcements.view') }}"
-                class="mt-8 flex flex-col gap-2 sm:flex-row sm:items-center"
+                class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center"
             >
+                <input type="hidden" name="per_page" value="{{ request('per_page', 5) }}">
                 {{-- Search --}}
                 <div class="relative min-w-0 sm:flex-1">
                     <label
@@ -209,7 +209,7 @@
             {{-- Announcement results --}}
             <div
                 id="publicAnnouncementResults"
-                class="mt-8 transition-opacity duration-200"
+                class="mt-3 transition-opacity duration-200"
             >
                 @include('announcements.partials.public-results', [
                     'announcements' => $announcements,

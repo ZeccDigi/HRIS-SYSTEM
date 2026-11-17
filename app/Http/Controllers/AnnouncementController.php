@@ -28,6 +28,7 @@ class AnnouncementController extends Controller
         $year = (int) $request->query('year', now()->year);
         $month = $request->query('month', 'all');
         $sort = $request->query('sort', 'latest');
+        $perPage = $this->perPage($request);
         $month = preg_match('/^\d{2}$/', (string) $month) ? $month : 'all';
         $mine = $request->boolean('mine');
         $categories = ['General', 'Meeting', 'Memo', 'Training', 'Workshop', 'Office Orders', 'Advisory'];
@@ -49,8 +50,9 @@ class AnnouncementController extends Controller
         ]);
 
         $announcements = $this->announcementIndexQuery($search, $status, $category, $year, $month, $mine, $sort)
-            ->paginate(10)
-            ->appends($request->only(['search', 'status', 'category', 'year', 'month', 'mine', 'sort']));
+            ->paginate($perPage)
+            ->withPath(route('announcements.index'))
+            ->withQueryString();
 
         return view('announcements.index', compact('announcements', 'search', 'status', 'category', 'year', 'years', 'month', 'categories', 'months', 'mine', 'sort'));
     }
@@ -63,15 +65,20 @@ class AnnouncementController extends Controller
         $year = (int) $request->query('year', now()->year);
         $month = $request->query('month', 'all');
         $sort = $request->query('sort', 'latest');
+        $perPage = $this->perPage($request);
         $month = preg_match('/^\d{2}$/', (string) $month) ? $month : 'all';
         $mine = $request->boolean('mine');
 
         $announcements = $this->announcementIndexQuery($search, $status, $category, $year, $month, $mine, $sort)
-            ->paginate(10)
-            ->appends($request->only(['search', 'status', 'category', 'year', 'month', 'mine', 'sort']));
+            ->paginate($perPage)
+            ->withPath(route('announcements.index'))
+            ->withQueryString();
 
         return response()->json([
-            'html' => view('announcements.partials.results', compact('announcements'))->render(),
+            'html' => view('announcements.partials.results', [
+                'announcements' => $announcements,
+                'paginationAction' => route('announcements.index'),
+            ])->render(),
             'count' => $announcements->total(),
         ]);
     }
@@ -113,19 +120,32 @@ class AnnouncementController extends Controller
     public function userIndex(Request $request)
     {
         $search = $request->query('search');
+        $category = $request->query('category', 'all');
+        $year = (int) $request->query('year', now()->year);
         $month = $request->query('month', 'all');
         $sort = $request->query('sort', 'latest');
-        $month = preg_match('/^\d{4}-\d{2}$/', $month) ? $month : 'all';
-        $months = Announcement::published()
+        $perPage = $this->perPage($request);
+        $month = preg_match('/^\d{2}$/', (string) $month) ? $month : 'all';
+        $categories = ['General', 'Meeting', 'Memo', 'Training', 'Workshop', 'Office Orders', 'Advisory'];
+        $years = Announcement::published()
             ->visibleTo($request->user())
             ->latest()
             ->get(['created_at'])
-            ->map(fn ($announcement) => [
-                'value' => $announcement->created_at->format('Y-m'),
-                'label' => $announcement->created_at->format('F Y'),
-            ])
-            ->unique('value')
+            ->toBase()
+            ->map(fn ($announcement) => (int) $announcement->created_at->format('Y'))
+            ->push(now()->year)
+            ->unique()
+            ->sortDesc()
             ->values();
+
+        if (! $years->contains($year)) {
+            $year = (int) ($years->first() ?: now()->year);
+        }
+
+        $months = collect(range(1, 12))->map(fn ($number) => [
+            'value' => str_pad((string) $number, 2, '0', STR_PAD_LEFT),
+            'label' => Carbon::create($year, $number, 1)->format('F'),
+        ]);
 
         $announcements = Announcement::with('author.employee')
             ->published()
@@ -138,15 +158,16 @@ class AnnouncementController extends Controller
                         ->orWhere('tags', 'like', "%{$search}%");
                 });
             })
-            ->when($month !== 'all', function ($query) use ($month) {
+            ->when($category !== 'all', fn ($query) => $query->where('tags', 'like', "%{$category}%"))
+            ->when($month !== 'all', function ($query) use ($year, $month) {
                 $query->whereBetween('created_at', [
-                    Carbon::createFromFormat('Y-m', $month)->startOfMonth(),
-                    Carbon::createFromFormat('Y-m', $month)->endOfMonth(),
+                    Carbon::create($year, (int) $month, 1)->startOfMonth(),
+                    Carbon::create($year, (int) $month, 1)->endOfMonth(),
                 ]);
-            })
+            }, fn ($query) => $query->whereYear('created_at', $year))
             ->when($sort === 'oldest', fn ($query) => $query->oldest(), fn ($query) => $query->latest())
-            ->paginate(12)
-            ->appends($request->only(['search', 'month', 'sort']));
+            ->paginate($perPage)
+            ->withQueryString();
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -155,7 +176,17 @@ class AnnouncementController extends Controller
             ]);
         }
 
-        return view('announcements.view', compact('announcements', 'search', 'month', 'months', 'sort'));
+        return view('announcements.view', compact(
+            'announcements',
+            'search',
+            'category',
+            'year',
+            'month',
+            'months',
+            'categories',
+            'years',
+            'sort'
+        ));
     }
 
     /**
@@ -310,21 +341,17 @@ class AnnouncementController extends Controller
     {
         $this->ensureCanManageAnnouncement($announcement);
 
-        if ($announcement->attachment_path) {
-            Storage::disk('public')->delete($announcement->attachment_path);
-        }
-
         $announcement->delete();
 
         AuditLogListener::logActivity(
-            'Delete Announcement',
+            'Archive Announcement',
             'System',
-            "Deleted announcement: {$announcement->title}",
+            "Archived announcement: {$announcement->title}",
             auth()->user()
         );
 
         return redirect()->route('announcements.index')
-            ->with('success', 'Announcement deleted successfully.');
+            ->with('success', 'Announcement moved to Archive.');
     }
 
     private function isChief(?User $user): bool
@@ -363,5 +390,12 @@ class AnnouncementController extends Controller
         return User::query()
             ->whereHas('employee', fn ($query) => $query->where('division', $announcement->audience_division))
             ->get();
+    }
+
+    private function perPage(Request $request): int
+    {
+        $perPage = (int) $request->query('per_page', 5);
+
+        return in_array($perPage, [5, 10, 20, 50], true) ? $perPage : 5;
     }
 }

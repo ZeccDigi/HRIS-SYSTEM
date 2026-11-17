@@ -4,7 +4,6 @@
     @php
         $currentYear = now()->year;
         $selectedYear = request('year', $currentYear);
-        $selectedStatus = request('status', '');
     @endphp
 
     <div
@@ -60,6 +59,7 @@
                 data-filter-url="{{ route('leave-applications.filter') }}"
                 class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:flex-row sm:items-center"
             >
+                <input type="hidden" name="per_page" value="{{ request('per_page', 5) }}">
                 {{-- Search --}}
                 <div class="relative min-w-0 sm:flex-1">
                     <label
@@ -95,71 +95,47 @@
                     />
                 </div>
 
-                {{-- Status filter --}}
-                <div class="sm:w-40 sm:shrink-0">
-                    <label
-                        for="status"
-                        class="sr-only"
-                    >
-                        {{ __('Status') }}
-                    </label>
-
-                    <select
-                        id="status"
-                        name="status"
-                        class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    >
-                        <option value="">
-                            {{ __('Status') }}
-                        </option>
-
-                        <option
-                            value="pending"
-                            {{ $selectedStatus === 'pending' ? 'selected' : '' }}
-                        >
-                            {{ __('Pending') }}
-                        </option>
-
-                        <option
-                            value="approved"
-                            {{ $selectedStatus === 'approved' ? 'selected' : '' }}
-                        >
-                            {{ __('Approved') }}
-                        </option>
-
-                        <option
-                            value="rejected"
-                            {{ $selectedStatus === 'rejected' ? 'selected' : '' }}
-                        >
-                            {{ __('Rejected') }}
-                        </option>
-                    </select>
-                </div>
-
                 {{-- Leave type filter --}}
-                <div class="sm:w-52 sm:shrink-0">
-                    <label
-                        for="leave_type_id"
-                        class="sr-only"
-                    >
-                        {{ __('Leave Type') }}
-                    </label>
-
+                <div class="sm:w-40 sm:shrink-0">
+                    <label for="leave_type_id" class="sr-only">{{ __('Leave Type') }}</label>
                     <select
                         id="leave_type_id"
                         name="leave_type_id"
                         class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     >
+                        <option value="">{{ __('Types') }}</option>
+                        @foreach($leaveTypes as $leaveType)
+                            <option value="{{ $leaveType->id }}" {{ (string) $leaveTypeId === (string) $leaveType->id ? 'selected' : '' }}>
+                                {{ $leaveType->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- Month filter --}}
+                <div class="sm:w-52 sm:shrink-0">
+                    <label
+                        for="month"
+                        class="sr-only"
+                    >
+                        {{ __('Month') }}
+                    </label>
+
+                    <select
+                        id="month"
+                        name="month"
+                        class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    >
                         <option value="">
-                            {{ __('Leave Types') }}
+                            {{ __('All Months') }}
                         </option>
 
-                        @foreach($leaveTypes as $leaveType)
+                        @foreach(range(1, 12) as $monthNumber)
                             <option
-                                value="{{ $leaveType->id }}"
-                                {{ (string) $leaveTypeId === (string) $leaveType->id ? 'selected' : '' }}
+                                value="{{ $monthNumber }}"
+                                {{ (string) ($month ?? request('month')) === (string) $monthNumber ? 'selected' : '' }}
                             >
-                                {{ $leaveType->name }}
+                                {{ \Carbon\Carbon::create()->month($monthNumber)->format('F') }}
                             </option>
                         @endforeach
                     </select>
@@ -181,37 +157,37 @@
                 <div class="w-full min-w-0">
                     <table class="w-full table-fixed divide-y divide-slate-200">
                         <colgroup>
-                            <col class="w-[9%]"> {{-- Date Filed --}}
-    <col class="w-[15%]"> {{-- Name --}}
-    <col class="w-[14%]"> {{-- Leave Type --}}
-    <col class="w-[13%]"> {{-- Leave Certification --}}
-    <col class="w-[14%]"> {{-- Recommending Approval --}}
-    <col class="w-[13%]"> {{-- Approval --}}
-    <col class="w-[10%]"> {{-- Status --}}
-    <col class="w-[12%]"> {{-- Actions --}}
+                            <col class="w-[11%]"> {{-- Date Filed --}}
+                            <col class="w-[16%]"> {{-- Name --}}
+                            <col class="w-[17%]"> {{-- Leave Type --}}
+                            <col class="w-[11%]"> {{-- Leave Certification --}}
+                            <col class="w-[12%]"> {{-- Recommending Approval --}}
+                            <col class="w-[10%]"> {{-- Final Approval --}}
+                            <col class="w-[10%]"> {{-- Status --}}
+                            <col class="w-[13%]"> {{-- Actions --}}
                         </colgroup>
 
                         <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                             <tr>
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
-                                    {{ __('Date Filed') }}
+                                    <span class="whitespace-nowrap">{{ __('Date Filed') }}</span>
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
                                     {{ __('Name') }}
                                 </th>
 
                                 <th
                                     scope="col"
-                                    class="break-words whitespace-normal px-2 py-3 text-left text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
-                                    {{ __('Leave Type') }}
+                                    <span class="whitespace-nowrap">{{ __('Leave Type') }}</span>
                                 </th>
 
 
@@ -219,21 +195,30 @@
                                     scope="col"
                                     class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
-                                    {{ __('Leave Certification') }}
+                                    <span class="inline-flex w-full flex-col items-center">
+                                        <span>{{ __('Leave') }}</span>
+                                        <span>{{ __('Certification') }}</span>
+                                    </span>
                                 </th>
 
                                 <th
                                     scope="col"
                                     class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
-                                    {{ __('Recommending Approval') }}
+                                    <span class="inline-flex w-full flex-col items-center">
+                                        <span>{{ __('Recommending') }}</span>
+                                        <span>{{ __('Approval') }}</span>
+                                    </span>
                                 </th>
 
                                 <th
                                     scope="col"
                                     class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                 >
-                                    {{ __('Approval') }}
+                                    <span class="inline-flex w-full flex-col items-center">
+                                        <span>{{ __('Final') }}</span>
+                                        <span>{{ __('Approval') }}</span>
+                                    </span>
                                 </th>
     
                                 <th
@@ -263,6 +248,14 @@
                             ])
                         </tbody>
                     </table>
+                </div>
+                <div id="leaveApplicationPagination">
+                    @include('partials.table-pagination', [
+                        'paginator' => $leaves,
+                        'label' => __('leave requests'),
+                        'perPageOptions' => [5, 10, 20, 50],
+                        'perPageSelectId' => 'pending_leave_per_page',
+                    ])
                 </div>
             </div>
         </div>

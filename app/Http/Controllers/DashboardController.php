@@ -210,10 +210,18 @@ class DashboardController extends Controller
         $canReviewEmployeeDocuments = in_array($role, ['admin', 'hrstaff', 'regionaldirector'], true);
         $pdsQuery = Employee::with(['pdsSectionReviews' => fn ($query) => $query->where('status', 'pending')->latest()])
             ->whereHas('pdsSectionReviews', fn ($query) => $query->where('status', 'pending'));
+        $latestPdsQuery = Employee::with([
+            'pdsSectionReviews' => fn ($query) => $query->latest(),
+            'pdsSnapshots' => fn ($query) => $query->latest('year'),
+        ])
+            ->whereHas('pdsSnapshots')
+            ->withMax('pdsSnapshots', 'updated_at')
+            ->orderByDesc('pds_snapshots_max_updated_at');
         $salnQuery = Saln::with('employee')->where('review_status', 'pending');
 
         if (! $canReviewEmployeeDocuments) {
             $pdsQuery->whereRaw('1 = 0');
+            $latestPdsQuery->whereRaw('1 = 0');
             $salnQuery->whereRaw('1 = 0');
         }
 
@@ -238,6 +246,10 @@ class DashboardController extends Controller
                 'query' => $pdsQuery,
                 'title' => fn (Employee $employee) => $employee->pdsSectionReviews->count().' section'.($employee->pdsSectionReviews->count() === 1 ? '' : 's').' updated',
                 'date' => fn (Employee $employee) => $employee->pdsSectionReviews->first()?->updated_at?->format('M d, Y') ?? $employee->updated_at?->format('M d, Y'),
+                'fallback_query' => $latestPdsQuery,
+                'fallback_title' => fn (Employee $employee) => 'PDS '.($employee->pdsSnapshots->first()?->year ?? now()->year),
+                'fallback_date' => fn (Employee $employee) => $employee->pdsSnapshots->first()?->updated_at?->format('M d, Y') ?? $employee->updated_at?->format('M d, Y'),
+                'fallback_status' => 'verified',
             ],
             [
                 'label' => 'SALN',
@@ -262,6 +274,12 @@ class DashboardController extends Controller
         $latestApprovals = $approvalSources
             ->map(function ($source) {
                 $record = (clone $source['query'])->latest()->first();
+                $isFallback = false;
+
+                if (! $record && isset($source['fallback_query'])) {
+                    $record = (clone $source['fallback_query'])->first();
+                    $isFallback = (bool) $record;
+                }
 
                 if (! $record) {
                     return null;
@@ -275,10 +293,15 @@ class DashboardController extends Controller
 
                 return [
                     'label' => $source['label'],
-                    'title' => $source['title']($record),
+                    'title' => $isFallback && isset($source['fallback_title'])
+                        ? $source['fallback_title']($record)
+                        : $source['title']($record),
                     'employee' => $employeeName ?: 'Employee',
-                    'date' => $source['date']($record) ?: '',
+                    'date' => $isFallback && isset($source['fallback_date'])
+                        ? ($source['fallback_date']($record) ?: '')
+                        : ($source['date']($record) ?: ''),
                     'url' => is_string($source['route']) ? $source['route'] : $source['route']($record),
+                    'status' => $isFallback ? ($source['fallback_status'] ?? 'current') : 'pending',
                 ];
             })
             ->filter()

@@ -2,7 +2,7 @@
     <x-slot name="title">{{ __('Employee Details') }} - {{ $employee->firstname }} {{ $employee->lastname }}</x-slot>
 
     @php
-        $employeeInitialTab = in_array(request('tab'), ['pds', 'leave-credits', 'cto-credits', 'saln'], true)
+        $employeeInitialTab = in_array(request('tab'), ['pds', 'leave-credits', 'cto-credits', 'core-time', 'saln'], true)
             ? request('tab')
             : 'pds';
     @endphp
@@ -51,18 +51,21 @@
                 </div>
 
                 <!-- Tabs Navigation -->
-                <div class="flex border-t border-gray-100 px-6 sm:px-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
-                    <button @click="tab = 'pds'" :class="tab === 'pds' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="px-6 py-4 border-b-2 font-bold text-sm transition-all focus:outline-none">
+                <div class="flex overflow-x-auto whitespace-nowrap border-t border-gray-100 px-4 sm:px-5 scrollbar-hide">
+                    <button @click="tab = 'pds'" :class="tab === 'pds' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="border-b-2 px-4 py-3 text-xs font-bold transition-all focus:outline-none sm:text-sm">
                         {{ __('Personal Data Sheet (PDS)') }}
                     </button>
-                    <button @click="tab = 'leave-credits'" :class="tab === 'leave-credits' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="px-6 py-4 border-b-2 font-bold text-sm transition-all focus:outline-none">
+                    <button @click="tab = 'saln'" :class="tab === 'saln' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="border-b-2 px-4 py-3 text-xs font-bold transition-all focus:outline-none sm:text-sm">
+                        {{ __('SALN') }}
+                    </button>
+                    <button @click="tab = 'leave-credits'" :class="tab === 'leave-credits' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="border-b-2 px-4 py-3 text-xs font-bold transition-all focus:outline-none sm:text-sm">
                         {{ __('Leave Credits') }}
                     </button>
-                    <button @click="tab = 'cto-credits'" :class="tab === 'cto-credits' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="px-6 py-4 border-b-2 font-bold text-sm transition-all focus:outline-none">
+                    <button @click="tab = 'cto-credits'" :class="tab === 'cto-credits' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="border-b-2 px-4 py-3 text-xs font-bold transition-all focus:outline-none sm:text-sm">
                         {{ __('CTO Credits') }}
                     </button>
-                    <button @click="tab = 'saln'" :class="tab === 'saln' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="px-6 py-4 border-b-2 font-bold text-sm transition-all focus:outline-none">
-                        {{ __('SALN') }}
+                    <button @click="tab = 'core-time'" :class="tab === 'core-time' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="border-b-2 px-4 py-3 text-xs font-bold transition-all focus:outline-none sm:text-sm">
+                        {{ __('Core Time') }}
                     </button>
                 </div>
             </div>
@@ -102,17 +105,34 @@
                             ->values();
                     @endphp
 
-                    <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
-                        <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+                        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <h3 class="text-xl font-black tracking-tight text-gray-900">{{ __('PDS Updates for Verification') }}</h3>
-                                <p class="mt-1 text-sm font-medium text-slate-500">{{ __('Pending employee changes that need HR review.') }}</p>
+                                <h3 class="text-lg font-black tracking-tight text-gray-900">{{ $pdsYear === (int) now()->year ? __('PDS Updates for Verification') : __('Saved PDS for :year', ['year' => $pdsYear]) }}</h3>
+                                @if($pdsYear === (int) now()->year)
+                                    <p class="mt-0.5 text-xs font-medium text-slate-500">{{ __('Pending employee changes that need HR review.') }}</p>
+                                @endif
                             </div>
-                            <a href="{{ route('employees.pds.print', ['employee' => $employee->id]) }}" data-no-transition class="inline-flex h-11 items-center justify-center rounded-xl bg-indigo-600 px-5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700">
-                                {{ __('Open Preview') }}
-                            </a>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <form method="GET" action="{{ route('employees.show', $employee) }}">
+                                    <input type="hidden" name="tab" value="pds">
+                                    <input type="hidden" name="saln_year" value="{{ $salnYear }}">
+                                    <label for="employee-pds-year" class="sr-only">{{ __('PDS Year') }}</label>
+                                    <select id="employee-pds-year" name="pds_year" onchange="this.form.submit()" class="h-9 rounded-lg border-slate-300 py-1 text-sm">
+                                        @foreach($pdsYears as $year)
+                                            <option value="{{ $year }}" @selected($pdsYear === $year)>{{ $year }}</option>
+                                        @endforeach
+                                    </select>
+                                </form>
+                                <a href="{{ route('employees.pds.print', ['employee' => $employee->id, 'year' => $pdsYear]) }}" data-no-transition class="inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700">
+                                    {{ __('Open Preview') }}
+                                </a>
+                            </div>
                         </div>
 
+                        @if($pdsYear !== (int) now()->year)
+                            <p class="text-sm text-slate-600">{{ __('Open Preview to view the saved PDS for this year.') }}</p>
+                        @else
                         <div class="overflow-hidden rounded-xl border border-slate-200">
                             @if($pdsPendingReviews->isNotEmpty())
                                 <table class="w-full table-fixed divide-y divide-slate-100">
@@ -146,12 +166,9 @@
                                                 </td>
                                                 <td class="px-5 py-4 align-middle">
                                                     <div class="flex justify-center">
-                                                        <button type="button" @click="reviewModalOpen = true; currentSection = @js($review->section_name); sectionData = @js($pdsReviewSections[$review->section_name] ?? null); changedFields = @js($changed['fields']); changedEntries = @js($changed['entries']); reviewStatus = 'approved'; reviewRemarks = @js($review->remarks ?? '')" class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition hover:bg-indigo-100" title="{{ __('Review update') }}">
-                                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.269 2.943 9.542 7-1.273 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                            </svg>
-                                                        </button>
+                                                        <a href="{{ route('employees.pds.show', $employee) }}" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition-colors hover:bg-indigo-50 hover:text-indigo-900" title="{{ __('View PDS record') }}" aria-label="{{ __('View PDS record') }}">
+                                                            <i class="fa-solid fa-eye text-sm" aria-hidden="true"></i>
+                                                        </a>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -267,18 +284,19 @@
                                 </a>
                             </div>
                         </div>
+                        @endif
                     </div>
                 </div>
 
                 <!-- Leave Credits Tab -->
                 <div x-show="tab === 'leave-credits'" x-data="{ leaveCreditSearch: '', adjustModalOpen: {{ $errors->has('leave_credit_id') || $errors->has('operation') || $errors->has('amount') ? 'true' : 'false' }} }" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;">
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-                        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+                        <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                             <div>
-                                <h3 class="text-xl font-black text-gray-900 tracking-tight">{{ __('Leave Credits') }}</h3>
+                                <h3 class="text-lg font-black tracking-tight text-gray-900">{{ __('Leave Credits') }}</h3>
                             </div>
                             <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto">
-                                <div class="relative w-full sm:w-[25rem] lg:w-[28rem]">
+                                <div class="relative w-full sm:w-[20rem] lg:w-[23rem]">
                                     <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M21 21l-4.35-4.35M10.75 18.5a7.75 7.75 0 100-15.5 7.75 7.75 0 000 15.5z" />
@@ -288,10 +306,10 @@
                                         type="search"
                                         x-model.debounce.150ms="leaveCreditSearch"
                                         placeholder="{{ __('Search leave type...') }}"
-                                        class="block h-11 w-full rounded-xl border-gray-300 bg-white pl-10 pr-3 text-sm font-medium shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-indigo-500"
+                                        class="block h-9 w-full rounded-lg border-gray-300 bg-white pl-10 pr-3 text-sm font-medium shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-indigo-500"
                                     >
                                 </div>
-                                <button type="button" @click="adjustModalOpen = true" class="inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-indigo-600 px-5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700">
+                                <button type="button" @click="adjustModalOpen = true" class="inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M12 5v14m7-7H5" />
                                     </svg>
@@ -458,10 +476,10 @@
                         $pendingCtoCount = $employee->ctoRequests->where('status', 'pending')->count();
                     @endphp
 
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-                        <div class="mb-6">
-                            <h3 class="text-xl font-black text-gray-900 tracking-tight">{{ __('CTO Credits') }}</h3>
-                            <p class="text-sm font-medium text-gray-500">{{ __('Current compensatory time-off balance and activity for this employee.') }}</p>
+                    <div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+                        <div class="mb-4">
+                            <h3 class="text-lg font-black tracking-tight text-gray-900">{{ __('CTO Credits') }}</h3>
+                            <p class="mt-0.5 text-xs font-medium text-gray-500">{{ __('Current compensatory time-off balance and activity for this employee.') }}</p>
                         </div>
 
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -542,6 +560,41 @@
                     </div>
                 </div>
 
+                <!-- Core Time Tab -->
+                <div
+                    x-show="tab === 'core-time'"
+                    x-transition:enter="transition ease-out duration-300"
+                    x-transition:enter-start="opacity-0 translate-y-4"
+                    x-transition:enter-end="opacity-100 translate-y-0"
+                    style="display: none;"
+                >
+                    <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+                        <form
+                            method="POST"
+                            action="{{ route('employees.core-time.update', $employee) }}"
+                            class="grid grid-cols-1 gap-4 md:grid-cols-2"
+                            x-data="{ coreTimeEditing: @js($errors->has('core_time_start_date') || $errors->has('core_time_end_date') || $errors->has('core_time_schedule')) }"
+                        >
+                            @csrf
+                            @method('PATCH')
+                            @include('employees.partials.core-time-fields', ['employee' => $employee])
+
+                            <div x-show="coreTimeEditing" x-cloak class="flex justify-end gap-3 border-t border-gray-100 pt-3 md:col-span-2">
+                                <button
+                                    type="button"
+                                    @click="$el.form.reset(); coreTimeEditing = false"
+                                    class="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-[11px] font-black uppercase tracking-wider text-gray-700 transition hover:bg-gray-50"
+                                >
+                                    {{ __('Cancel') }}
+                                </button>
+                                <button type="submit" class="inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700">
+                                    {{ __('Save Core Time') }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
                 <!-- SALN Tab -->
                 <div
                     x-show="tab === 'saln'"
@@ -551,23 +604,32 @@
                     x-transition:enter-end="opacity-100 translate-y-0"
                     style="display: none;"
                 >
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5">
-                        <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+                        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <h3 class="text-xl font-black text-gray-900 tracking-tight">{{ __('SALN Records') }}</h3>
-                                <p class="mt-1 text-sm font-medium text-slate-500">{{ __('Employee Statement of Assets, Liabilities, and Net Worth records.') }}</p>
+                                <h3 class="text-lg font-black tracking-tight text-gray-900">{{ __('SALN Records') }}</h3>
+                                <p class="mt-0.5 text-xs font-medium text-slate-500">{{ __('Employee Statement of Assets, Liabilities, and Net Worth records.') }}</p>
                             </div>
-                            @if($employee->salns && $employee->salns->count() > 0)
-                                @php
-                                    $latestSalnRecord = $employee->salns->sortByDesc('as_of_date')->first();
-                                @endphp
-                                <a href="{{ route('salns.show', ['saln' => $latestSalnRecord, 'back' => route('employees.show', ['employee' => $employee, 'tab' => 'saln'])]) }}" data-no-transition class="inline-flex h-11 items-center justify-center rounded-xl bg-indigo-600 px-5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700">
-                                    {{ __('Open Preview') }}
-                                </a>
-                            @endif
+                            <div class="flex flex-wrap items-center gap-2">
+                                <form method="GET" action="{{ route('employees.show', $employee) }}">
+                                    <input type="hidden" name="tab" value="saln">
+                                    <input type="hidden" name="pds_year" value="{{ $pdsYear }}">
+                                    <label for="employee-saln-year" class="sr-only">{{ __('SALN Year') }}</label>
+                                    <select id="employee-saln-year" name="saln_year" onchange="this.form.submit()" class="h-9 rounded-lg border-slate-300 py-1 text-sm">
+                                        @foreach($salnYears as $year)
+                                            <option value="{{ $year }}" @selected($salnYear === $year)>{{ $year }}</option>
+                                        @endforeach
+                                    </select>
+                                </form>
+                                @if($latestSalnRecord = $salnRecords->first())
+                                    <a href="{{ route('salns.show', ['saln' => $latestSalnRecord, 'back' => $salnBackUrl]) }}" data-no-transition class="inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700">
+                                        {{ __('Open Preview') }}
+                                    </a>
+                                @endif
+                            </div>
                         </div>
 
-                        @if($employee->salns && $employee->salns->count() > 0)
+                        @if($salnRecords->isNotEmpty())
                             <div class="overflow-hidden rounded-xl border border-gray-100">
                                 <table class="w-full table-fixed divide-y divide-gray-200">
                                     <colgroup>
@@ -591,7 +653,7 @@
                                         </tr>
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-100 text-sm">
-                                        @foreach($employee->salns->sortByDesc('as_of_date') as $saln)
+                                        @foreach($salnRecords as $saln)
                                             @php
                                                 $salnReviewStatus = strtolower((string) ($saln->review_status ?? 'pending'));
                                                 $salnStatusClass = match ($salnReviewStatus) {
@@ -616,36 +678,10 @@
                                                 </td>
                                                 <td class="px-3 py-4 text-center text-sm font-medium">
                                                     <div class="flex items-center justify-center gap-1.5">
-                                                    <a href="{{ route('salns.show', ['saln' => $saln, 'back' => route('employees.show', ['employee' => $employee, 'tab' => 'saln'])]) }}" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 transition-colors hover:bg-indigo-100 hover:text-indigo-900" title="View SALN Preview" aria-label="View SALN Preview">
-                                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z" />
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        </svg>
+                                                    <a href="{{ route('salns.show', ['saln' => $saln, 'back' => $salnBackUrl]) }}" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition-colors hover:bg-indigo-50 hover:text-indigo-900" title="View SALN Preview" aria-label="View SALN Preview">
+                                                        <i class="fa-solid fa-eye text-sm" aria-hidden="true"></i>
                                                         <span class="sr-only">View SALN Preview</span>
                                                     </a>
-                                                    @if($salnReviewStatus !== 'approved')
-                                                        <form method="POST" action="{{ route('salns.review', $saln) }}" class="inline">
-                                                            @csrf
-                                                            @method('PATCH')
-                                                            <input type="hidden" name="review_status" value="approved">
-                                                            <button type="submit" class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100" title="Approve SALN" aria-label="Approve SALN">
-                                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M5 13l4 4L19 7" />
-                                                                </svg>
-                                                            </button>
-                                                        </form>
-                                                        <button
-                                                            type="button"
-                                                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100"
-                                                            title="Return SALN"
-                                                            aria-label="Return SALN"
-                                                            @click="salnReturnAction = '{{ route('salns.review', $saln) }}'; salnReturnRemarks = ''; salnReturnOpen = true"
-                                                        >
-                                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
-                                                        </button>
-                                                    @endif
                                                     </div>
                                                 </td>
                                             </tr>
@@ -682,7 +718,7 @@
                                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 </div>
                                 <h3 class="text-lg font-black text-gray-900 mb-1">No SALN Records</h3>
-                                <p class="text-gray-500 text-sm">This employee has not submitted any Statement of Assets, Liabilities, and Net Worth.</p>
+                                <p class="text-gray-500 text-sm">No SALN records for the selected year.</p>
                             </div>
                         @endif
                     </div>

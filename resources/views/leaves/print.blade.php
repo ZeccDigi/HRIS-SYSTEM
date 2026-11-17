@@ -66,6 +66,17 @@
             color: #fff;
         }
 
+        .print-toolbar .print-back {
+            width: auto;
+            height: 9mm;
+            gap: 2mm;
+            padding: 0 4mm;
+            border-color: #e2e8f0;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, .1);
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
         .leave-form {
             width: 200mm;
             min-height: 286mm;
@@ -392,11 +403,13 @@
             display: inline-block;
             flex: 1 1 auto;
             min-width: 18mm;
-            height: 3.2mm;
+            /* Keep entered details comfortably above the ruled answer line. */
+            height: 4.5mm;
             border-bottom: 0.2mm solid #000;
             font-weight: 700;
             text-align: left;
-            padding: 0 0.8mm;
+            line-height: 1;
+            padding: 0.55mm 0.8mm 0;
             overflow: hidden;
             white-space: nowrap;
         }
@@ -458,16 +471,16 @@
         }
 
         .signature-block {
-            height: 13.5mm;
-            padding-top: 6.5mm;
+            margin-top: 1.5mm;
             text-align: center;
             font-size: 7.8pt;
+            line-height: 1.15;
         }
 
         .signature-block .signature-line {
             display: block;
             width: 78mm;
-            min-height: 3.6mm;
+            height: 8mm;
             margin: 0 auto 0.4mm;
             border-bottom: 0.2mm solid #000;
         }
@@ -475,8 +488,8 @@
         .applicant-signature {
             display: block;
             max-width: 46mm;
-            max-height: 8mm;
-            margin: 0 auto 0.5mm;
+            max-height: 7.5mm;
+            margin: 0 auto;
             object-fit: contain;
         }
 
@@ -694,7 +707,17 @@
     $signatureUrl = $employee?->effective_signature_url ?? ($employee?->pdsGovId?->signature_path ? Storage::disk('public')->url($employee->pdsGovId->signature_path) : null);
     $isApproved = $leaveRequest->status === 'approved';
     $isRejected = $leaveRequest->status === 'rejected';
-    $rejectReason = trim(collect([$leaveRequest->rd_remarks, $leaveRequest->hrstaff_remarks, $leaveRequest->chief_remarks, $leaveRequest->remarks])->filter()->implode(' '));
+    // Section 7.B is the Division Chief's recommendation, independent of
+    // HR's credit certification (7.A) and the Regional Director's final action.
+    $chiefApproved = $leaveRequest->chief_status === 'approved';
+    $chiefRejected = $leaveRequest->chief_status === 'rejected';
+    $chiefRejectReason = trim((string) $leaveRequest->chief_remarks);
+    $finalRejectReason = trim(collect([
+        $leaveRequest->rd_remarks,
+        $leaveRequest->hrstaff_remarks,
+        $leaveRequest->chief_remarks,
+        $leaveRequest->remarks,
+    ])->filter()->implode(' '));
     $check = fn (bool $condition) => $condition ? '✓' : '';
     $typeCheck = fn (string $needle) => str_contains($leaveTypeLower, $needle);
     $isVacationLike = $typeCheck('vacation') || $typeCheck('special privilege');
@@ -712,7 +735,12 @@
 
 @unless($isPreview)
     <div class="print-toolbar">
-        <a href="{{ request()->routeIs('leave-applications.print') ? route('leave-applications.show', $leaveRequest) : route('leaves.show', $leaveRequest) }}" data-no-transition>Back</a>
+        <a href="{{ request()->routeIs('leave-applications.print') ? route('leave-applications.show', $leaveRequest) : route('leaves.show', $leaveRequest) }}" class="print-back" data-no-transition>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m15 19-7-7 7-7" />
+            </svg>
+            {{ __('Back') }}
+        </a>
         <button type="button" onclick="window.print()">Print Leave</button>
     </div>
 @endunless
@@ -930,8 +958,8 @@
                 </td>
                 <td>
                     <div>7.B RECOMMENDATION</div>
-                    <div class="recommendation-option approval"><span class="box">{{ $check($leaveRequest->chief_status === 'approved' || $leaveRequest->hrstaff_status === 'approved' || $leaveRequest->rd_status === 'approved' || $isApproved) }}</span><span class="recommendation-text">For approval</span></div>
-                    <div class="recommendation-option disapproval"><span class="box">{{ $check($leaveRequest->chief_status === 'rejected' || $leaveRequest->hrstaff_status === 'rejected' || $leaveRequest->rd_status === 'rejected' || $isRejected) }}</span><span class="recommendation-text">For disapproval due to</span><span class="recommendation-lines">{{ $isRejected ? $rejectReason : '' }}</span></div>
+                    <div class="recommendation-option approval"><span class="box">{{ $check($chiefApproved) }}</span><span class="recommendation-text">For approval</span></div>
+                    <div class="recommendation-option disapproval"><span class="box">{{ $check($chiefRejected) }}</span><span class="recommendation-text">For disapproval due to</span><span class="recommendation-lines">{{ $chiefRejected ? $chiefRejectReason : '' }}</span></div>
                     <span class="recommendation-extra-line"></span>
                     <span class="recommendation-extra-line"></span>
                     <span class="officer-name" style="margin-top: 5mm;">{{ $chiefName }}</span>
@@ -956,7 +984,7 @@
                 </td>
                 <td>
                     <div>7.D DISAPPROVED DUE TO:</div>
-                    <span class="approval-line" style="margin-top: 1mm;">{{ $isRejected ? $rejectReason : '' }}</span>
+                    <span class="approval-line" style="margin-top: 1mm;">{{ $isRejected ? $finalRejectReason : '' }}</span>
                     <span class="approval-line"></span>
                     <span class="approval-line"></span>
                 </td>

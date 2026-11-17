@@ -122,65 +122,23 @@
                     />
                 </div>
 
-                {{-- CTO type --}}
+                {{-- CTO type filter --}}
                 <div class="sm:w-44 sm:shrink-0">
-                    <label
-                        for="ctoType"
-                        class="sr-only"
-                    >
-                        {{ __('CTO Type') }}
-                    </label>
-
-                    <select
-                        id="ctoType"
-                        x-model="type"
-                        @change="applyFilters()"
-                        class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    >
-                        <option value="">
-                            {{ __('Types') }}
-                        </option>
-
-                        <option value="earn">
-                            {{ __('Earn CTO') }}
-                        </option>
-
-                        <option value="use">
-                            {{ __('Use CTO') }}
-                        </option>
+                    <label for="ctoType" class="sr-only">{{ __('CTO Type') }}</label>
+                    <select id="ctoType" x-model="type" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">{{ __('Types') }}</option>
+                        <option value="earn">{{ __('Earn COC') }}</option>
+                        <option value="use">{{ __('Use CTO') }}</option>
                     </select>
                 </div>
 
-                {{-- Status filter --}}
                 <div class="sm:w-44 sm:shrink-0">
-                    <label
-                        for="ctoStatus"
-                        class="sr-only"
-                    >
-                        {{ __('Status') }}
-                    </label>
-
-                    <select
-                        id="ctoStatus"
-                        x-model="status"
-                        @change="applyFilters()"
-                        class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    >
-                        <option value="">
-                            {{ __('Status') }}
-                        </option>
-
-                        <option value="pending">
-                            {{ __('Pending') }}
-                        </option>
-
-                        <option value="approved">
-                            {{ __('Approved') }}
-                        </option>
-
-                        <option value="rejected">
-                            {{ __('Rejected') }}
-                        </option>
+                    <label for="ctoMonth" class="sr-only">{{ __('Month filed') }}</label>
+                    <select id="ctoMonth" x-model="month" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">{{ __('Months') }}</option>
+                        <option value="1">{{ __('January') }}</option><option value="2">{{ __('February') }}</option><option value="3">{{ __('March') }}</option><option value="4">{{ __('April') }}</option>
+                        <option value="5">{{ __('May') }}</option><option value="6">{{ __('June') }}</option><option value="7">{{ __('July') }}</option><option value="8">{{ __('August') }}</option>
+                        <option value="9">{{ __('September') }}</option><option value="10">{{ __('October') }}</option><option value="11">{{ __('November') }}</option><option value="12">{{ __('December') }}</option>
                     </select>
                 </div>
 
@@ -301,6 +259,10 @@
                             </tbody>
                         </table>
                     </div>
+                    @include('partials.client-table-pagination', [
+                        'tableKey' => 'pending',
+                        'label' => __('CTO requests'),
+                    ])
                 </div>
             </div>
 
@@ -389,7 +351,7 @@
                             >
                                 @include('my-cto._admin-rows', [
                                     'requests' => $allCtoRequests,
-                                    'emptyMessage' => __('No approved or rejected CTO requests yet.'),
+                                    'emptyMessage' => __('No CTO requests found.'),
                                     'actionMode' => 'view',
                                 ])
 
@@ -409,6 +371,10 @@
                             </tbody>
                         </table>
                     </div>
+                    @include('partials.client-table-pagination', [
+                        'tableKey' => 'all',
+                        'label' => __('CTO requests'),
+                    ])
                 </div>
             </div>
         </div>
@@ -660,8 +626,11 @@
 
                 search: '',
                 type: '',
-                status: '',
                 year: String(currentYear),
+                month: '',
+                perPage: 5,
+                pages: { pending: 1, all: 1 },
+                counts: { pending: 0, all: 0 },
 
                 pendingRows: [],
                 allRows: [],
@@ -685,7 +654,7 @@
                 previewData: {
                     title: '',
                     date: '',
-                    status: '',
+                    type: '',
                     remarks: '',
                     printUrl: '',
                     directPrintUrl: '',
@@ -729,12 +698,14 @@
                 applyFilters() {
                     const pendingVisibleCount = this.filterRows(
                         this.pendingRows,
-                        document.getElementById('pendingCtoRows')
+                        document.getElementById('pendingCtoRows'),
+                        'pending'
                     );
 
                     const allVisibleCount = this.filterRows(
                         this.allRows,
-                        document.getElementById('allCtoRows')
+                        document.getElementById('allCtoRows'),
+                        'all'
                     );
 
                     this.pendingNoResults =
@@ -746,7 +717,7 @@
                         this.allRows.length > 0;
                 },
 
-                filterRows(rows, tbody) {
+                filterRows(rows, tbody, tableKey) {
                     if (!tbody) {
                         return 0;
                     }
@@ -754,8 +725,6 @@
                     const searchValue = this.search
                         .trim()
                         .toLowerCase();
-
-                    let visibleCount = 0;
 
                     /*
                      * Newest CTO requests are always displayed first.
@@ -772,11 +741,14 @@
                         return secondFiled - firstFiled;
                     });
 
-                    rows.forEach((row) => {
+                    const matchingRows = rows.filter((row) => {
                         const filedDate = this.getFiledDate(row);
 
                         const filedYear = filedDate
                             ? String(filedDate.getFullYear())
+                            : '';
+                        const filedMonth = filedDate
+                            ? String(filedDate.getMonth() + 1)
                             : '';
 
                         const rowSearch = (
@@ -787,10 +759,6 @@
                             row.dataset.type || ''
                         ).toLowerCase();
 
-                        const rowStatus = (
-                            row.dataset.status || ''
-                        ).toLowerCase();
-
                         const matchesSearch =
                             !searchValue ||
                             rowSearch.includes(searchValue);
@@ -799,33 +767,60 @@
                             !this.type ||
                             rowType === String(this.type).toLowerCase();
 
-                        const matchesStatus =
-                            !this.status ||
-                            rowStatus === String(this.status).toLowerCase();
-
                         const matchesYear =
                             !this.year ||
                             filedYear === String(this.year);
+                        const matchesMonth =
+                            !this.month ||
+                            filedMonth === String(this.month);
 
                         const visible =
                             matchesSearch &&
                             matchesType &&
-                            matchesStatus &&
-                            matchesYear;
+                            matchesYear &&
+                            matchesMonth;
 
-                        row.classList.toggle(
-                            'hidden',
-                            !visible
-                        );
+                        return visible;
+                    });
 
-                        if (visible) {
-                            visibleCount++;
-                        }
+                    this.counts[tableKey] = matchingRows.length;
+                    const lastPage = this.totalPages(tableKey);
+                    this.pages[tableKey] = Math.min(Math.max(1, this.pages[tableKey]), lastPage);
 
+                    const firstIndex = (this.pages[tableKey] - 1) * this.perPage;
+                    const pageRows = new Set(matchingRows.slice(firstIndex, firstIndex + this.perPage));
+
+                    rows.forEach((row) => {
+                        row.classList.toggle('hidden', !pageRows.has(row));
                         tbody.appendChild(row);
                     });
 
-                    return visibleCount;
+                    return matchingRows.length;
+                },
+
+                totalPages(tableKey) {
+                    return Math.max(1, Math.ceil((this.counts[tableKey] || 0) / this.perPage));
+                },
+
+                pageNumbers(tableKey) {
+                    return Array.from({ length: this.totalPages(tableKey) }, (_, index) => index + 1);
+                },
+
+                rangeStart(tableKey) {
+                    return this.counts[tableKey] > 0 ? ((this.pages[tableKey] - 1) * this.perPage) + 1 : 0;
+                },
+
+                rangeEnd(tableKey) {
+                    return Math.min(this.pages[tableKey] * this.perPage, this.counts[tableKey] || 0);
+                },
+
+                setPage(tableKey, page) {
+                    this.pages[tableKey] = Math.min(Math.max(1, page), this.totalPages(tableKey));
+                    this.applyFilters();
+                },
+
+                resetPages() {
+                    this.pages = { pending: 1, all: 1 };
                 },
 
                 getFiledDate(row) {
@@ -866,8 +861,9 @@
                 reset() {
                     this.search = '';
                     this.type = '';
-                    this.status = '';
                     this.year = String(currentYear);
+                    this.month = '';
+                    this.resetPages();
 
                     this.applyFilters();
                 },

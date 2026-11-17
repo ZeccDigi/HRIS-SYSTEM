@@ -38,11 +38,19 @@ class EmployeeController extends Controller
         $search = trim((string) $request->query('search', ''));
         $division = (string) $request->query('division', '');
         $sort = $request->query('sort', 'name_asc');
+        $perPage = $this->perPage($request, 'per_page');
+        $archivePerPage = $this->perPage($request, 'archive_per_page');
 
-        $employees = $this->employeeIndexQuery($search, $division, $sort, $divisionOptions)->get();
-        $archivedEmployees = Employee::onlyTrashed()->with('user')->latest('deleted_at')->get();
+        $employees = $this->employeeIndexQuery($search, $division, $sort, $divisionOptions)
+            ->paginate($perPage, ['*'], 'employees_page')
+            ->withQueryString();
+        $archivedEmployees = Employee::onlyTrashed()
+            ->with('user')
+            ->latest('deleted_at')
+            ->paginate($archivePerPage, ['*'], 'archive_page')
+            ->withQueryString();
 
-        return view('employees.index', compact('employees', 'archivedEmployees', 'divisionOptions', 'search', 'division', 'sort'));
+        return view('employees.index', compact('employees', 'archivedEmployees', 'divisionOptions', 'search', 'division', 'sort', 'perPage', 'archivePerPage'));
     }
 
     public function filter(Request $request)
@@ -50,11 +58,22 @@ class EmployeeController extends Controller
         $search = trim((string) $request->query('search', ''));
         $division = (string) $request->query('division', '');
         $sort = $request->query('sort', 'name_asc');
-        $employees = $this->employeeIndexQuery($search, $division, $sort, $this->divisionOptions())->get();
+        $perPage = $this->perPage($request, 'per_page');
+        $employees = $this->employeeIndexQuery($search, $division, $sort, $this->divisionOptions())
+            ->paginate($perPage, ['*'], 'employees_page')
+            ->withPath(route('employees.index'))
+            ->withQueryString();
 
         return response()->json([
             'html' => view('employees.partials.rows', compact('employees'))->render(),
-            'count' => $employees->count(),
+            'count' => $employees->total(),
+            'pagination' => view('partials.table-pagination', [
+                'paginator' => $employees,
+                'label' => __('employees'),
+                'perPageOptions' => [5, 10, 20, 50],
+                'perPageSelectId' => 'employees_per_page',
+                'formAction' => route('employees.index'),
+            ])->render(),
         ]);
     }
 
@@ -100,6 +119,7 @@ class EmployeeController extends Controller
     {
         $request->merge([
             'hris_username' => Str::lower(trim((string) $request->input('hris_username'))),
+            'notification_email' => Str::lower(trim((string) $request->input('notification_email'))),
         ]);
 
         $validated = $request->validate([
@@ -107,7 +127,7 @@ class EmployeeController extends Controller
             'firstname' => 'required|string|max:255',
             'middlename' => 'nullable|string|max:255',
             'contact_number' => 'required|string|max:20',
-            'notification_email' => 'required|email|max:255',
+            'notification_email' => ['required', 'email', 'max:255', Rule::unique('employees', 'notification_email')],
             'division' => ['required', 'string', Rule::in($this->divisionOptions())],
             'position' => 'required|string|max:255',
             'account_role' => 'required|string|in:employee,hrstaff,recordofficer,chief,regionaldirector,admin',
@@ -117,8 +137,10 @@ class EmployeeController extends Controller
             'rfid_number' => 'nullable|string|max:255|unique:employees,rfid_number',
         ], [
             'notification_email.required' => 'The Recovery / OTP Email field is required.',
+            'notification_email.unique' => 'This Recovery / OTP Email is already assigned to another employee.',
             'hris_username.required' => 'The HRIS Username field is required.',
             'hris_username.regex' => 'The HRIS Username may only contain lowercase letters, numbers, dots, underscores, and hyphens.',
+            'rfid_number.unique' => 'This RFID Number is already assigned to another employee.',
         ]);
 
         $loginUsername = $validated['hris_username'].'@dmw.gov.ph';
@@ -195,7 +217,7 @@ class EmployeeController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Employee $employee): View
+    public function show(Request $request, Employee $employee, \App\Services\PdsSnapshotService $snapshots): View
     {
         $employee->ensureLeaveCredits(now()->year);
 
@@ -208,7 +230,25 @@ class EmployeeController extends Controller
 
         $pdsReviewChangedFields = $this->pdsReviewChangedFields($employee);
 
-        return view('employees.show', compact('employee', 'pdsReviewChangedFields'));
+        $currentYear = (int) now()->year;
+        $pdsYears = $snapshots->yearsFor($employee);
+        $pdsYear = $request->integer('pds_year', $currentYear);
+        $pdsYear = $pdsYears->containsStrict($pdsYear) ? $pdsYear : $currentYear;
+
+        $salnYears = $employee->salns->pluck('as_of_date')->filter()
+            ->map(fn ($date) => $date->year)->unique()->sortDesc()->values();
+        if ($salnYears->isEmpty()) {
+            $salnYears->push($currentYear);
+        }
+        $salnYear = $request->integer('saln_year', $salnYears->first());
+        $salnYear = $salnYears->containsStrict($salnYear) ? $salnYear : $salnYears->first();
+        $salnRecords = $employee->salns->filter(fn ($saln) => $saln->as_of_date?->year === $salnYear)
+            ->sortByDesc('as_of_date');
+        $salnBackUrl = route('employees.show', ['employee' => $employee, 'tab' => 'saln', 'saln_year' => $salnYear, 'pds_year' => $pdsYear]);
+
+        return view('employees.show', compact(
+            'employee', 'pdsReviewChangedFields', 'pdsYears', 'pdsYear', 'salnYears', 'salnYear', 'salnRecords', 'salnBackUrl'
+        ));
     }
 
     public function storeLeaveCreditAdjustment(Request $request, Employee $employee): RedirectResponse
@@ -264,6 +304,44 @@ class EmployeeController extends Controller
             ->route('employees.show', $employee)
             ->withFragment('leave-credits')
             ->with('success', 'Leave credit adjustment saved successfully.');
+    }
+
+    public function updateCoreTime(Request $request, Employee $employee): RedirectResponse
+    {
+        $validated = $request->validate([
+            'core_time_start_date' => ['nullable', 'date', 'required_with:core_time_end_date'],
+            'core_time_end_date' => ['nullable', 'date', 'required_with:core_time_start_date', 'after_or_equal:core_time_start_date'],
+            'core_time_schedule' => ['nullable', 'array'],
+            'core_time_schedule.*.am_start' => ['nullable', 'date_format:H:i', 'required_with:core_time_schedule.*.am_end'],
+            'core_time_schedule.*.am_end' => ['nullable', 'date_format:H:i', 'required_with:core_time_schedule.*.am_start', 'after:core_time_schedule.*.am_start'],
+            'core_time_schedule.*.pm_start' => ['nullable', 'date_format:H:i', 'required_with:core_time_schedule.*.pm_end'],
+            'core_time_schedule.*.pm_end' => ['nullable', 'date_format:H:i', 'required_with:core_time_schedule.*.pm_start', 'after:core_time_schedule.*.pm_start'],
+        ]);
+
+        $schedule = collect($validated['core_time_schedule'] ?? [])
+            ->map(fn (array $day) => collect($day)
+                ->map(fn ($time) => filled($time) ? $time : null)
+                ->filter()
+                ->all())
+            ->filter()
+            ->all();
+
+        $employee->update([
+            'core_time_start_date' => $validated['core_time_start_date'] ?? null,
+            'core_time_end_date' => $validated['core_time_end_date'] ?? null,
+            'core_time_schedule' => $schedule !== [] ? $schedule : null,
+        ]);
+
+        AuditLogListener::logActivity(
+            'Update Employee Core Time',
+            'Employees',
+            'Updated approved core time for '.trim(($employee->firstname ?? '').' '.($employee->lastname ?? '')),
+            auth()->user()
+        );
+
+        return redirect()
+            ->route('employees.show', ['employee' => $employee, 'tab' => 'core-time'])
+            ->with('success', 'Approved core time updated successfully.');
     }
 
     private function pdsReviewChangedFields(Employee $employee): array
@@ -409,12 +487,16 @@ class EmployeeController extends Controller
      */
     public function update(Request $request, Employee $employee): RedirectResponse
     {
+        $request->merge([
+            'notification_email' => Str::lower(trim((string) $request->input('notification_email'))),
+        ]);
+
         $validated = $request->validate([
             'lastname' => 'required|string|max:255',
             'firstname' => 'required|string|max:255',
             'middlename' => 'nullable|string|max:255',
             'contact_number' => 'nullable|string|max:20',
-            'notification_email' => 'required|email|max:255',
+            'notification_email' => ['required', 'email', 'max:255', Rule::unique('employees', 'notification_email')->ignore($employee->id)],
             'division' => ['required', 'string', Rule::in($this->divisionOptions())],
             'position' => 'required|string|max:255',
             'account_role' => 'required|string|in:employee,hrstaff,recordofficer,chief,regionaldirector,admin',
@@ -424,6 +506,8 @@ class EmployeeController extends Controller
             'rfid_number' => 'nullable|string|max:255|unique:employees,rfid_number,' . $employee->id,
         ], [
             'notification_email.required' => 'The Recovery / OTP Email field is required.',
+            'notification_email.unique' => 'This Recovery / OTP Email is already assigned to another employee.',
+            'rfid_number.unique' => 'This RFID Number is already assigned to another employee.',
         ]);
 
         $employee->update($validated);
@@ -597,6 +681,13 @@ class EmployeeController extends Controller
         if (Storage::disk('public')->exists($path)) {
             Storage::disk('public')->delete($path);
         }
+    }
+
+    private function perPage(Request $request, string $key): int
+    {
+        $perPage = (int) $request->query($key, 5);
+
+        return in_array($perPage, [5, 10, 20, 50], true) ? $perPage : 5;
     }
 }
 

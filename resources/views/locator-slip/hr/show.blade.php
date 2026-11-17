@@ -28,33 +28,25 @@
     <div class="py-10">
         <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
             <div class="mb-5 flex items-center justify-between gap-3">
+                <x-page-action href="{{ route('hr.locator-slips.index', [ 'tab' => $displayStatus === 'pending' ? 'pending' : 'all', ]) }}" />
+
                 <a
-                    href="{{ route('hr.locator-slips.index', [
-                        'tab' => $displayStatus === 'pending' ? 'pending' : 'all',
-                    ]) }}"
-                    class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-indigo-600"
-                >
-                    <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
-                    </svg>
-
-                    {{ __('Back') }}
-                </a>
-
-                <button
-                    type="button"
-                    onclick="printLocatorForm()"
+                    href="{{ route('locator-slips.print', $locatorSlip) }}"
+                    target="_blank"
+                    rel="noopener"
+                    data-no-transition
                     class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700"
                 >
                     <i class="fa-solid fa-print mr-2"></i>
                     {{ __('Print Locator Slip') }}
-                </button>
+                </a>
             </div>
 
             <x-approval-tracker
                 :payload="$trackedLocatorPayload"
                 event="locator-selected"
                 empty="No locator slip approval process to track yet."
+                compact
             />
 
             <div class="mt-8 space-y-6">
@@ -67,9 +59,10 @@
                                 'preview' => 1,
                             ]) }}"
                             class="block w-full border-0 bg-white"
-                            style="aspect-ratio: 210 / 297;"
+                            style="height: 1px;"
                             title="{{ __('Locator slip print preview') }}"
                             scrolling="no"
+                            onload="resizeLocatorPreview(this)"
                         ></iframe>
                     </div>
                 </section>
@@ -210,16 +203,12 @@
     <script>
         let locatorDecisionAction = null;
 
-        function printLocatorForm() {
-            const previewIframe = document.getElementById('locator-form-preview');
+        function resizeLocatorPreview(frame) {
+            const previewSheet = frame.contentDocument?.querySelector('.preview-sheet');
 
-            if (!previewIframe || !previewIframe.contentWindow) {
-                alert('Locator slip preview is not ready yet.');
-                return;
+            if (previewSheet) {
+                frame.style.height = `${Math.ceil(previewSheet.getBoundingClientRect().height) + 2}px`;
             }
-
-            previewIframe.contentWindow.focus();
-            previewIframe.contentWindow.print();
         }
 
         function openLocatorDecisionModal(action) {

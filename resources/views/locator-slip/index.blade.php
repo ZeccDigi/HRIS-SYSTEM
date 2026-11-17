@@ -2,7 +2,7 @@
     <x-slot name="title">{{ __('My Locator Slips') }}</x-slot>
 
     <div
-        class="p-3 sm:p-4 lg:p-5"
+        class="px-1 py-3 sm:px-2 lg:px-3"
         x-data="myLocatorSlipTable()"
         x-init="init()"
     >
@@ -33,7 +33,8 @@
             </div>
         </div>
 
-        <div class="mb-4 flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
+        <section class="rounded-2xl border border-slate-100 bg-white p-2 shadow-sm sm:p-3">
+        <div class="mb-3 flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
             <div class="relative min-w-[260px] flex-1">
                 <label for="my_locator_search" class="sr-only">{{ __('Search locator slip') }}</label>
                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -44,18 +45,18 @@
                 <input id="my_locator_search" type="search" name="search" x-model="search" @input.debounce.400ms="submitFilters()" placeholder="{{ __('Search date, type, status, or destination...') }}" class="block h-9 w-full rounded-lg border-gray-300 pl-10 pr-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
 
-            <select name="type" x-model="type" @change="submitFilters()" class="block h-9 w-40 shrink-0 rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="">{{ __('Types') }}</option>
-                @foreach(['Official Business', 'Pass Slip'] as $typeOption)
-                    <option value="{{ $typeOption }}">{{ $typeOption }}</option>
-                @endforeach
-            </select>
-
             <select name="status" x-model="status" @change="submitFilters()" class="block h-9 w-40 shrink-0 rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 <option value="">{{ __('Status') }}</option>
                 <option value="pending">{{ __('Pending') }}</option>
                 <option value="approved">{{ __('Approved') }}</option>
                 <option value="rejected">{{ __('Rejected') }}</option>
+            </select>
+
+            <select name="month" x-model="month" @change="submitFilters()" class="block h-9 w-40 shrink-0 rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                <option value="">{{ __('Months') }}</option>
+                <option value="1">{{ __('January') }}</option><option value="2">{{ __('February') }}</option><option value="3">{{ __('March') }}</option><option value="4">{{ __('April') }}</option>
+                <option value="5">{{ __('May') }}</option><option value="6">{{ __('June') }}</option><option value="7">{{ __('July') }}</option><option value="8">{{ __('August') }}</option>
+                <option value="9">{{ __('September') }}</option><option value="10">{{ __('October') }}</option><option value="11">{{ __('November') }}</option><option value="12">{{ __('December') }}</option>
             </select>
 
             <button type="button" @click="reset()" class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-xs font-bold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50">
@@ -66,14 +67,22 @@
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
             <div class="overflow-x-auto lg:overflow-x-visible">
                 <table class="w-full table-fixed border-collapse text-left">
+                    <colgroup>
+                        <col class="w-1/6">
+                        <col class="w-1/6">
+                        <col class="w-1/6">
+                        <col class="w-1/6">
+                        <col class="w-1/6">
+                        <col class="w-1/6">
+                    </colgroup>
                      <thead class="bg-slate-50">
                         <tr>
-                            <th scope="col" class="w-[13%] whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Date Covered</th>
-                            <th scope="col" class="w-[14%] whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Type</th>
-                            <th scope="col" class="w-[27%] whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Destination</th>
-                            <th scope="col" class="w-[19%] whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Approval</th>
-                            <th scope="col" class="w-[14%] whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                            <th scope="col" class="w-[13%] whitespace-nowrap px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
+                            <th scope="col" class="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Date Covered</th>
+                            <th scope="col" class="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Type</th>
+                            <th scope="col" class="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Destination</th>
+                            <th scope="col" class="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Approval</th>
+                            <th scope="col" class="whitespace-nowrap px-3 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
+                            <th scope="col" class="whitespace-nowrap px-3 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="myLocatorSlipTableBody" class="divide-y divide-gray-100 bg-white">
@@ -122,30 +131,30 @@
                                 data-status="{{ $displayStatus }}"
                                 data-year="{{ \Carbon\Carbon::parse($slip->date_covered)->year }}"
                             >
-                                <td class="whitespace-nowrap px-4 py-2.5 text-sm font-bold text-gray-900">
+                                <td class="whitespace-nowrap px-3 py-2.5 text-sm font-bold text-gray-900">
                                     {{ \Carbon\Carbon::parse($slip->date_covered)->format('M d, Y') }}
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-2.5 text-sm text-gray-700">
+                                <td class="whitespace-nowrap px-3 py-2.5 text-sm text-gray-700">
                                     {{ $displayType ?: 'N/A' }}
                                 </td>
-                                <td class="px-4 py-2.5 text-sm text-gray-700">
+                                <td class="px-3 py-2.5 text-sm text-gray-700">
                                     <div class="truncate" title="{{ $slip->destination }}">
                                         {{ $slip->destination ?: 'N/A' }}
                                     </div>
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-2.5 text-sm text-gray-700">
+                                <td class="whitespace-nowrap px-3 py-2.5 text-sm text-gray-700">
                                     <div class="flex min-w-0 items-center gap-2">
                                         <span class="h-2.5 w-2.5 rounded-full {{ $approvalDotClass }}" title="Chief"></span>
                                         <span class="truncate text-xs font-semibold text-gray-700">{{ $approverName }}</span>
                                     </div>
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-2.5 text-sm">
+                                <td class="whitespace-nowrap px-3 py-2.5 text-center text-sm">
                                     <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold leading-5 shadow-sm {{ $statusClass }}">
                                         {{ ucfirst($displayStatus) }}
                                     </span>
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-2.5 text-right">
-                                    <div class="inline-flex items-center gap-1">
+                                <td class="whitespace-nowrap px-3 py-2.5 text-center">
+                                    <div class="mx-auto grid w-fit grid-cols-2 place-items-center gap-1 whitespace-nowrap">
                                         @if($slip->qr_svg)
                                             <button
                                                 type="button"
@@ -156,6 +165,8 @@
                                             >
                                                 <i class="fa-solid fa-qrcode"></i>
                                             </button>
+                                        @else
+                                            <span class="h-9 w-9" aria-hidden="true"></span>
                                         @endif
 
                                         <a
@@ -188,8 +199,14 @@
                 </table>
             </div>
 
-            @include('partials.table-pagination', ['paginator' => $locatorSlips, 'label' => __('locator slips')])
+            @include('partials.table-pagination', [
+                'paginator' => $locatorSlips,
+                'label' => __('locator slips'),
+                'perPageOptions' => [5, 10, 20, 50],
+                'perPageSelectId' => 'my_locator_per_page',
+            ])
         </div>
+        </section>
 
         <template x-teleport="body">
         <div
@@ -431,9 +448,10 @@
         function myLocatorSlipTable() {
             return {
                 search: @js($search),
-                type: @js($type),
+                month: @js($month),
                 status: @js($status),
                 year: @js((string) $year),
+                perPage: @js((string) $perPage),
                 rows: [],
                 noResults: false,
                 qrModalOpen: false,
@@ -468,8 +486,8 @@
                         url.searchParams.set('search', this.search.trim());
                     }
 
-                    if (this.type) {
-                        url.searchParams.set('type', this.type);
+                    if (this.month) {
+                        url.searchParams.set('month', this.month);
                     }
 
                     if (this.status) {
@@ -480,14 +498,19 @@
                         url.searchParams.set('year', this.year);
                     }
 
+                    if (this.perPage) {
+                        url.searchParams.set('per_page', this.perPage);
+                    }
+
                     window.location.href = url.toString();
                 },
 
                 reset() {
                     this.search = '';
-                    this.type = '';
+                    this.month = '';
                     this.status = '';
                     this.year = '{{ now()->year }}';
+                    this.perPage = '5';
                     window.location.href = @js(route('locator-slips.index'));
                 },
 

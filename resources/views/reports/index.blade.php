@@ -39,6 +39,12 @@
             gap: 0.5rem;
         }
 
+        .reports-main-filters input:disabled {
+            cursor: not-allowed;
+            background-color: #f8fafc;
+            color: #94a3b8;
+        }
+
         @media (max-width: 1023px) {
             .reports-main-filters,
             .reports-detail-filters {
@@ -58,13 +64,13 @@
         }
     </style>
 
-    <div class="min-h-screen bg-slate-50 py-4" x-data="reportsDashboard()" x-init="initCharts()">
-        <div class="mx-auto w-full px-0 sm:px-1 lg:px-2">
-            <div class="mb-4">
+    <div class="min-h-screen bg-slate-50 py-2" x-data="reportsDashboard()" x-init="initCharts()">
+        <div class="mx-auto w-full px-0 sm:px-1">
+            <div class="mb-2">
                 <h1 class="text-2xl font-black tracking-tight text-slate-900">{{ __('Report Summary') }}</h1>
             </div>
 
-            <div class="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
+            <div class="rounded-xl border border-blue-100 bg-white p-3 shadow-sm">
                 <div class="reports-main-filters">
                     <label>
                         <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('Report Type') }}</span>
@@ -100,11 +106,25 @@
                         <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('To') }}</span>
                         <input type="date" x-model="filters.to" @change="applyFilters()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
                     </label>
+
+                    <label x-show="visibleFilters().includes('year')" x-cloak>
+                        <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('Year') }}</span>
+                        <select x-model="filters.year" @change="filters.from = `${filters.year}-01-01`; filters.to = `${filters.year}-12-31`; applyFilters()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
+                            <template x-for="year in yearOptions" :key="year">
+                                <option :value="year" x-text="year"></option>
+                            </template>
+                        </select>
+                    </label>
+
+                    <label x-show="visibleFilters().includes('year')" x-cloak>
+                        <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('As of') }}</span>
+                        <input type="date" :value="`${filters.year}-12-31`" disabled class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-slate-50 text-sm font-semibold text-slate-400">
+                    </label>
                 </div>
             </div>
 
-            <div class="mt-5 rounded-xl border border-blue-100 bg-white shadow-sm">
-                <div class="flex flex-col gap-4 border-b border-blue-50 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="mt-3 rounded-xl border border-blue-100 bg-white shadow-sm">
+                <div class="flex flex-col gap-3 border-b border-blue-50 px-4 py-3 lg:flex-row lg:items-start lg:justify-between">
                     <div class="flex items-start">
                         <div>
                             <h2 class="text-lg font-black text-slate-900" x-text="active.title"></h2>
@@ -124,8 +144,8 @@
                     </div>
                 </div>
 
-                <div class="p-4">
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="flex flex-col p-3">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" style="order: 2;">
                         <template x-for="metric in active.metrics" :key="metric.label">
                             <div class="rounded-lg border border-blue-100 bg-white p-3 shadow-sm">
                                 <div class="flex items-center">
@@ -138,17 +158,35 @@
                         </template>
                     </div>
 
-                    <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+                    <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3" style="order: 3;">
                         <div class="rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
                             <div class="mb-3 flex items-center justify-between">
                                 <h3 class="text-sm font-black text-slate-900" x-text="visibleCharts[0]?.title"></h3>
                                 <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Breakdown</span>
                             </div>
-                            <div class="relative h-52">
-                                <canvas x-ref="chartOne" x-show="hasChartData(visibleCharts[0])"></canvas>
-                                <div x-show="!hasChartData(visibleCharts[0])" x-cloak class="absolute inset-0 flex items-center justify-center rounded-lg bg-slate-50 text-center text-xs font-bold text-slate-500">
-                                    No chart data for this selection.
+                            <div :class="visibleCharts[0]?.type === 'doughnut' ? 'report-chart-compact' : 'h-52'">
+                                <div :class="visibleCharts[0]?.type === 'doughnut' ? 'relative mx-auto h-28 w-28' : 'relative h-full'">
+                                    <canvas x-ref="chartOne" x-show="hasChartData(visibleCharts[0])"></canvas>
+                                    <div x-show="!hasChartData(visibleCharts[0])" x-cloak class="absolute inset-0 flex items-center justify-center rounded-lg bg-slate-50 text-center text-xs font-bold text-slate-500">
+                                        No chart data for this selection.
+                                    </div>
                                 </div>
+                                <div x-show="visibleCharts[0]?.type === 'doughnut'" x-cloak class="min-w-0 space-y-2 text-[11px] font-bold text-slate-500">
+                                    <template x-for="item in (visibleCharts[0]?.items || [])" :key="`${item.label}-primary-legend`">
+                                        <span class="flex min-w-0 items-center gap-1.5" :title="item.fullLabel || item.label">
+                                            <span class="h-2 w-2 rounded-full" :style="`background-color: ${item.color}`"></span>
+                                            <span class="truncate" x-text="item.shortLabel || item.label"></span>
+                                        </span>
+                                    </template>
+                                </div>
+                            </div>
+                            <div x-show="visibleCharts[0]?.type === 'doughnut'" x-cloak class="gender-count-cards mt-3">
+                                <template x-for="item in (visibleCharts[0]?.items || [])" :key="`count-primary-${item.label}`">
+                                    <div class="min-w-0 rounded-lg border border-blue-100 bg-slate-50 px-2.5 py-2">
+                                        <p class="truncate text-[10px] font-black uppercase tracking-wider text-slate-500" x-text="item.shortLabel || item.label"></p>
+                                        <p class="text-lg font-black text-slate-900" x-text="item.value"></p>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                         <div class="rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
@@ -213,20 +251,18 @@
                         </div>
                     </div>
 
-                    <div class="mt-4 rounded-lg border border-blue-100 bg-white shadow-sm">
+                    <div class="mb-6 rounded-lg border border-blue-100 bg-white shadow-sm" style="order: 1;">
                         <div class="flex flex-col gap-3 border-b border-blue-50 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
                             <div>
                                 <h3 class="text-lg font-black text-slate-900">{{ __('Detailed Report') }}</h3>
                                 <p class="mt-1 text-xs font-semibold text-slate-500">Showing <span x-text="filteredRows().length"></span> of <span x-text="active.recordCount"></span> records</p>
                                 <div x-show="generatedType === 'overtime_cto'" x-cloak class="mt-3 inline-flex rounded-lg border border-blue-100 bg-blue-50 p-1">
-                                    <button type="button" @click="ctoTab = 'overtime'; renderCharts()" :class="ctoTab === 'overtime' ? 'bg-[#0038a8] text-white shadow-sm' : 'text-slate-600 hover:bg-white'" class="rounded-md px-4 py-2 text-[11px] font-black uppercase tracking-wider transition">Overtime</button>
-                                    <button type="button" @click="ctoTab = 'cto'; renderCharts()" :class="ctoTab === 'cto' ? 'bg-[#0038a8] text-white shadow-sm' : 'text-slate-600 hover:bg-white'" class="rounded-md px-4 py-2 text-[11px] font-black uppercase tracking-wider transition">CTO</button>
+                                    <button type="button" @click="ctoTab = 'overtime'; page = 1; renderCharts()" :class="ctoTab === 'overtime' ? 'bg-[#0038a8] text-white shadow-sm' : 'text-slate-600 hover:bg-white'" class="rounded-md px-4 py-2 text-[11px] font-black uppercase tracking-wider transition">Overtime</button>
+                                    <button type="button" @click="ctoTab = 'cto'; page = 1; renderCharts()" :class="ctoTab === 'cto' ? 'bg-[#0038a8] text-white shadow-sm' : 'text-slate-600 hover:bg-white'" class="rounded-md px-4 py-2 text-[11px] font-black uppercase tracking-wider transition">CTO</button>
                                 </div>
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
-                                <button type="button" @click="exportPdf()" style="background-color: #0038a8; border-color: #002f8f; color: #ffffff;" class="inline-flex h-10 min-w-[8.5rem] items-center justify-center rounded-lg border px-4 text-xs font-black uppercase tracking-wider shadow-sm hover:opacity-90">{{ __('Export PDF') }}</button>
-                                <button type="button" @click="exportExcel()" style="background-color: #059669; border-color: #047857; color: #ffffff;" class="inline-flex h-10 min-w-[8.5rem] items-center justify-center rounded-lg border px-4 text-xs font-black uppercase tracking-wider shadow-sm hover:opacity-90">{{ __('Export Excel') }}</button>
-                                <button type="button" onclick="window.print()" style="background-color: #ffffff; border-color: #dbeafe; color: #475569;" class="inline-flex h-10 min-w-[8.5rem] items-center justify-center rounded-lg border px-4 text-xs font-black uppercase tracking-wider shadow-sm hover:bg-blue-50">{{ __('Print') }}</button>
+                                <button type="button" @click="exportPdf()" style="background-color: #0038a8; border-color: #002f8f; color: #ffffff;" class="inline-flex h-10 min-w-[8.5rem] items-center justify-center rounded-lg border px-4 text-xs font-black uppercase tracking-wider shadow-sm hover:opacity-90">{{ __('Print') }}</button>
                             </div>
                         </div>
 
@@ -246,43 +282,151 @@
                             </select>
                         </div>
 
-                        <div class="overflow-x-auto px-4 pb-4">
-                            <table class="w-full min-w-[980px] overflow-hidden rounded-lg text-left text-sm">
-                                <thead class="bg-blue-50 text-[11px] font-black uppercase tracking-wider text-slate-600">
+                        <div class="overflow-x-auto px-3 pb-3">
+                            <table class="w-full min-w-[760px] overflow-hidden rounded-lg text-left text-sm">
+                                <thead class="bg-blue-50 text-[11px] font-black uppercase tracking-[0.06em] text-slate-600">
                                     <tr>
                                         <template x-for="column in active.columns" :key="column">
-                                            <th class="px-4 py-3" x-text="column"></th>
+                                            <th class="px-3 py-2.5" x-text="column"></th>
                                         </template>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-blue-50">
-                                    <template x-for="row in filteredRows()" :key="row.key">
+                                    <template x-for="row in paginatedRows()" :key="row.key">
                                         <tr class="hover:bg-blue-50/40">
                                             <template x-for="(cell, index) in displayCells(row)" :key="`${row.key}-${index}`">
-                                                <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-700">
-                                                    <span x-show="['Active', 'Approved', 'Present'].includes(cell)" class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700" x-text="cell"></span>
-                                                    <span x-show="['Pending', 'Late'].includes(cell)" class="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700" x-text="cell"></span>
-                                                    <span x-show="['Inactive', 'Rejected', 'Absent'].includes(cell)" class="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700" x-text="cell"></span>
+                                                <td class="whitespace-nowrap px-3 py-2.5 font-semibold text-slate-700">
+                                                    <span x-show="['Active', 'Approved', 'Present'].includes(cell)" class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700" x-text="cell"></span>
+                                                    <span x-show="['Pending', 'Late'].includes(cell)" class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-700" x-text="cell"></span>
+                                                    <span x-show="['Inactive', 'Rejected', 'Absent'].includes(cell)" class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-black text-red-700" x-text="cell"></span>
                                                     <span x-show="!['Active', 'Approved', 'Present', 'Pending', 'Late', 'Inactive', 'Rejected', 'Absent'].includes(cell)" x-text="cell"></span>
                                                 </td>
                                             </template>
                                         </tr>
                                     </template>
+                                    <tr x-show="filteredRows().length === 0" x-cloak>
+                                        <td :colspan="active.columns.length" class="px-6 py-10 text-center text-sm font-semibold text-slate-400">
+                                            {{ __('No matching records found.') }}
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
 
-                        <div class="flex flex-col gap-3 border-t border-blue-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div class="flex gap-1">
-                                <button type="button" class="h-8 w-8 rounded-lg bg-[#0038a8] text-xs font-black text-white">1</button>
-                                <button type="button" class="h-8 w-8 rounded-lg border border-blue-100 bg-white text-xs font-black text-slate-500">2</button>
-                                <button type="button" class="h-8 w-8 rounded-lg border border-blue-100 bg-white text-xs font-black text-slate-500">3</button>
+                        <div class="border-t border-slate-100 bg-white px-4 py-3">
+                            <div class="grid items-center gap-3 text-sm text-slate-600 sm:grid-cols-[1fr_auto_1fr]">
+                                <div class="font-semibold">
+                                    <span x-text="rangeStart()"></span>-<span x-text="rangeEnd()"></span>
+                                    {{ __('of') }}
+                                    <span x-text="filteredRows().length"></span>
+                                    {{ __('records') }}
+                                </div>
+
+                                <nav x-show="totalPages() > 1" class="flex items-center justify-start gap-3 sm:justify-center" aria-label="Pagination">
+                                    <button
+                                        type="button"
+                                        @click="setPage(1)"
+                                        :disabled="page <= 1"
+                                        class="inline-flex h-8 w-8 items-center justify-center text-sky-500 transition hover:text-blue-900 disabled:text-slate-300"
+                                        aria-label="First page"
+                                    >
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="m11 17-5-5 5-5m7 10-5-5 5-5" />
+                                        </svg>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        @click="setPage(page - 1)"
+                                        :disabled="page <= 1"
+                                        class="inline-flex h-8 w-8 items-center justify-center text-sky-500 transition hover:text-blue-900 disabled:text-slate-300"
+                                        aria-label="Previous page"
+                                    >
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="m15 18-6-6 6-6" />
+                                        </svg>
+                                    </button>
+
+                                    <template x-if="pageWindow().start > 1">
+                                        <button
+                                            type="button"
+                                            @click="setPage(1)"
+                                            class="inline-flex h-8 min-w-8 items-center justify-center px-2 text-sm font-semibold text-slate-600 transition hover:text-blue-900"
+                                        >1</button>
+                                    </template>
+                                    <template x-if="pageWindow().start > 2">
+                                        <span class="inline-flex h-8 min-w-8 items-center justify-center px-1 text-sm font-semibold text-slate-400">...</span>
+                                    </template>
+
+                                    <template x-for="p in pageWindow().pages" :key="p">
+                                        <span
+                                            x-show="p === page"
+                                            class="inline-flex h-8 min-w-8 items-center justify-center px-2 text-sm font-black text-sky-600"
+                                            x-text="p"
+                                        ></span>
+                                        <button
+                                            type="button"
+                                            x-show="p !== page"
+                                            @click="setPage(p)"
+                                            class="inline-flex h-8 min-w-8 items-center justify-center px-2 text-sm font-semibold text-slate-600 transition hover:text-blue-900"
+                                            x-text="p"
+                                        ></button>
+                                    </template>
+
+                                    <template x-if="pageWindow().end < pageWindow().last - 1">
+                                        <span class="inline-flex h-8 min-w-8 items-center justify-center px-1 text-sm font-semibold text-slate-400">...</span>
+                                    </template>
+                                    <template x-if="pageWindow().end < pageWindow().last">
+                                        <button
+                                            type="button"
+                                            @click="setPage(pageWindow().last)"
+                                            class="inline-flex h-8 min-w-8 items-center justify-center px-2 text-sm font-semibold text-slate-600 transition hover:text-blue-900"
+                                            x-text="pageWindow().last"
+                                        ></button>
+                                    </template>
+
+                                    <button
+                                        type="button"
+                                        @click="setPage(page + 1)"
+                                        :disabled="page >= totalPages()"
+                                        class="inline-flex h-8 w-8 items-center justify-center text-sky-500 transition hover:text-blue-900 disabled:text-slate-300"
+                                        aria-label="Next page"
+                                    >
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="m9 18 6-6-6-6" />
+                                        </svg>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        @click="setPage(totalPages())"
+                                        :disabled="page >= totalPages()"
+                                        class="inline-flex h-8 w-8 items-center justify-center text-sky-500 transition hover:text-blue-900 disabled:text-slate-300"
+                                        aria-label="Last page"
+                                    >
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="m6 17 5-5-5-5m7 10 5-5-5-5" />
+                                        </svg>
+                                    </button>
+                                </nav>
+                                <div x-show="totalPages() <= 1"></div>
+
+                                <div class="flex items-center justify-start gap-2 sm:justify-end">
+                                    <label for="detailed_report_per_page" class="whitespace-nowrap text-xs font-semibold text-slate-600">
+                                        {{ __('Show') }}
+                                    </label>
+                                    <select
+                                        id="detailed_report_per_page"
+                                        x-model.number="perPage"
+                                        @change="page = 1"
+                                        class="block h-8 w-20 rounded-lg border-gray-300 bg-white py-1 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    >
+                                        @foreach([5, 10, 20, 50] as $pageSize)
+                                            <option value="{{ $pageSize }}">{{ $pageSize }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
                             </div>
-                            <select class="h-9 rounded-lg border-blue-100 text-xs font-bold text-slate-600">
-                                <option>10 / page</option>
-                                <option>25 / page</option>
-                                <option>50 / page</option>
-                            </select>
                         </div>
                     </div>
                 </div>
@@ -537,6 +681,9 @@
                 employmentStatuses: serverReportData.employmentStatuses,
                 search: '',
                 filters: serverReportData.filters,
+                yearOptions: Array.from({ length: new Date().getFullYear() - 1999 }, (_, index) => new Date().getFullYear() - index),
+                page: 1,
+                perPage: 10,
                 charts: {
                     chartOne: null,
                     chartTwo: null,
@@ -564,7 +711,7 @@
                 },
                 changeReportCategory(category) {
                     this.selectedCategory = category;
-                    this.selectedType = this.subReports()[0]?.value || 'employee_compliance';
+                    this.selectedType = this.subReports()[0]?.value || 'hr_overview';
                     this.changeSubReport(this.selectedType);
                 },
                 changeSubReport(reportType) {
@@ -581,6 +728,7 @@
                         to: this.filters.to,
                         division: this.filters.division,
                         employment_status: this.filters.employmentStatus,
+                        year: this.filters.year,
                     });
 
                     window.location.assign(`{{ route('reports.index') }}?${params.toString()}`);
@@ -592,13 +740,23 @@
                         to: this.filters.to,
                         division: this.filters.division,
                         employment_status: this.filters.employmentStatus,
+                        cto_tab: this.ctoTab,
                     });
 
                     window.open(`{{ route('reports.print') }}?${params.toString()}`, '_blank', 'noopener');
                 },
                 initCharts() {
-                    this.$watch('filters.division', () => this.renderCharts());
-                    this.$watch('filters.employmentStatus', () => this.renderCharts());
+                    this.$watch('filters.division', () => {
+                        this.page = 1;
+                        this.renderCharts();
+                    });
+                    this.$watch('filters.employmentStatus', () => {
+                        this.page = 1;
+                        this.renderCharts();
+                    });
+                    this.$watch('search', () => {
+                        this.page = 1;
+                    });
                     this.$nextTick(() => this.renderCharts());
                 },
                 renderCharts() {
@@ -899,26 +1057,52 @@
                         return matchesSearch && matchesDivision && matchesEmployment;
                     });
                 },
+                paginatedRows() {
+                    const rows = this.filteredRows();
+                    const total = Math.max(1, Math.ceil(rows.length / this.perPage));
+                    if (this.page > total) {
+                        this.page = total;
+                    }
+                    if (this.page < 1) {
+                        this.page = 1;
+                    }
+                    const start = (this.page - 1) * this.perPage;
+                    return rows.slice(start, start + this.perPage);
+                },
+                totalPages() {
+                    return Math.max(1, Math.ceil(this.filteredRows().length / this.perPage));
+                },
+                rangeStart() {
+                    return this.filteredRows().length > 0 ? ((this.page - 1) * this.perPage) + 1 : 0;
+                },
+                rangeEnd() {
+                    return Math.min(this.page * this.perPage, this.filteredRows().length);
+                },
+                setPage(p) {
+                    this.page = Math.min(Math.max(1, p), this.totalPages());
+                },
+                pageWindow() {
+                    const current = this.page;
+                    const last = this.totalPages();
+                    const start = Math.max(1, current - 2);
+                    const end = Math.min(last, current + 2);
+                    const pages = [];
+                    for (let i = start; i <= end; i++) {
+                        pages.push(i);
+                    }
+                    return {
+                        start,
+                        end,
+                        last,
+                        pages,
+                    };
+                },
                 displayCells(row) {
                     return this.active.columns.map((column, index) => {
                         const value = row.cells?.[index];
 
                         return value === undefined || value === null || String(value).trim() === '' ? 'N/A' : value;
                     });
-                },
-                exportExcel() {
-                    const rows = [this.active.columns, ...this.filteredRows().map((row) => this.displayCells(row))];
-                    const csv = rows
-                        .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
-                        .join('\n');
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                    const link = document.createElement('a');
-                    const filename = `${this.active.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`;
-
-                    link.href = URL.createObjectURL(blob);
-                    link.download = filename;
-                    link.click();
-                    URL.revokeObjectURL(link.href);
                 },
             };
         }
