@@ -272,7 +272,7 @@ class DashboardController extends Controller
         });
 
         $latestApprovals = $approvalSources
-            ->map(function ($source) {
+            ->map(function ($source) use ($role) {
                 $record = (clone $source['query'])->latest()->first();
                 $isFallback = false;
 
@@ -282,7 +282,15 @@ class DashboardController extends Controller
                 }
 
                 if (! $record) {
-                    return null;
+                    if (! in_array($role, ['admin', 'hrstaff'], true)) return null;
+                    return [
+                        'label' => $source['label'],
+                        'title' => 'No pending records',
+                        'employee' => '',
+                        'date' => '',
+                        'url' => is_string($source['route']) ? $source['route'] : route('employees.index'),
+                        'status' => 'empty',
+                    ];
                 }
 
                 $employee = $record instanceof Employee ? $record : $record->employee;

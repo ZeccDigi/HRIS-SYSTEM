@@ -145,15 +145,16 @@
                                                             <div class="min-w-0">
                                                                 <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">{{ $approval['label'] }}</p>
                                                                 <p class="mt-1.5 truncate text-base font-black text-gray-900">{{ $approval['title'] }}</p>
-                                                                <p class="mt-1 truncate text-xs font-semibold text-gray-400">{{ $approval['employee'] }} · {{ $approval['date'] }}</p>
+                                                                @if($approval['employee'] || $approval['date'])<p class="mt-1 truncate text-xs font-semibold text-gray-400">{{ $approval['employee'] }}{{ $approval['employee'] && $approval['date'] ? ' · ' : '' }}{{ $approval['date'] }}</p>@endif
                                                             </div>
                                                             <div class="flex shrink-0 items-center gap-2">
                                                                 <span @class([
                                                                     'rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest',
                                                                     'border-green-100 bg-green-50 text-green-700' => in_array($approval['status'], ['verified', 'current'], true),
-                                                                    'border-amber-100 bg-amber-50 text-amber-700' => ! in_array($approval['status'], ['verified', 'current'], true),
+                                                                    'border-slate-200 bg-slate-50 text-slate-500' => $approval['status'] === 'empty',
+                                                                    'border-amber-100 bg-amber-50 text-amber-700' => ! in_array($approval['status'], ['verified', 'current', 'empty'], true),
                                                                 ])>
-                                                                    {{ __($approval['status']) }}
+                                                                    {{ $approval['status'] === 'empty' ? __('No pending') : __($approval['status']) }}
                                                                 </span>
                                                                 <a href="{{ $approval['url'] }}" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-900 transition hover:bg-blue-50 hover:text-blue-700" aria-label="{{ __('View') }}">
                                                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
