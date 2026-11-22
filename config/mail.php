@@ -36,6 +36,7 @@ return [
     */
 
     'mailers' => [
+        'disabled' => ['transport'=>'disabled'],
 
         'smtp' => [
             'transport' => 'smtp',
@@ -82,6 +83,7 @@ return [
         'failover' => [
             'transport' => 'failover',
             'mailers' => [
+        'disabled' => ['transport'=>'disabled'],
                 'smtp',
                 'log',
             ],
@@ -91,6 +93,7 @@ return [
         'roundrobin' => [
             'transport' => 'roundrobin',
             'mailers' => [
+        'disabled' => ['transport'=>'disabled'],
                 'ses',
                 'postmark',
             ],

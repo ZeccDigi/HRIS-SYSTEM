@@ -43,7 +43,7 @@ class UtilityController extends Controller
         $search = trim($salaryFilters['salary_search'] ?? '');
         if ($search !== '') $query->where(function ($query) use ($search) {
             $query->where('salary_grade', 'like', '%'.$search.'%')->orWhere('salary_step', 'like', '%'.$search.'%')
-                ->orWhere('monthly_salary', 'like', '%'.str_replace(',', '', $search).'%');
+                ->orWhereRaw('CAST(monthly_salary AS '.(in_array(\Illuminate\Support\Facades\DB::getDriverName(), ['mysql', 'mariadb'], true) ? 'CHAR' : 'TEXT').') LIKE ?', ['%'.str_replace(',', '', $search).'%']);
         });
         foreach (['salary_year' => 'year', 'salary_grade' => 'salary_grade', 'salary_step' => 'salary_step'] as $filter => $column) {
             if (filled($salaryFilters[$filter] ?? null)) $query->where($column, $salaryFilters[$filter]);

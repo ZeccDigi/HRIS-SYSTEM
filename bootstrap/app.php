@@ -12,6 +12,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [\App\Http\Middleware\PersistPresentationFiles::class]);
+        if (env('RENDER')) $middleware->trustProxies(at: '*');
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
             'privacy.consent' => \App\Http\Middleware\RequirePrivacyConsent::class,

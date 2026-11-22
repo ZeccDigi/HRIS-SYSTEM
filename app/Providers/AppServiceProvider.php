@@ -25,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Illuminate\Support\Facades\Mail::extend('disabled', fn () => new \App\Mail\DisabledTransport());
         \Illuminate\Validation\Rules\Password::defaults(fn () => \Illuminate\Validation\Rules\Password::min(8)->rules([new \App\Rules\AcceptablePasswordStrength()]));
         View::composer(['layouts.app', 'layouts.sidebar', 'dashboard'], function () {
             if (Auth::check()) {
