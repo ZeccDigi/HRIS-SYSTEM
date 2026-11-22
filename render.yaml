@@ -4,7 +4,7 @@ services:
     runtime: docker
     plan: free
     region: singapore
-    branch: codex/render-presentation
+    branch: pre-deployment
     dockerfilePath: ./Dockerfile
     healthCheckPath: /up
     envVars:
