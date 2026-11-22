@@ -13,11 +13,14 @@ use Illuminate\View\View;
 
 class UtilityController extends Controller
 {
-    public function index(Request $request): View|\Illuminate\Http\JsonResponse
+    public function index(Request $request): View|\Illuminate\Http\JsonResponse|\Illuminate\Http\Response
     {
         if (! $request->expectsJson()) UtilityOptionRegistry::ensureDefaults();
 
         $tabs = UtilityOptionRegistry::tabs();
+        $canManageKiosks = in_array(strtolower($request->user()->role), ['admin', 'hrstaff'], true);
+        if ($request->query('tab') === 'kiosk-connections') abort_unless($canManageKiosks, 403);
+        if ($canManageKiosks) $tabs['kiosk-connections'] = 'Kiosk Connections';
         $tab = $request->query('tab', $request->session()->get('utilities.tab', 'leave-types'));
         if (! is_string($tab)) $tab = 'leave-types';
         if (! array_key_exists($tab, $tabs)) {
@@ -55,7 +58,12 @@ class UtilityController extends Controller
             $canManageSalary = in_array(strtolower($request->user()->role), ['admin', 'hrstaff'], true);
             return response()->json(['html' => view('utilities.salary-rate-results', compact('salaryRates', 'canManageSalary'))->render()]);
         }
-        return view('utilities.index', compact('tab', 'tabs', 'groups', 'leaveTypes', 'optionsByGroup', 'salaryRates', 'salaryYears', 'salaryFilters'));
+        $data = compact('tab', 'tabs', 'groups', 'leaveTypes', 'optionsByGroup', 'salaryRates', 'salaryYears', 'salaryFilters');
+        if ($tab === 'kiosk-connections') {
+            $data['devices'] = \Illuminate\Support\Facades\DB::table('kiosk_devices')->orderByDesc('id')->paginate(20, ['*'], 'kiosk_page')->withQueryString();
+            return response()->view('utilities.index', $data)->header('Cache-Control', 'no-store');
+        }
+        return view('utilities.index', $data);
     }
 
     public function saveSalaryRate(Request $request, ?SalaryRate $salaryRate = null): RedirectResponse

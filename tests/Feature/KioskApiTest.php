@@ -100,7 +100,11 @@ it('allows Admin and HR to manage kiosks while denying other roles', function ()
         $this->post(route('kiosk-devices.store'), ['name' => $role.' kiosk'])->assertRedirect()->assertSessionHas('kiosk_key');
         $device = DB::table('kiosk_devices')->latest('id')->first();
         expect($device->token_hash)->toBe(hash('sha256', session('kiosk_key')));
-        $this->get(route('kiosk-devices.index'))->assertOk()->assertSee(route('kiosk-devices.index'), false);
+        $this->get(route('kiosk-devices.index'))->assertRedirect(route('utilities.index', ['tab' => 'kiosk-connections']));
+        $page = $this->get(route('utilities.index', ['tab' => 'kiosk-connections']))->assertOk();
+        expect($page->headers->get('Cache-Control'))->toContain('no-store');
+        expect(array_key_last($page->viewData('tabs')))->toBe('kiosk-connections');
+        $page->assertSee('Create kiosk key')->assertDontSee('href="'.route('kiosk-devices.index').'"', false);
         $this->post(route('kiosk-devices.revoke', $device->id))->assertRedirect();
         expect(DB::table('kiosk_devices')->where('id', $device->id)->value('revoked_at'))->not->toBeNull();
     }

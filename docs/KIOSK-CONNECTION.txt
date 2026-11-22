@@ -11,7 +11,7 @@ The two computers do not need the same Wi-Fi; the kiosk needs internet to commun
 
 1. PREPARE THE HRIS
 Wait until Render has deployed the latest kiosk API update successfully.
-Sign in as Admin or HR Admin. Open Settings -> Kiosk Connections (also linked from Utilities).
+Sign in as Admin or HR Admin. Open Utilities -> Kiosk Connections (last tab).
 Enter the computer name (example: Entrance kiosk) and click Create kiosk key.
 Copy the key immediately; it is displayed only once. Do not share it in a presentation.
 This key is not an employee password, a database password, or the kiosk Settings PIN.
@@ -72,7 +72,7 @@ has a revocable access key; the database password is never installed on the kios
 HRIS Offline: check internet, hosted login page, Render deployment and database availability.
 Free Render may need about a minute to wake after inactivity. Open HRIS first, wait,
 then use Test Connection and Sync again. A failed request never claims successful upload.
-Invalid/revoked key: create a new key in Settings -> Kiosk Connections (also linked from Utilities) and replace it in Settings.
+Invalid/revoked key: create a new key in Utilities -> Kiosk Connections (last tab) and replace it in Settings.
 RFID not found: assign it to an active employee in HRIS, then Sync again.
 Existing punch differs: the kiosk deliberately will not overwrite it. Ask HR to review.
 Other HRIS queue: finish syncing to the original HRIS before switching databases.
