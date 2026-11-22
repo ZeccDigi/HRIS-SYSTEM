@@ -279,6 +279,15 @@
                 </x-sidebar-link>
             @endif
 
+            @if($isApproved && in_array(auth()->user()->role, ['admin', 'hrstaff']))
+                <x-sidebar-link :href="route('kiosk-devices.index')" :active="request()->routeIs('kiosk-devices.*')">
+                    <x-slot name="icon">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" stroke-width="2"/><path d="M8 20h8M12 16v4" stroke-width="2"/></svg>
+                    </x-slot>
+                    {{ __('Kiosk Connections') }}
+                </x-sidebar-link>
+            @endif
+
             @if($isApproved && in_array(auth()->user()->role, ['admin', 'hrstaff', 'regionaldirector']))
                 <x-sidebar-link :href="route('utilities.index')" :active="request()->routeIs('utilities.*') || request()->routeIs('leave-types.*')">
                     <x-slot name="icon">

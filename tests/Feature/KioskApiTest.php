@@ -84,13 +84,24 @@ it('recognizes a wrong-date QR without writing and rejects weekend or pending sl
     $headers['Idempotency-Key'] = (string) Str::uuid();
     $this->postJson('/api/kiosk/v1/locator-scan', $body, $headers)->assertStatus(400);
 });
-it('limits kiosk key management to HR and Admin and stores only a key hash', function () {
+it('allows Admin and HR to manage kiosks while denying other roles', function () {
     $employee = kioskEmployee();
-    $this->actingAs($employee->user)->get(route('kiosk-devices.index'))->assertForbidden();
-    $employee->update(['account_role' => 'hrstaff']);
-    $this->actingAs($employee->user->fresh());
-    $this->post(route('kiosk-devices.store'), ['name' => 'Entrance'])->assertRedirect()->assertSessionHas('kiosk_key');
-    $key = session('kiosk_key');
-    expect(DB::table('kiosk_devices')->value('token_hash'))->toBe(hash('sha256',$key));
-    $this->get(route('kiosk-devices.index'))->assertOk();
+    foreach (['employee', 'chief', 'regionaldirector'] as $role) {
+        $employee->update(['account_role' => $role]);
+        $this->actingAs($employee->user->fresh());
+        $this->get(route('kiosk-devices.index'))->assertForbidden();
+        $this->post(route('kiosk-devices.store'), ['name' => 'Not allowed'])->assertForbidden();
+        $this->post(route('kiosk-devices.revoke', 1))->assertForbidden();
+    }
+    $this->assertDatabaseCount('kiosk_devices', 0);
+    foreach (['admin', 'hrstaff'] as $role) {
+        $employee->update(['account_role' => $role]);
+        $this->actingAs($employee->user->fresh());
+        $this->post(route('kiosk-devices.store'), ['name' => $role.' kiosk'])->assertRedirect()->assertSessionHas('kiosk_key');
+        $device = DB::table('kiosk_devices')->latest('id')->first();
+        expect($device->token_hash)->toBe(hash('sha256', session('kiosk_key')));
+        $this->get(route('kiosk-devices.index'))->assertOk()->assertSee(route('kiosk-devices.index'), false);
+        $this->post(route('kiosk-devices.revoke', $device->id))->assertRedirect();
+        expect(DB::table('kiosk_devices')->where('id', $device->id)->value('revoked_at'))->not->toBeNull();
+    }
 });
