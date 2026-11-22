@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: dmw-hris-presentation
+    name: dmw-hris-pre-deployment
     runtime: docker
     plan: free
     region: singapore
@@ -9,7 +9,7 @@ services:
     healthCheckPath: /up
     envVars:
       - key: APP_NAME
-        value: DMW HRIS Presentation
+        value: DMW HRIS Pre-deployment
       - key: APP_ENV
         value: production
       - key: APP_DEBUG

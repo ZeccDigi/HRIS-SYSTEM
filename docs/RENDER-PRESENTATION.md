@@ -27,3 +27,5 @@ MAIL_MAILER=disabled deliberately reports unavailable delivery instead of silent
 ## Verification after deployment
 
 Wait for Live, open the HTTPS Render URL, sign in with a demo account, check the Dashboard and role menus, make a sample file upload, and verify persistence after a manual restart. Test PDS PDF export; Chromium is included in the image. A free instance may be slow to wake and has limited memory, so avoid simultaneous large PDF exports during the presentation. Do not configure a paid worker, disk or database for this free setup.
+
+The web service is named dmw-hris-pre-deployment. The existing database keeps its original name; renaming the app must not replace the database or change APP_KEY_SEED. Verify the public URL shown by Render rather than assuming the service rename changes it.
