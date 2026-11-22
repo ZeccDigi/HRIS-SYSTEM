@@ -26,7 +26,7 @@ class KioskApiController extends Controller
         $employees = Employee::with('coreTimeSchedules')->whereHas('user', fn ($q) => $q->where('account_status', '!=', 'disabled')->where('is_approved', true))->whereNotNull('rfid_number')->where('rfid_number', '!=', '')->orderBy('id')->get();
 
         return response()->json(['success' => true, 'server_id' => self::serverId(), 'employees' => $employees->map(fn ($e) => [
-            'id' => $e->id, 'firstname' => $e->firstname, 'middlename' => $e->middlename, 'lastname' => $e->lastname, 'position' => $e->position, 'rfid_number' => $e->rfid_number,
+            'id' => $e->id, 'firstname' => $e->firstname, 'middlename' => $e->middlename, 'lastname' => $e->lastname, 'position' => $e->position, 'division' => $e->division, 'rfid_number' => $e->rfid_number,
             'core_time_start_date' => $e->core_time_start_date?->toDateString(), 'core_time_end_date' => $e->core_time_end_date?->toDateString(), 'core_time_schedule' => $e->core_time_schedule,
             'core_time_history' => $e->coreTimeSchedules->map(fn ($v) => ['id' => $v->id, 'applies_from' => $v->applies_from?->toDateString(), 'core_time_start_date' => $v->core_time_start_date?->toDateString(), 'core_time_end_date' => $v->core_time_end_date?->toDateString(), 'core_time_schedule' => $v->core_time_schedule])->values(),
         ])->values()]);

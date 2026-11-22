@@ -30,7 +30,8 @@ it('requires a device key and rejects revoked keys', function () {
 it('returns only the minimum active employee directory', function () {
     $headers = pairedKioskHeaders();
     $employee = kioskEmployee();
-    $r = $this->getJson('/api/kiosk/v1/employees', $headers)->assertOk()->assertJsonPath('employees.0.id', $employee->id);
+    $employee->update(['division' => 'Test Division']);
+    $r = $this->getJson('/api/kiosk/v1/employees', $headers)->assertOk()->assertJsonPath('employees.0.id', $employee->id)->assertJsonPath('employees.0.division', 'Test Division');
     expect($r->json('employees.0'))->not->toHaveKeys(['notification_email', 'monthly_salary', 'password', 'date_of_birth']);
     $employee->user->update(['account_status' => 'disabled']);
     $this->getJson('/api/kiosk/v1/employees', $headers)->assertJsonCount(0, 'employees');
