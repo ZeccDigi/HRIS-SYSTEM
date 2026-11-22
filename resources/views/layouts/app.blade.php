@@ -19,7 +19,6 @@
         @livewireStyles
     </head>
     <body class="font-sans antialiased text-gray-900 bg-gray-50/50" x-data="{ sidebarOpen: false, sidebarCollapsed: false }">
-        @if(config('presentation.enabled'))<div role="status" class="bg-amber-50 px-4 py-1 text-center text-xs text-amber-800">Presentation preview · Sample records only</div>@endif
         <div class="flex h-screen overflow-hidden">
             <!-- Off-canvas menu for mobile -->
             <div x-show="sidebarOpen" 

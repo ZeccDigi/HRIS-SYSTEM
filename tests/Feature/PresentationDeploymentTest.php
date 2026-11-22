@@ -19,7 +19,7 @@ test('presentation creates sample accounts and preserves changes on the next sta
  expect(User::count())->toBe(6)->and(Employee::count())->toBe(6);
  $hr=User::where('email','demo.hrstaff@dmw.gov.ph')->firstOrFail();
  expect(Hash::check(config('presentation.password'),$hr->password))->toBeTrue()->and($hr->role)->toBe('hrstaff');
- $this->actingAs($hr)->get(route('dashboard'))->assertOk()->assertSee('Presentation preview');
+ $this->actingAs($hr)->get(route('dashboard'))->assertOk()->assertDontSee('Presentation preview');
  $hr->employee->update(['position'=>'Updated demo position']);
  $this->artisan('presentation:initialize')->assertSuccessful();
  expect(User::count())->toBe(6)->and($hr->employee->fresh()->position)->toBe('Updated demo position');
