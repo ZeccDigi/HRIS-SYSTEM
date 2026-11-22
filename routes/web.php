@@ -81,6 +81,10 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     Route::resource('leave-types', LeaveTypeController::class)->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
     Route::resource('holidays', HolidayController::class)->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
 
+    Route::get('/kiosk-devices', [\App\Http\Controllers\KioskDeviceController::class, 'index'])->name('kiosk-devices.index')->middleware('role:ADMIN,HRSTAFF');
+    Route::post('/kiosk-devices', [\App\Http\Controllers\KioskDeviceController::class, 'store'])->name('kiosk-devices.store')->middleware(['role:ADMIN,HRSTAFF','throttle:10,1']);
+    Route::post('/kiosk-devices/{device}/revoke', [\App\Http\Controllers\KioskDeviceController::class, 'revoke'])->name('kiosk-devices.revoke')->middleware('role:ADMIN,HRSTAFF')->whereNumber('device');
+
     Route::get('/utilities', [UtilityController::class, 'index'])->name('utilities.index')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
     Route::delete('/utilities/salary-rates/{salaryRate}', [UtilityController::class, 'destroySalaryRate'])->name('utilities.salary-rates.destroy')->middleware('role:ADMIN,HRSTAFF');
     Route::post('/utilities/salary-rates', [UtilityController::class, 'saveSalaryRate'])->name('utilities.salary-rates.store')->middleware('role:ADMIN,HRSTAFF');

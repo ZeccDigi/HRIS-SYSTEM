@@ -12,6 +12,7 @@
         <div class="mx-auto w-full min-w-0 space-y-4">
             <div>
                 <h2 class="text-xl font-bold text-gray-800 sm:text-2xl">Utilities</h2>
+                @if(in_array(strtoupper(auth()->user()->role), ['ADMIN','HRSTAFF']))<a href="{{ route('kiosk-devices.index') }}" class="inline-block mt-2 text-sm font-semibold text-blue-700">Kiosk Connections</a>@endif
                 <p class="mt-0.5 text-xs text-gray-500 sm:text-sm">Manage fixed dropdown values used across leave, PDS, and SALN.</p>
             </div>
 

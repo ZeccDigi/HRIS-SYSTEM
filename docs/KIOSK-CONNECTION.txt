@@ -1,0 +1,87 @@
+KIOSK + HOSTED HRIS SETUP AND PRESENTATION GUIDE
+Updated: November 23, 2026
+
+WHAT CONNECTS TO WHAT
+RFID reader / USB camera -> local kiosk -> HTTPS -> hosted HRIS -> central database.
+The kiosk opens at http://127.0.0.1:8000/attendance on its own computer.
+The HRIS opens at https://dmw-hris.onrender.com in a browser.
+Both Attendance and Locator Slip are tabs of the same local kiosk.
+The kiosk does not need a public website, a searchable address, or an open database port.
+The two computers do not need the same Wi-Fi; the kiosk needs internet to communicate with HRIS.
+
+1. PREPARE THE HRIS
+Wait until Render has deployed the latest kiosk API update successfully.
+Sign in as HR or Admin. Open Utilities -> Kiosk Connections.
+Enter the computer name (example: Entrance kiosk) and click Create kiosk key.
+Copy the key immediately; it is displayed only once. Do not share it in a presentation.
+This key is not an employee password, a database password, or the kiosk Settings PIN.
+Create a separate key for each kiosk. Revoke a key here if a computer is lost or retired.
+
+2. INSTALL ON THE KIOSK COMPUTER
+Extract this entire ZIP to a permanent local folder, such as C:\DMW-Kiosk.
+Do not run the launchers from inside the ZIP or directly from the flash drive.
+Double-click 1 - SETUP.cmd. Create a Settings password or PIN when asked.
+Setup creates the local database and local encryption key. PHP is included; XAMPP is not required.
+If PHP cannot start, install the official Microsoft Visual C++ x64 Redistributable:
+https://aka.ms/vc14/vc_redist.x64.exe
+Then run Setup again. A re-run preserves an existing local database and app key.
+Double-click 2 - START KIOSK.cmd. Keep its server window open while using the kiosk.
+Connect the USB camera and RFID reader. Allow camera access when the browser asks.
+
+3. PAIR THE KIOSK
+On the kiosk page, click Settings and unlock with the Settings password/PIN.
+Select Hosted HRIS (HTTPS).
+HRIS address: https://dmw-hris.onrender.com
+Kiosk key: paste the key created in Step 1.
+Click Save Configuration, then Test Connection.
+Return to the Attendance page and click Sync.
+Wait for a successful sync and HRIS Online before demonstrating locator scans.
+Only active, approved employees with assigned RFID numbers are downloaded.
+Assign RFID values in the hosted HRIS before pressing Sync.
+HRIS is authoritative; local employee IDs are kept separate from hosted IDs.
+No real employee records or pairing keys are included in this package.
+
+4. VERIFY BEFORE PRESENTING
+A. RFID: scan an assigned employee RFID. Confirm a follow-up action if prompted.
+   Check the correct date and punch in that employee's hosted Attendance/DTR.
+   The local result says saved in HRIS, or saved locally / pending sync.
+B. Offline attendance: first sync the employee directory. Disconnect internet but
+   keep the local kiosk running. Scan during the employee's attendance window.
+   The punch stays in local SQLite. Reconnect, click Sync, then check hosted DTR.
+   Original punch time is preserved; it does not become the reconnect time.
+C. Locator: approve a slip for TODAY (a weekday) in hosted HRIS. Show its QR on a phone.
+   Scan once for OUT; scan again when returning for IN. Inspect the hosted slip's times.
+   The existing 10-second duplicate guard still applies. Weekends remain disabled.
+D. Wrong-date locator: scan another approved QR scheduled for a different day.
+   It must show the schedule warning and must not record OUT or IN.
+E. Offline locator: disconnect internet and scan. The kiosk reports that HRIS did not
+   confirm it. It does not claim a saved locator time. Reconnect and retry the same QR.
+   If the HRIS saved a scan but its response was lost, retry returns that same result,
+   rather than accidentally turning OUT into IN.
+
+5. WHAT TO SAY IN THE PRESENTATION
+"Our attendance and locator scanner runs locally on a designated computer, so it
+can use the USB camera and RFID reader. It sends records securely to the online
+HRIS through an authenticated HTTPS connection. HR and employees see the central
+records online. RFID punches can be queued locally during an internet outage and
+synced afterward with their original time. Locator slips require online validation
+of approval and scheduled date before an OUT or IN scan is confirmed. Each kiosk
+has a revocable access key; the database password is never installed on the kiosk."
+
+6. CONNECTION TROUBLESHOOTING
+HRIS Offline: check internet, hosted login page, Render deployment and database availability.
+Free Render may need about a minute to wake after inactivity. Open HRIS first, wait,
+then use Test Connection and Sync again. A failed request never claims successful upload.
+Invalid/revoked key: create a new key in Utilities -> Kiosk Connections and replace it in Settings.
+RFID not found: assign it to an active employee in HRIS, then Sync again.
+Existing punch differs: the kiosk deliberately will not overwrite it. Ask HR to review.
+Other HRIS queue: finish syncing to the original HRIS before switching databases.
+Legacy records from a separate local database are preserved and are not silently sent
+into the hosted HRIS. Use the new clean package for the hosted demonstration.
+Camera cannot start: check USB connection and browser permissions; keep the QR fully visible.
+The computer clock must be correct. Keep the kiosk server running during offline operation.
+
+STATUS
+This package includes the connection implementation. A newly installed kiosk is
+UNPAIRED until an authorized HR/Admin creates its key and you complete Step 3.
+The ZIP does not automatically authenticate to the deployed HRIS.
