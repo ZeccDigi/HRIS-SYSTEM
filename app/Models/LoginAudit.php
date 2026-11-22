@@ -51,7 +51,7 @@ class LoginAudit extends Model
         $diffSeconds = (int) $this->login_at->diffInSeconds($end);
 
         return sprintf(
-            '%02d:%02d:%02d.00',
+            '%02d.%02d.%02d',
             intdiv($diffSeconds, 3600),
             intdiv($diffSeconds % 3600, 60),
             $diffSeconds % 60,

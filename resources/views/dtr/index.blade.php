@@ -35,71 +35,17 @@
             ? trim(($regionalDirector->firstname ?? '') . ' ' . ($regionalDirector->middlename ? mb_substr($regionalDirector->middlename, 0, 1) . '. ' : '') . ($regionalDirector->lastname ?? ''))
             : 'MARIA CAROLINA B. AGDAMAG';
         $printMonthPeriod = $selectedDate->format('F 1') . ' - ' . $selectedDate->copy()->endOfMonth()->format('F j, Y');
-        $actualWorkedMinutes = function ($record) {
-            if (! $record) {
-                return 0;
-            }
-
-            $minutes = 0;
-
-            if ($record->time_in && $record->am_out) {
-                $minutes += \Carbon\Carbon::parse($record->time_in)->diffInMinutes(\Carbon\Carbon::parse($record->am_out));
-            }
-
-            if ($record->pm_in && $record->time_out) {
-                $minutes += \Carbon\Carbon::parse($record->pm_in)->diffInMinutes(\Carbon\Carbon::parse($record->time_out));
-            }
-
-            if ($minutes === 0 && $record->time_in && $record->time_out) {
-                $minutes = \Carbon\Carbon::parse($record->time_in)->diffInMinutes(\Carbon\Carbon::parse($record->time_out));
-
-                if ($minutes > 240) {
-                    $minutes -= 60;
-                }
-            }
-
-            return max(0, $minutes);
-        };
-        $lateMinutesForRecord = function ($record) {
-            if (! $record) {
-                return 0;
-            }
-
-            $minutes = 0;
-
-            if ($record->time_in && \Carbon\Carbon::parse($record->time_in)->format('H:i:s') > '08:00:00') {
-                $minutes += \Carbon\Carbon::parse('08:00:00')->diffInMinutes(\Carbon\Carbon::parse($record->time_in));
-            }
-
-            if ($record->pm_in && \Carbon\Carbon::parse($record->pm_in)->format('H:i:s') > '13:00:00') {
-                $minutes += \Carbon\Carbon::parse('13:00:00')->diffInMinutes(\Carbon\Carbon::parse($record->pm_in));
-            }
-
-            return $minutes;
-        };
-        $undertimeMinutesForRecord = function ($record) {
-            if (! $record) {
-                return 0;
-            }
-
-            $minutes = 0;
-
-            if ($record->am_out && \Carbon\Carbon::parse($record->am_out)->format('H:i:s') < '12:00:00') {
-                $minutes += \Carbon\Carbon::parse($record->am_out)->diffInMinutes(\Carbon\Carbon::parse('12:00:00'));
-            }
-
-            if ($record->time_out && \Carbon\Carbon::parse($record->time_out)->format('H:i:s') < '17:00:00') {
-                $minutes += \Carbon\Carbon::parse($record->time_out)->diffInMinutes(\Carbon\Carbon::parse('17:00:00'));
-            }
-
-            return $minutes;
-        };
+        $calculator = app(\App\Services\AttendanceCalculator::class);
+        $actualWorkedMinutes = fn ($record) => $calculator->actualMinutes($record, $employee);
+        $lateMinutesForRecord = fn ($record) => $calculator->lateMinutes($record, $employee);
+        $undertimeMinutesForRecord = fn ($record) => $calculator->undertimeMinutes($record, $employee);
         $attendanceEventsByDate = collect($attendanceEventsByDate ?? []);
-        $printDays = collect(range(1, 31))->map(function ($dayNumber) use ($selectedDate, $recordsByDate, $undertimeMinutesForRecord, $attendanceEventsByDate) {
+        $printDays = collect(range(1, 31))->map(function ($dayNumber) use ($selectedDate, $recordsByDate, $undertimeMinutesForRecord, $attendanceEventsByDate, $calculator, $employee) {
             $day = $dayNumber <= $selectedDate->daysInMonth ? $selectedDate->copy()->day($dayNumber) : null;
             $record = $day ? $recordsByDate->get($day->format('Y-m-d'), collect())->first() : null;
             $approvedEvent = $day ? $attendanceEventsByDate->get($day->format('Y-m-d')) : null;
-            $undertimeMinutes = $day && ! $day->isWeekend() && ! $approvedEvent ? $undertimeMinutesForRecord($record) : 0;
+            if ($day && $calculator->isBlankDay($employee, $day)) { $record = null; $approvedEvent = null; }
+            $undertimeMinutes = $day && (!$approvedEvent || ($approvedEvent['locator_only'] ?? false)) ? $undertimeMinutesForRecord($record) : 0;
 
             return [
                 'day_number' => $dayNumber,
@@ -123,28 +69,31 @@
             return number_format($minutes / 60, 2);
         };
         $monthlyActualMinutes = collect($dtrRecords ?? [])->sum(fn ($record) => $actualWorkedMinutes($record));
-        $monthlyOvertimeMinutes = collect($dtrRecords ?? [])->sum(fn ($record) => max(0, $actualWorkedMinutes($record) - 480));
-        $monthlyOfficialMinutes = $calendarDays->sum(function ($day) use ($recordsByDate, $attendanceEventsByDate, $actualWorkedMinutes) {
-            if ($day->isWeekend()) {
+        $monthlyOvertimeMinutes = collect($dtrRecords ?? [])->sum(fn ($record) => $calculator->overtimeMinutes($record, $employee));
+        $monthlyOfficialMinutes = $calendarDays->sum(function ($day) use ($recordsByDate, $attendanceEventsByDate, $calculator, $employee) {
+            if ($calculator->isBlankDay($employee, $day)) {
                 return 0;
             }
 
             $record = $recordsByDate->get($day->format('Y-m-d'), collect())->first();
-            $workedMinutes = min(480, $actualWorkedMinutes($record));
+            $workedMinutes = $calculator->regularMinutes($record, $employee);
+            $scheduledMinutes = $calculator->scheduledMinutes($employee, $day);
 
             return $attendanceEventsByDate->has($day->format('Y-m-d'))
-                ? max(480, $workedMinutes)
+                ? max($scheduledMinutes, $workedMinutes)
                 : $workedMinutes;
         });
         $monthlyLateMinutes = $calendarDays->sum(function ($day) use ($recordsByDate, $attendanceEventsByDate, $lateMinutesForRecord) {
-            if ($day->isWeekend() || $attendanceEventsByDate->has($day->format('Y-m-d'))) {
+            $event = $attendanceEventsByDate->get($day->format('Y-m-d'));
+            if ($day->isWeekend() || ($event && !($event['locator_only'] ?? false))) {
                 return 0;
             }
 
             return $lateMinutesForRecord($recordsByDate->get($day->format('Y-m-d'), collect())->first());
         });
         $monthlyUndertimeMinutes = $calendarDays->sum(function ($day) use ($recordsByDate, $attendanceEventsByDate, $undertimeMinutesForRecord) {
-            if ($day->isWeekend() || $attendanceEventsByDate->has($day->format('Y-m-d'))) {
+            $event = $attendanceEventsByDate->get($day->format('Y-m-d'));
+            if ($day->isWeekend() || ($event && !($event['locator_only'] ?? false))) {
                 return 0;
             }
 
@@ -155,7 +104,8 @@
         $monthlyDeductionMinutes = $monthlyLateMinutes + $monthlyUndertimeMinutes;
         $monthlyEquivalentDays = $monthlyTotalWorkedMinutes / 480;
         $formatSummaryHours = fn ($minutes) => $isDataVisible ? number_format(max(0, $minutes) / 60, 2) : '';
-        $coreTimeSchedule = collect($employee?->core_time_schedule ?? []);
+        $scheduleSource = $calculator->sourceFor($employee, $calendarDays->last());
+        $coreTimeSchedule = collect($scheduleSource?->core_time_schedule ?? []);
         $coreTimeDayLabels = [
             'monday' => 'Mon',
             'tuesday' => 'Tue',
@@ -178,9 +128,29 @@
             return $periods ? $label.' '.$periods : null;
         })->filter()->values();
         $coreTimePeriod = collect([
-            $employee?->core_time_start_date?->format('M. d, Y'),
-            $employee?->core_time_end_date?->format('M. d, Y'),
+            $scheduleSource?->core_time_start_date?->format('M. d, Y'),
+            $scheduleSource?->core_time_end_date?->format('M. d, Y'),
         ])->filter()->implode(' to ');
+        $previousSchedule = null;
+        $scheduleSegment = 0;
+        $coreTimeSections = $calendarDays->groupBy(function ($day) use ($calculator, $employee, &$previousSchedule, &$scheduleSegment) {
+            $source = $calculator->sourceFor($employee, $day);
+            $schedule = collect($source?->core_time_schedule ?? [])->sortKeys()->map(fn ($slots) => collect($slots)->sortKeys()->all())->all();
+            $signature = json_encode($schedule);
+            if ($signature !== $previousSchedule) { $scheduleSegment++; $previousSchedule = $signature; }
+            return $scheduleSegment;
+        })->map(function ($days) use ($calculator, $employee, $coreTimeDayLabels, $formatCoreTime) {
+            $source = $calculator->sourceFor($employee, $days->first());
+            $lines = collect($coreTimeDayLabels)->map(function ($label, $key) use ($source, $formatCoreTime) {
+                $day = $source?->core_time_schedule[$key] ?? [];
+                $periods = [];
+                foreach (['am', 'pm'] as $session) {
+                    if (!empty($day[$session.'_start']) && !empty($day[$session.'_end'])) $periods[] = $formatCoreTime($day[$session.'_start']).' - '.$formatCoreTime($day[$session.'_end']);
+                }
+                return $periods ? $label.' '.implode(' | ', $periods) : null;
+            })->filter()->implode('; ');
+            return ['period' => $days->first()->format('M. d, Y').' to '.$days->last()->format('M. d, Y'), 'lines' => $lines];
+        });
     @endphp
 
     <style>
@@ -315,6 +285,25 @@
             overflow: visible;
             text-overflow: clip;
             white-space: normal;
+        }
+
+        .dtr-screen-table td.dtr-duration-cell {
+            overflow: visible;
+            text-overflow: clip;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            padding-left: 2px !important;
+            padding-right: 2px !important;
+            line-height: 1.35;
+        }
+
+        .dtr-screen-table td.dtr-remarks-cell {
+            overflow: visible;
+            text-overflow: clip;
+            white-space: normal;
+            overflow-wrap: normal;
+            word-break: normal;
+            line-height: 1.4;
         }
 
         .dtr-reference-value {
@@ -478,7 +467,7 @@
                     <div class="grid flex-1 gap-4 sm:grid-cols-2">
                         <label class="relative block">
                             <span class="absolute -top-2 left-3 bg-white px-1 text-xs text-slate-500">Month</span>
-                            <select name="month" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#2b428f]">
+                            <select name="month" class="h-9 w-full rounded-lg border border-slate-300 bg-white pl-3 pr-8 py-1 text-xs outline-none focus:border-[#2b428f]">
                                 @foreach($months as $num => $name)
                                     <option value="{{ $num }}" {{ (int) $selectedMonth === $num ? 'selected' : '' }}>{{ $name }}</option>
                                 @endforeach
@@ -487,7 +476,7 @@
 
                         <label class="relative block">
                             <span class="absolute -top-2 left-3 bg-white px-1 text-xs text-slate-500">Year</span>
-                            <select name="year" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#2b428f]">
+                            <select name="year" class="h-9 w-full rounded-lg border border-slate-300 bg-white pl-3 pr-8 py-1 text-xs outline-none focus:border-[#2b428f]">
                                 @for($year = $startYear; $year <= $endYear; $year++)
                                     <option value="{{ $year }}" {{ (int) $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
                                 @endfor
@@ -496,10 +485,10 @@
                     </div>
 
                     <div class="flex gap-2 lg:shrink-0">
-                        <button type="submit" style="background-color: #2b428f;" class="min-w-28 rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow">
+                        <button type="submit" style="background-color: #2b428f;" class="inline-flex h-9 min-w-24 items-center justify-center rounded-xl px-4 text-xs font-bold uppercase tracking-wide text-white shadow">
                             {{ __('Select') }}
                         </button>
-                        <a href="{{ $printDtrRoute }}" target="_blank" rel="noopener" style="background-color: #2b428f;" class="inline-flex min-w-28 items-center justify-center rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow">
+                        <a href="{{ $printDtrRoute }}" target="_blank" rel="noopener" style="background-color: #2b428f;" class="inline-flex h-9 min-w-24 items-center justify-center rounded-xl px-4 text-xs font-bold uppercase tracking-wide text-white shadow">
                             {{ __('Print') }}
                         </a>
                     </div>
@@ -567,11 +556,20 @@
                                         @php
                                             $record = $recordsByDate->get($day->format('Y-m-d'), collect())->first();
                                             $isWeekend = $day->isWeekend();
+                                            $blankDay = $calculator->isBlankDay($employee, $day);
                                             $approvedEvent = $attendanceEventsByDate->get($day->format('Y-m-d'));
+                                            if ($blankDay) { $record = null; $approvedEvent = null; }
                                             $slotLabels = $approvedEvent['slot_labels'] ?? [];
                                             $hours = $record ? $recordHours($record) : '';
-                                            $lateMinutes = $record && ! $approvedEvent ? $lateMinutesForRecord($record) : 0;
-                                            $remarks = $approvedEvent['remarks'] ?? ($record ? $statusText($record) : ($isWeekend ? 'Weekend' : ''));
+                                            $excusedDay = $approvedEvent && !($approvedEvent['locator_only'] ?? false);
+                                            $lateMinutes = $record && !$excusedDay ? $lateMinutesForRecord($record) : 0;
+                                            $undertimeMinutes = $record && !$excusedDay ? $undertimeMinutesForRecord($record) : 0;
+                                            $remarks = $approvedEvent['remarks'] ?? ($isWeekend ? 'Weekend' : ($record ? $statusText($record) : ''));
+                                            if (!$isWeekend && $calculator->isIncomplete($record, $employee, $day, $slotLabels)) {
+                                                $remarks = $approvedEvent['remarks'] ?? '';
+                                            }
+                                            if ($blankDay) $remarks = $isWeekend ? 'Weekend' : '';
+                                            if (!$isWeekend && !$calculator->hasDayEnded($day)) $remarks = '';
                                         @endphp
                                         <tr class="hover:bg-slate-50">
                                             <td class="border border-slate-300 px-2 py-1">{{ $day->day }}</td>
@@ -583,11 +581,11 @@
                                             <td class="border border-slate-300 px-2 py-1"></td>
                                             <td class="border border-slate-300 px-2 py-1"></td>
                                             <td class="border border-slate-300 px-2 py-1">{{ $hours }}</td>
-                                            <td class="border border-slate-300 px-2 py-1">{{ ! $isDataVisible || $isWeekend ? '' : '8.00' }}</td>
-                                            <td class="border border-slate-300 px-2 py-1"></td>
-                                            <td class="border border-slate-300 px-2 py-1">{{ $lateMinutes > 0 ? number_format($lateMinutes, 3) . ' min' : '' }}</td>
-                                            <td class="border border-slate-300 px-2 py-1"></td>
-                                            <td class="border border-slate-300 px-2 py-1 text-left">{{ $isDataVisible ? $remarks : '' }}</td>
+                                            <td class="border border-slate-300 px-2 py-1">{{ $isWeekend || $calculator->assignedMinutes($employee, $day) <= 0 ? '' : number_format($calculator->assignedMinutes($employee, $day) / 60, 2) }}</td>
+                                            <td class="border border-slate-300 px-2 py-1">{{ $record && $calculator->overtimeMinutes($record, $employee) > 0 ? number_format($calculator->overtimeMinutes($record, $employee) / 60, 2) : '' }}</td>
+                                            <td class="dtr-duration-cell border border-slate-300 py-1">{{ $lateMinutes > 0 ? number_format($lateMinutes, 2) . ' min' : '' }}</td>
+                                            <td class="dtr-duration-cell border border-slate-300 py-1">{{ $undertimeMinutes > 0 ? number_format($undertimeMinutes, 2) . ' min' : '' }}</td>
+                                            <td class="dtr-remarks-cell border border-slate-300 px-2 py-1 text-left">{{ ($isWeekend && $blankDay) || $isDataVisible ? $remarks : '' }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -639,6 +637,13 @@
                             </table>
 
                             <div class="mt-5 text-xs leading-6 text-slate-800">
+                                @if($coreTimeSections->count() > 1)
+                                    <p class="font-bold">Approved Core Time:</p>
+                                    @foreach($coreTimeSections as $section)
+                                        <p class="font-semibold">{{ $section['period'] }}</p>
+                                        <p>{{ $section['lines'] ?: 'No weekday core-time schedule assigned.' }}</p>
+                                    @endforeach
+                                @else
                                 <p>
                                     <span class="font-bold">Approved Core Time:</span>
                                     {{ $coreTimePeriod ?: 'No effective period assigned' }}
@@ -647,6 +652,7 @@
                                     <p>{{ $coreTimeLines->implode('; ') }}</p>
                                 @else
                                     <p class="text-slate-500">No weekday core-time schedule assigned.</p>
+                                @endif
                                 @endif
                             </div>
                         </div>

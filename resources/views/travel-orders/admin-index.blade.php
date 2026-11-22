@@ -56,7 +56,7 @@
                             ? 'border-indigo-600 text-indigo-700'
                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
                     >
-                        {{ __('Pending') }}
+                        {{ __('Pending Travel Authorities') }}
                     </button>
 
                     <button
@@ -67,7 +67,7 @@
                             ? 'border-indigo-600 text-indigo-700'
                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
                     >
-                        {{ __('All TA') }}
+                        {{ __('All Travel Authorities') }}
                     </button>
 
                     <button
@@ -78,7 +78,7 @@
                             ? 'border-indigo-600 text-indigo-700'
                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
                     >
-                        {{ __('TAR') }}
+                        {{ __('TAR Reports') }}
                     </button>
                 </nav>
             </div>
@@ -118,14 +118,16 @@
                     />
                 </div>
 
-                {{-- Travel type filter --}}
+                {{-- TAR status filter --}}
                 <div class="lg:w-48 lg:shrink-0">
-                    <label for="travelType" class="sr-only">{{ __('Travel Type') }}</label>
-                    <select id="travelType" x-model="travelType" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="">{{ __('Types') }}</option>
-                        @foreach($travelTypes as $value => $label)
-                            <option value="{{ $value }}">{{ __($label) }}</option>
-                        @endforeach
+                    <label for="tarStatusFilter" class="sr-only">{{ __('TAR Status') }}</label>
+                    <select id="tarStatusFilter" x-model="travelType" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">{{ __('TAR Status') }}</option>
+                        <option value="pending">{{ __('Pending') }}</option>
+                        <option value="submitted">{{ __('Submitted') }}</option>
+                        <option value="returned">{{ __('Returned') }}</option>
+                        <option value="overdue">{{ __('Overdue') }}</option>
+                        <option value="not_applicable">{{ __('N/A') }}</option>
                     </select>
                 </div>
 
@@ -220,11 +222,11 @@
                                     </th>
 
                                     <th class="w-[8%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
-                                        {{ __('AR Deadline') }}
+                                        {{ __('TAR Deadline') }}
                                     </th>
 
                                     <th class="w-[7%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">
-                                        {{ __('AR Status') }}
+                                        {{ __('TAR Status') }}
                                     </th>
 
                                     <th class="w-[11%] px-2 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">
@@ -295,12 +297,13 @@
                     <table class="w-full table-fixed border-collapse text-left">
                         <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
                             <tr>
-                                <th class="w-[12%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Submitted') }}</th>
-                                <th class="w-[16%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TA Stamp') }}</th>
-                                <th class="w-[17%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Employee') }}</th>
-                                <th class="w-[18%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Division') }}</th>
-                                <th class="w-[13%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Deadline') }}</th>
-                                <th class="w-[17%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Review Stage') }}</th>
+                                <th class="w-[11%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Submitted') }}</th>
+                                <th class="w-[18%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TA Stamp') }}</th>
+                                <th class="w-[18%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Employee') }}</th>
+                                <th class="w-[11%] px-2 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Chief') }}</th>
+                                <th class="w-[12%] px-2 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Regional Director') }}</th>
+                                <th class="w-[12%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Deadline') }}</th>
+                                <th class="w-[11%] px-2 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('TAR Status') }}</th>
                                 <th class="w-[7%] px-2 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500">{{ __('Action') }}</th>
                             </tr>
                         </thead>
@@ -308,7 +311,7 @@
                             @include('travel-orders._report-rows', ['orders' => $postActivityReports])
                             @if($postActivityReports->isNotEmpty())
                                 <tr x-show="reportsNoResults" x-cloak>
-                                    <td colspan="7" class="px-6 py-10 text-center text-sm font-semibold text-gray-500">{{ __('No matching TAR records found.') }}</td>
+                                    <td colspan="8" class="px-6 py-10 text-center text-sm font-semibold text-gray-500">{{ __('No matching TAR records found.') }}</td>
                                 </tr>
                             @endif
                         </tbody>
@@ -719,7 +722,7 @@
 
                         const matchesType =
                             !this.travelType ||
-                            row.dataset.type === this.travelType;
+                            row.dataset.tarStatus === this.travelType;
 
                         const matchesYear =
                             !this.year ||

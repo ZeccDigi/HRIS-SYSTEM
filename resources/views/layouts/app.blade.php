@@ -148,9 +148,12 @@
                         'hr.cto.index',
                     ];
                     $isDashboardPage = request()->routeIs('dashboard');
-                    $isFullWidthPage = $isDashboardPage || request()->routeIs($applicationListRoutes);
+                    $isSalnFormPage = request()->routeIs('salns.create') || (request()->routeIs('salns.index') && request()->boolean('edit'));
+                    $isPdsFormPage = request()->routeIs('pds.index', 'pds.edit', 'employees.pds.show') || $isSalnFormPage;
+                    $isReportsPage = request()->routeIs('reports.*');
+                    $isFullWidthPage = $isDashboardPage || $isPdsFormPage || $isReportsPage || request()->routeIs($applicationListRoutes);
                     $flatContentRoutes = [...$applicationListRoutes, 'announcements.show', 'audit-logs.login', 'audit-logs.activity'];
-                    $isFlatContentPage = request()->routeIs($flatContentRoutes);
+                    $isFlatContentPage = $isSalnFormPage || $isReportsPage || request()->routeIs($flatContentRoutes);
                     $contentPanelClass = $isFlatContentPage
                         ? 'overflow-visible bg-transparent shadow-none border-0'
                         : ($isDashboardPage
@@ -170,8 +173,8 @@
                         default => null,
                     };
                 @endphp
-                <main class="flex-1 relative overflow-x-hidden focus:outline-none {{ request()->routeIs('dashboard') ? 'overflow-hidden py-3' : 'overflow-y-auto py-6' }}">
-                    <div class="mx-auto w-full min-w-0 {{ $isFullWidthPage ? 'max-w-none px-1 sm:px-2 md:px-3' : 'max-w-7xl px-4 sm:px-6 md:px-8' }}">
+                <main class="flex-1 relative overflow-x-hidden focus:outline-none {{ request()->routeIs('dashboard') ? 'overflow-hidden py-3' : ($isReportsPage ? 'overflow-y-auto py-3' : 'overflow-y-auto py-6') }}">
+                    <div class="mx-auto w-full min-w-0 {{ $isPdsFormPage ? 'max-w-screen-2xl px-3 sm:px-4 md:px-6' : ($isFullWidthPage ? 'max-w-none px-1 sm:px-2 md:px-3' : 'max-w-7xl px-4 sm:px-6 md:px-8') }}">
                         <!-- Page Heading -->
                         @isset($header)
                             <div class="{{ request()->routeIs('dashboard') ? 'mb-3' : 'mb-8' }}">
@@ -277,5 +280,6 @@
                 })();
             </script>
         @endif
+        <x-application-archive-confirmation />
     </body>
 </html>

@@ -152,8 +152,8 @@ class TravelOrderController extends Controller
                     'notes_remarks' => $validated['notes_remarks'] ?? null,
                     'driver_name' => $validated['driver_name'] ?? null,
                     'vehicle_plate_no' => $validated['vehicle_plate_no'] ?? null,
-                    'tar_deadline' => Carbon::parse($validated['travel_date_end'])->addDays(5)->toDateString(),
-                    'attachment_path' => $request->file('attachment')?->store('travel-order-attachments', 'public') ?? $current->attachment_path,
+                    'tar_deadline' => null,
+                    'attachment_path' => $request->file('attachment')?->store('travel-order-attachments', 'documents') ?? $current->attachment_path,
                 ]);
                 $current->companions()->sync($validated['companions'] ?? []);
             });
@@ -163,7 +163,7 @@ class TravelOrderController extends Controller
 
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('travel-order-attachments', 'public');
+            $attachmentPath = $request->file('attachment')->store('travel-order-attachments', 'documents');
         }
 
         $travelOrder = DB::transaction(function () use ($employee, $validated, $attachmentPath) {
@@ -182,7 +182,7 @@ class TravelOrderController extends Controller
                 'status' => 'pending',
                 'recordofficer_status' => 'pending',
                 'rd_status' => 'pending',
-                'tar_deadline' => Carbon::parse($validated['travel_date_end'])->addDays(5)->toDateString(),
+                'tar_deadline' => null,
                 'tar_status' => 'pending',
                 'chief_status' => 'pending',
                 'hrstaff_status' => 'pending',
@@ -272,7 +272,15 @@ class TravelOrderController extends Controller
     public function acknowledgementReport(TravelOrder $travelOrder): View
     {
         $this->authorizeTravelOrderAccess($travelOrder);
-        $travelOrder->loadMissing(['employee.user', 'companions', 'recordsOfficer', 'regionalDirector']);
+        $travelOrder->loadMissing([
+            'employee.user',
+            'companions',
+            'recordsOfficer',
+            'regionalDirector',
+            'tarHrReviewer',
+            'tarChiefReviewer',
+            'tarRegionalDirectorReviewer',
+        ]);
 
         $divisionHead = $this->divisionHeadFor($travelOrder);
 
@@ -296,13 +304,13 @@ class TravelOrderController extends Controller
     {
         $this->authorizeTravelOrderAccess($travelOrder);
 
-        if (! $travelOrder->tar_attachment_path || ! Storage::disk('public')->exists($travelOrder->tar_attachment_path)) {
+        if (! $travelOrder->tar_attachment_path || ! Storage::disk('documents')->exists($travelOrder->tar_attachment_path)) {
             abort(404);
         }
 
         $fileName = ($travelOrder->ta_number ?: 'travel-authority-report') . '.pdf';
 
-        return Storage::disk('public')->response($travelOrder->tar_attachment_path, $fileName, [
+        return Storage::disk('documents')->response($travelOrder->tar_attachment_path, $fileName, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $fileName . '"',
         ]);
@@ -355,6 +363,7 @@ class TravelOrderController extends Controller
         $validated = $request->validate([
             'status' => 'required|in:approved,rejected',
             'remarks' => 'nullable|string',
+            'is_tar_required' => 'sometimes|boolean',
         ]);
 
         $role = strtolower((string) auth()->user()->role);
@@ -365,6 +374,8 @@ class TravelOrderController extends Controller
         abort_unless($employeeId && in_array($role, ['recordofficer', 'regionaldirector'], true), 403);
 
         DB::transaction(function () use ($validated, $travelOrder, $role, $employeeId, $remarks, &$updated) {
+            $travelOrder = TravelOrder::whereKey($travelOrder->id)->lockForUpdate()->firstOrFail();
+            if ($travelOrder->status !== 'pending') return;
             if ($role === 'recordofficer') {
                 if (($travelOrder->recordofficer_status ?? 'pending') !== 'pending') {
                     return;
@@ -382,6 +393,11 @@ class TravelOrderController extends Controller
                         "Your travel authority to {$travelOrder->places_of_travel} was rejected by the Record Officer."
                     ));
                 } else {
+                    $tarRequired = (bool) ($validated['is_tar_required'] ?? true);
+                    $travelOrder->is_tar_required = $tarRequired;
+
+                    $travelOrder->tar_deadline = null;
+
                     $travelOrder->status = 'pending';
 
                     $regionalDirectors = User::whereHas('employee', function ($query) {
@@ -407,6 +423,9 @@ class TravelOrderController extends Controller
                 $travelOrder->rd_remarks = $remarks;
                 $travelOrder->rd_status = $validated['status'];
                 $travelOrder->status = $validated['status'] === 'approved' ? 'approved' : 'rejected';
+                $travelOrder->tar_deadline = $validated['status'] === 'approved' && ($travelOrder->is_tar_required ?? true)
+                    ? $travelOrder->travel_date_end?->copy()->addDays(5)->toDateString()
+                    : null;
 
                 $travelOrder->employee?->user?->notify(new TravelOrderNotification(
                     $travelOrder,
@@ -452,6 +471,10 @@ class TravelOrderController extends Controller
             return back()->with('error', 'Only approved travel authorities can accept a TAR submission.');
         }
 
+        if (! ($travelOrder->is_tar_required ?? true)) {
+            return back()->with('error', 'TAR submission is not required for this travel authority.');
+        }
+
         $reviewStage = (string) ($travelOrder->tar_review_status ?? '');
         $isFirstSubmission = $travelOrder->tar_submitted_at === null;
         $isReturnedForCorrection = $reviewStage === 'returned';
@@ -495,18 +518,18 @@ class TravelOrderController extends Controller
         $attachmentPath = $travelOrder->tar_attachment_path;
         if ($request->hasFile('tar_attachment')) {
             if ($attachmentPath) {
-                Storage::disk('public')->delete($attachmentPath);
+                Storage::disk('documents')->delete($attachmentPath);
             }
 
-            $attachmentPath = $request->file('tar_attachment')->store('travel-accomplishment-reports', 'public');
+            $attachmentPath = $request->file('tar_attachment')->store('travel-accomplishment-reports', 'documents');
         }
 
         $travelOrder->update([
             'tar_attachment_path' => $attachmentPath,
             'tar_submitted_at' => now(),
             'tar_status' => 'submitted',
-            'tar_review_status' => 'pending_hr',
-            'tar_hr_status' => 'pending',
+            'tar_review_status' => 'pending_chief',
+            'tar_hr_status' => 'not_applicable',
             'tar_reviewed_by_hr' => null,
             'tar_hr_remarks' => null,
             'tar_chief_status' => 'pending',
@@ -533,13 +556,10 @@ class TravelOrderController extends Controller
 
         $travelOrder->loadMissing('employee');
         $submitterName = trim(($employee->firstname ?? '') . ' ' . ($employee->lastname ?? '')) ?: 'An employee';
-        $viewers = User::whereHas('employee', function ($query) {
-            $query->whereIn('account_role', ['admin', 'hrstaff']);
-        })->get();
-
-        Notification::send($viewers, new TravelOrderNotification(
+        $divisionChief = $this->divisionHeadFor($travelOrder);
+        $divisionChief?->user?->notify(new TravelOrderNotification(
             $travelOrder,
-            'TAR Submitted',
+            'TAR Ready for Division Chief Review',
             "{$submitterName} submitted a Travel Authority Report for {$travelOrder->ta_number}."
         ));
 
@@ -566,18 +586,12 @@ class TravelOrderController extends Controller
 
         $role = strtolower((string) auth()->user()->role);
         $reviewer = auth()->user()->employee;
-        $stage = (string) ($travelOrder->tar_review_status ?: 'pending_hr');
+        $stage = (string) ($travelOrder->tar_review_status ?: 'pending_chief');
         $isReturn = $validated['action'] === 'return';
         $remarks = $validated['remarks'] ?? null;
 
         DB::transaction(function () use ($travelOrder, $role, $reviewer, $stage, $isReturn, $remarks) {
-            if (in_array($role, ['admin', 'hrstaff'], true)) {
-                abort_unless($stage === 'pending_hr', 403);
-                $travelOrder->tar_hr_status = $isReturn ? 'returned' : 'approved';
-                $travelOrder->tar_reviewed_by_hr = $reviewer?->id;
-                $travelOrder->tar_hr_remarks = $remarks;
-                $travelOrder->tar_review_status = $isReturn ? 'returned' : 'pending_chief';
-            } elseif ($role === 'chief') {
+            if ($role === 'chief') {
                 abort_unless($stage === 'pending_chief' && $this->chiefCanViewEmployee($travelOrder->employee), 403);
                 $travelOrder->tar_chief_status = $isReturn ? 'returned' : 'approved';
                 $travelOrder->tar_reviewed_by_chief = $reviewer?->id;
@@ -592,6 +606,10 @@ class TravelOrderController extends Controller
                 $travelOrder->tar_approved_at = $isReturn ? null : now();
             } else {
                 abort(403);
+            }
+
+            if ($isReturn) {
+                $travelOrder->tar_status = 'returned';
             }
 
             $travelOrder->save();
@@ -752,6 +770,22 @@ class TravelOrderController extends Controller
         $createdAt = $travelOrder->created_at ?? now();
 
         return sprintf('TA-%s-%03d', $createdAt->format('Y-m-d'), $travelOrder->getKey());
+    }
+
+    public function destroy(TravelOrder $travelOrder): RedirectResponse
+    {
+        abort_unless(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true), 403);
+
+        $travelOrder->delete();
+
+        AuditLogListener::logActivity(
+            'Archive Travel Authority',
+            'Travel Authority',
+            "Archived travel authority ({$travelOrder->ta_number}) for " . trim(($travelOrder->employee?->firstname ?? '') . ' ' . ($travelOrder->employee?->lastname ?? '')),
+            auth()->user()
+        );
+
+        return redirect()->back()->with('success', 'Travel authority moved to Archive.');
     }
 
     private function perPage(Request $request): int

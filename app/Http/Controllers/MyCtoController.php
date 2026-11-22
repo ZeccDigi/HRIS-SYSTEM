@@ -21,6 +21,17 @@ use Illuminate\View\View;
 
 class MyCtoController extends Controller
 {
+    public function quoteCoc(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate(['date' => 'required|date|before_or_equal:today', 'hours' => 'required|numeric|min:2|max:999999.99', 'employee_id' => 'nullable|integer']);
+        $employee = auth()->user()->employee;
+        if (!empty($data['employee_id']) && (int) $data['employee_id'] !== (int) $employee?->id) {
+            abort_unless(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true), 403);
+            $employee = Employee::findOrFail($data['employee_id']);
+        }
+        abort_unless($employee, 403);
+        return response()->json(app(\App\Services\CocEntitlementService::class)->calculate($employee, $data['date'], (float) $data['hours']));
+    }
     public function index(Request $request): View
     {
         $employee = auth()->user()->employee;
@@ -35,6 +46,7 @@ class MyCtoController extends Controller
         $perPage = $this->perPage($request);
 
         $ctoRequests = $employee->ctoRequests()
+            ->where(fn ($query) => $query->whereNull('credit_source')->orWhere('credit_source', '!=', 'hr_direct'))
             ->with(['chief', 'hrstaff', 'regionalDirector'])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
@@ -52,7 +64,10 @@ class MyCtoController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        return view('my-cto.index', compact('employee', 'ctoRequests', 'search', 'year', 'month', 'status'));
+        $approved = $employee->ctoRequests()->where('status', 'approved')->get(['type', 'hours']);
+        $earnedCtoHours = (float) $approved->where('type', 'earn')->sum('hours');
+        $usedCtoHours = (float) $approved->where('type', 'use')->sum('hours');
+        return view('my-cto.index', compact('employee', 'ctoRequests', 'search', 'year', 'month', 'status', 'earnedCtoHours', 'usedCtoHours'));
     }
 
     public function create(): View
@@ -106,13 +121,16 @@ class MyCtoController extends Controller
             'type' => 'required|in:earn,use',
             'date_start' => 'required|date',
             'date_end' => 'nullable|date|after_or_equal:date_start',
-            'hours' => 'nullable|numeric|min:0.5|max:999',
-            'purpose' => 'required|string',
+            'hours' => ['required', 'numeric', $request->input('type') === 'earn' ? 'min:2' : 'min:0.5', 'max:999'],
+            'purpose' => ['nullable', 'string', 'max:2000'],
             'overtime_authority_reference' => 'nullable|string|max:255',
-            'attachment' => 'nullable|file|mimes:pdf|max:5120',
+            'attachment' => [($request->input('type') === 'earn' && !$existing?->attachment_path) ? 'required' : 'nullable', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
+        $validated['purpose'] = trim((string) ($validated['purpose'] ?? ''));
         if ($validated['type'] === 'earn') {
+            $validated = array_merge($validated, app(\App\Services\CocEntitlementService::class)->calculate($employee, $validated['date_start'], (float) $validated['hours']));
+            $validated['purpose'] = $existing?->purpose ?? '';
             $overtimeDate = Carbon::parse($validated['date_start'])->startOfDay();
 
             if ($overtimeDate->gt(now()->startOfDay())) {
@@ -155,11 +173,15 @@ class MyCtoController extends Controller
                     'date_start' => $validated['date_start'] ?? null,
                     'date_end' => $validated['date_end'] ?? null,
                     'hours' => $validated['hours'] ?? null,
+                    'rendered_hours' => $validated['rendered_hours'] ?? null,
+                    'coc_rate' => $validated['coc_rate'] ?? null,
+                    'overtime_classification' => $validated['overtime_classification'] ?? null,
                     'purpose' => $validated['purpose'] ?? null,
                     'overtime_authority_reference' => $validated['type'] === 'earn' ? ($validated['overtime_authority_reference'] ?? null) : null,
                     'cto_balance_before' => $employee->cto_balance,
                     'cto_balance_after' => $validated['type'] === 'use' ? (float) $employee->cto_balance - (float) $validated['hours'] : null,
-                    'attachment_path' => $request->file('attachment')?->store('cto-attachments', 'public') ?? $current->attachment_path,
+                    'attachment_path' => $request->file('attachment')?->store('cto-attachments', 'documents') ?? $current->attachment_path,
+                    'attachment_original_name' => $request->file('attachment')?->getClientOriginalName() ?? $current->attachment_original_name,
                 ]);
             });
 
@@ -168,7 +190,7 @@ class MyCtoController extends Controller
 
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('cto-attachments', 'public');
+            $attachmentPath = $request->file('attachment')->store('cto-attachments', 'documents');
         }
 
         $ctoBalanceBefore = (float) $employee->cto_balance;
@@ -202,16 +224,22 @@ class MyCtoController extends Controller
         }
 
         $ctoRequest = $employee->ctoRequests()->create([
+            'credit_source' => $validated['type'] === 'earn' ? 'employee_request' : null,
+            'recorded_by' => auth()->id(),
             'type' => $validated['type'],
             'date_start' => $validated['date_start'],
             'date_end' => $validated['date_end'],
             'hours' => $validated['hours'],
+            'rendered_hours' => $validated['rendered_hours'] ?? null,
+            'coc_rate' => $validated['coc_rate'] ?? null,
+            'overtime_classification' => $validated['overtime_classification'] ?? null,
             'purpose' => $validated['purpose'],
             'overtime_authority_reference' => $validated['type'] === 'earn'
                 ? ($validated['overtime_authority_reference'] ?? null)
                 : null,
             'exception_justification' => null,
             'attachment_path' => $attachmentPath,
+            'attachment_original_name' => $request->file('attachment')?->getClientOriginalName(),
             'cto_balance_before' => $ctoBalanceBefore,
             'cto_balance_after' => $ctoBalanceAfter,
         ]);
@@ -258,7 +286,7 @@ class MyCtoController extends Controller
             abort(403);
         }
 
-        $ctoRequest->load(['employee', 'chief', 'hrstaff', 'regionalDirector']);
+        $ctoRequest->load(['employee.user', 'chief', 'hrstaff', 'regionalDirector', 'recordedBy.employee']);
 
         if ($ctoRequest->employee_id !== $employee?->id
             && strtolower(auth()->user()->role ?? '') === 'chief'
@@ -287,7 +315,7 @@ class MyCtoController extends Controller
         }
 
         if ($request->boolean('preview')) {
-            return view('my-cto.print-availment-new', [
+            return view($ctoRequest->type === 'earn' ? 'my-cto.print-coc-certificate' : 'my-cto.print-availment-new', [
                 'ctoRequest' => $ctoRequest,
                 'isPrintDocument' => false,
                 'dmwLogoPath' => asset('images/official DMW.png'),

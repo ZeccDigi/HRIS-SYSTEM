@@ -62,7 +62,7 @@ class LocatorSlipNotification extends Notification
         return [
             'type' => 'locator_slip',
             'locator_slip_id' => $this->locatorSlip->id,
-            'title' => $this->title,
+            'title' => \App\Support\NotificationTitle::format($this->title),
             'message' => $this->message,
             'action_url' => $actionUrl,
             'icon' => 'locator',

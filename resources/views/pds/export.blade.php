@@ -234,7 +234,7 @@
             <td>{{ $work->date_from }} - {{ $work->date_to }}</td>
             <td>{{ $work->position_title }}</td>
             <td>{{ $work->company }}</td>
-            <td>{{ $work->monthly_salary }}</td>
+            <td>{{ is_numeric($work->monthly_salary) ? number_format((float) $work->monthly_salary, 2) : $work->monthly_salary }}</td>
             <td>{{ $work->appointment_status }}</td>
         </tr>
         @endforeach

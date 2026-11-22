@@ -224,7 +224,7 @@
                 <td>{{ $work->date_to ? PdsFormatter::date($work->date_to) : 'PRESENT' }}</td>
                 <td>{{ $work->position_title }}</td>
                 <td>{{ $work->company }}</td>
-                <td>{{ PdsFormatter::val($work->monthly_salary) }}</td>
+                <td>{{ is_numeric($work->monthly_salary) ? number_format((float) $work->monthly_salary, 2) : PdsFormatter::val($work->monthly_salary) }}</td>
                 <td>{{ PdsFormatter::val($work->appointment_status) }}</td>
                 <td class="center">{{ $work->is_gov_service ? 'Y' : 'N' }}</td>
             </tr>

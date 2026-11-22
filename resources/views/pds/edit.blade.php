@@ -6,6 +6,7 @@
         $pdsReviewChangedInputNames = $pdsReviewChangedInputNames ?? [];
         $selectedYear = $selectedYear ?? (int) now()->year;
         $pdsYears = $pdsYears ?? collect([(int) now()->year]);
+        $pdsCompletion = app(\App\Services\PdsCompletionService::class)->summary($employee->pdsSectionReviews);
     @endphp
 
     <style>
@@ -65,9 +66,13 @@
 
     @php
         $yearOptions = range(now()->year, 1950);
+        $salaryScheduleYears = collect(range((int) now()->year, 2000))
+            ->merge(\App\Models\SalaryRate::where('is_active', true)->pluck('year'))
+            ->merge($employee->pdsWorkExperiences->pluck('salary_schedule_year'))
+            ->filter()->map(fn ($year) => (int) $year)->unique()->sortDesc()->values();
     @endphp
 
-    <div class="pds-line-page min-h-screen bg-slate-50 py-4" x-data="{ 
+    <div class="pds-line-page min-h-screen bg-slate-50 px-2 py-3" x-data="{ 
         init() {
             this.normalizeMobileNumber();
             this.normalizePagibigIdNo();
@@ -78,7 +83,11 @@
             this.normalizeTinNo();
         },
         tab: @js($initialTab),
-        children: {{ $employee->pdsChildren->count() > 0 ? $employee->pdsChildren->toJson() : '[{fullname: \'\', date_of_birth: \'\'}]' }},
+        editing: {{ !$isReadOnly && $errors->any() ? 'true' : 'false' }},
+        salaryRates: @js(\App\Models\SalaryRate::where('is_active', true)->get(['year', 'salary_grade', 'salary_step', 'monthly_salary'])),
+        salaryRateFor(w) { return this.salaryRates.find(r => String(r.year) === String(w.salary_schedule_year) && r.salary_grade === w.salary_grade && r.salary_step === w.salary_step); },
+        applySalaryRate(w) { const rate = this.salaryRateFor(w); if (rate) w.monthly_salary = rate.monthly_salary; },
+        children: @js(old('children', $employee->pdsChildren->count() > 0 ? $employee->pdsChildren->map(fn ($child) => array_merge($child->toArray(), ['date_of_birth' => $child->date_of_birth?->format('Y-m-d') ?? '']))->all() : [['fullname' => '', 'date_of_birth' => '']])),
         education: {{ $employee->pdsEducation->count() > 0 ? $employee->pdsEducation->toJson() : '[{level: \'\', school_name: \'\', course: \'\', period_from: \'\', period_to: \'\', highest_level: \'\', year_graduated: \'\', honors: \'\'}]' }},
         eligibility: {{ $employee->pdsEligibilities->count() > 0 ? $employee->pdsEligibilities->toJson() : '[{title: \'\', rating: \'\', date_of_exam: \'\', place_of_exam: \'\', license_number: \'\', license_validity: \'\'}]' }},
         work: {{ $employee->pdsWorkExperiences->count() > 0 ? $employee->pdsWorkExperiences->toJson() : '[{date_from: \'\', date_to: \'\', position_title: \'\', company: \'\', monthly_salary: \'\', salary_grade: \'\', appointment_status: \'\', is_gov_service: 0}]' }},
@@ -86,6 +95,10 @@
         voluntary: {{ $employee->pdsVoluntaryWorks->count() > 0 ? $employee->pdsVoluntaryWorks->toJson() : '[{organization_name: \'\', date_from: \'\', date_to: \'\', number_of_hours: \'\', position: \'\'}]' }},
         others: {{ $employee->pdsOthers->count() > 0 ? $employee->pdsOthers->toJson() : '[{type: \'Skill\', description: \'\'}]' }},
         references: {{ $employee->pdsReferences->count() > 0 ? $employee->pdsReferences->toJson() : '[{name: \'\', address: \'\', telephone_no: \'\'}, {name: \'\', address: \'\', telephone_no: \'\'}, {name: \'\', address: \'\', telephone_no: \'\'}]' }},
+        rowKey(row) {
+            if (!row._formRowKey) Object.defineProperty(row, '_formRowKey', { value: 'row-' + Date.now() + '-' + Math.random().toString(36).slice(2), enumerable: false });
+            return row._formRowKey;
+        },
         addresses: {
             res_region: @js(old('personal.res_region', $employee->pdsPersonal?->res_region)),
             res_province: @js(old('personal.res_province', $employee->pdsPersonal?->res_province)),
@@ -254,35 +267,46 @@
         signaturePreview: @js($employee->effective_signature_url),
         photoPreview: @js($employee->profile_picture_url)
     }">
-        <div class="mx-auto w-full px-1 sm:px-2 lg:px-3">
+        <div class="mx-auto w-full min-w-0">
             <div class="mb-6 flex flex-col gap-5 print:hidden">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    @if(! $isReadOnly)
-                        <x-page-action href="{{ route('dashboard') }}" />
-                    @else
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center {{ $isReadOnly ? 'sm:justify-between' : 'sm:justify-end' }}">
+                    @if($isReadOnly)
                         <x-page-action href="{{ route('employees.show', ['employee' => $employee, 'tab' => 'pds']) }}" />
                     @endif
                     <div class="flex flex-wrap items-center gap-2">
                         @unless($isReadOnly)
-                            <div class="flex h-11 items-center gap-2">
-                                <label for="pds_record_year" class="text-[10px] font-black uppercase tracking-widest text-slate-400">{{ __('Year') }}</label>
-                                <select id="pds_record_year" onchange="window.location.href = @js(route('pds.print')) + '?year=' + this.value" class="h-11 w-28 rounded-lg border-gray-100 bg-indigo-50/60 px-3 text-sm font-bold text-slate-700 shadow-sm outline-none focus:border-indigo-500 focus:ring-indigo-500">
+                            <div class="flex items-center gap-2">
+                                <label for="pds_record_year" class="text-sm font-semibold text-gray-700">{{ __('Year') }}</label>
+                                <select id="pds_record_year" onchange="window.location.href = @js(route('pds.edit')) + '?year=' + this.value" class="h-9 w-28 rounded-lg border-gray-300 bg-white pl-3 pr-8 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     @foreach($pdsYears as $pdsYear)
                                         <option value="{{ $pdsYear }}" @selected((int) $selectedYear === (int) $pdsYear)>{{ $pdsYear }}</option>
                                     @endforeach
                                 </select>
                             </div>
                         @endunless
-                        <a href="{{ route('pds.download', ['year' => $selectedYear]) }}" data-no-transition class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-white px-4 text-xs font-black uppercase tracking-widest text-indigo-700 ring-1 ring-indigo-100 hover:bg-indigo-50">Download PDF</a>
+                        @unless($isReadOnly)
+                            @unless($isPdsArchived ?? false)
+                            <button type="button" :disabled="editing" @click="editing = true" class="inline-flex h-9 w-32 items-center justify-center gap-2 rounded-lg border border-indigo-100 bg-white px-4 text-xs font-black uppercase tracking-widest text-indigo-700 hover:bg-indigo-50 disabled:cursor-default disabled:opacity-50"><i class="fa-solid fa-pen" aria-hidden="true"></i> {{ __('Edit') }}</button>
+                            @endunless
+                        @endunless
                         {{--
                         <a href="{{ route('pds.download-excel') }}" data-no-transition class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-white px-4 text-xs font-black uppercase tracking-widest text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-50">Download Excel</a>
                         --}}
-                        <a href="{{ route('pds.print', ['year' => $selectedYear]) }}" data-no-transition target="_blank" rel="noopener noreferrer" class="inline-flex h-11 min-w-[8.5rem] items-center justify-center rounded-lg bg-indigo-700 px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-800">Preview PDS</a>
+                        <a href="{{ route('pds.print', ['year' => $selectedYear]) }}" data-no-transition target="_blank" rel="noopener noreferrer" class="inline-flex h-9 w-32 items-center justify-center rounded-lg border border-indigo-700 bg-indigo-700 px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-800">Preview PDS</a>
                     </div>
                 </div>
-                <div>
-                    <h2 class="text-xl font-bold text-slate-900">Personal Data Sheet</h2>
-                    <p class="mt-2 text-sm font-medium text-slate-600">Please put N/A for fields if not applicable.</p>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">Personal Data Sheet</h2>
+                        <p class="mt-2 text-sm font-medium text-slate-600">Please put N/A for fields if not applicable.</p>
+                    </div>
+                    <div class="text-xs sm:text-right">
+                        <span class="font-semibold {{ $pdsCompletion['status'] === 'approved' ? 'text-emerald-700' : 'text-amber-700' }}">{{ $pdsCompletion['status'] === 'approved' ? 'Complete — HR Approved' : ($pdsCompletion['status'] === 'rejected' ? 'Requires changes' : 'Pending HR Approval') }}</span>
+                        <p class="mt-1 text-slate-500">{{ $pdsCompletion['approved'] }} of {{ $pdsCompletion['total'] }} sections approved by HR.</p>
+                    </div>
+                    @if($isPdsArchived ?? false)
+                        <p class="mt-2 text-sm text-slate-600">This year’s PDS is archived. Contact HR to restore it.</p>
+                    @endif
                 </div>
             </div>
 
@@ -347,11 +371,13 @@
                 @endif
 
                 @if(!($isReadOnly ?? false))
-                    <form action="{{ route('pds.update') }}" method="POST" class="pds-form-body px-2 pb-6 pt-5 sm:px-3 lg:px-4" enctype="multipart/form-data">
+                    <form id="pds-data-fields" action="{{ route('pds.update') }}" method="POST" @submit="if (!editing) $event.preventDefault()" class="pds-form-body px-2 pb-6 pt-4" enctype="multipart/form-data">
                         @csrf
                         @method('PUT')
+                        <input type="hidden" name="year" value="{{ $selectedYear }}">
+                        <fieldset :disabled="!editing" @disabled(!$errors->any()) class="min-w-0 border-0 p-0 m-0">
                 @else
-                    <div class="pds-form-body px-2 pb-6 pt-5 sm:px-3 lg:px-4">
+                    <div id="pds-data-fields" class="pds-form-body px-2 pb-6 pt-4">
                 @endif
 
                     <!-- Section I: Personal Information -->
@@ -367,19 +393,7 @@
     @php
         $yearOptions = range(now()->year, 1950);
     @endphp
-                                @if($personalReview && $personalReview->remarks)
-                                    <span class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-1 rounded font-bold border border-yellow-200">Has HR Remarks</span>
-                                @endif
                             </div>
-                            @if($personalReview && $personalReview->remarks)
-                                <div class="mb-6 flex items-start gap-3 border-l-4 border-yellow-300 bg-yellow-50/60 py-3 pl-4 pr-3">
-                                    <svg class="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    <div>
-                                        <span class="block text-[10px] font-black text-yellow-800 uppercase tracking-widest mb-1">HR Remarks ({{ ucfirst($personalReview->status) }})</span>
-                                        <p class="text-sm font-medium text-yellow-900 leading-relaxed">{{ $personalReview->remarks }}</p>
-                                    </div>
-                                </div>
-                            @endif
                             
                             <div class="space-y-8">
                                 <div class="pds-field-table pds-field-table-4">
@@ -413,7 +427,7 @@
                                     <div class="contents">
                                         <div class="space-y-1">
                                             <x-input-label value="Date of Birth" :required="true" class="text-[10px] font-black uppercase text-gray-500 tracking-wider" />
-                                            <x-text-input type="date" class="block w-full text-sm font-bold border-gray-100" name="personal[date_of_birth]" :value="old('personal.date_of_birth', $employee->pdsPersonal?->date_of_birth)" />
+                                            <x-text-input type="date" max="{{ now('Asia/Manila')->endOfYear()->toDateString() }}" class="block w-full text-sm font-bold border-gray-100" name="personal[date_of_birth]" :value="old('personal.date_of_birth', $employee->pdsPersonal?->date_of_birth)" />
                                         </div>
                                         <div class="space-y-1">
                                             <x-input-label value="Place of Birth" :required="true" class="text-[10px] font-black uppercase text-gray-500 tracking-wider" />
@@ -625,25 +639,17 @@
     @php
         $yearOptions = range(now()->year, 1950);
     @endphp
-                                @if($familyReview && $familyReview->remarks)
-                                    <span class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-1 rounded font-bold border border-yellow-200">Has HR Remarks</span>
-                                @endif
                             </div>
-                            @if($familyReview && $familyReview->remarks)
-                                <div class="mb-6 flex items-start gap-3 border-l-4 border-yellow-300 bg-yellow-50/60 py-3 pl-4 pr-3">
-                                    <svg class="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    <div>
-                                        <span class="block text-[10px] font-black text-yellow-800 uppercase tracking-widest mb-1">HR Remarks ({{ ucfirst($familyReview->status) }})</span>
-                                        <p class="text-sm font-medium text-yellow-900 leading-relaxed">{{ $familyReview->remarks }}</p>
-                                    </div>
-                                </div>
-                            @endif
                             
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                                 <div class="space-y-1"><x-input-label value="Spouse Surname" class="text-[9px] font-black uppercase text-gray-400 tracking-[0.2em]" /><x-text-input class="block w-full text-sm font-bold border-gray-100" name="family[spouse_surname]" :value="$employee->pdsFamily?->spouse_surname" /></div>
                                 <div class="space-y-1"><x-input-label value="Spouse First Name" class="text-[9px] font-black uppercase text-gray-400 tracking-[0.2em]" /><x-text-input class="block w-full text-sm font-bold border-gray-100" name="family[spouse_firstname]" :value="$employee->pdsFamily?->spouse_firstname" /></div>
                                 <div class="space-y-1"><x-input-label value="Spouse Extension" class="text-[9px] font-black uppercase text-gray-400 tracking-[0.2em]" /><select name="family[spouse_extension]" class="block w-full rounded-xl border-gray-100 text-sm font-bold"><option value="">Select extension</option>@foreach($utilityOptionSets['name_extensions'] as $option)<option value="{{ $option->value }}" {{ old('family.spouse_extension', $employee->pdsFamily?->spouse_extension) == $option->value ? 'selected' : '' }}>{{ $option->label }}</option>@endforeach</select></div>
                                 <div class="space-y-1"><x-input-label value="Occupation" class="text-[9px] font-black uppercase text-gray-400 tracking-[0.2em]" /><x-text-input class="block w-full text-sm font-bold border-gray-100" name="family[spouse_occupation]" :value="$employee->pdsFamily?->spouse_occupation" /></div>
+                                <div class="space-y-1"><x-input-label value="Spouse Middle Name" /><x-text-input class="block w-full text-sm" name="family[spouse_middlename]" :value="old('family.spouse_middlename', $employee->pdsFamily?->spouse_middlename)" /></div>
+                                <div class="space-y-1"><x-input-label value="Spouse Employer / Business" /><x-text-input class="block w-full text-sm" name="family[spouse_employer]" :value="old('family.spouse_employer', $employee->pdsFamily?->spouse_employer)" /></div>
+                                <div class="space-y-1"><x-input-label value="Spouse Business Address" /><x-text-input class="block w-full text-sm" name="family[spouse_business_address]" :value="old('family.spouse_business_address', $employee->pdsFamily?->spouse_business_address)" /></div>
+                                <div class="space-y-1"><x-input-label value="Spouse Telephone No." /><x-text-input class="block w-full text-sm" name="family[spouse_telephone_no]" :value="old('family.spouse_telephone_no', $employee->pdsFamily?->spouse_telephone_no)" /></div>
                             </div>
 
                             <!-- Dynamic Children Rows -->
@@ -662,10 +668,10 @@
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-gray-50">
-                                            <template x-for="(child, index) in children" :key="index">
+                                            <template x-for="(child, index) in children" :key="rowKey(child)">
                                                 <tr>
                                                     <td class="px-2 py-1"><x-text-input placeholder="Juan Dela Cruz" class="w-full text-xs font-bold border-transparent focus:border-indigo-100 focus:ring-0" x-model="child.fullname" ::name="`children[${index}][fullname]`" /></td>
-                                                    <td class="px-2 py-1"><x-text-input type="date" class="w-full text-xs font-bold border-transparent focus:border-indigo-100 focus:ring-0" x-model="child.date_of_birth" ::name="`children[${index}][date_of_birth]`" /></td>
+                                                    <td class="px-2 py-1"><x-text-input type="date" max="{{ now('Asia/Manila')->endOfYear()->toDateString() }}" class="w-full text-xs font-bold border-transparent focus:border-indigo-100 focus:ring-0" x-model="child.date_of_birth" ::name="`children[${index}][date_of_birth]`" /></td>
                                                     <td class="px-2 py-1"><button type="button" @click="children.splice(index, 1)" class="text-red-400 hover:text-red-600 font-bold transition">&times;</button></td>
                                                 </tr>
                                             </template>
@@ -689,21 +695,9 @@
     @php
         $yearOptions = range(now()->year, 1950);
     @endphp
-                                    @if($educationReview && $educationReview->remarks)
-                                        <span class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-1 rounded font-bold border border-yellow-200">Has HR Remarks</span>
-                                    @endif
                                     <button type="button" @click="education.push({level: '', school_name: '', course: '', period_from: '', period_to: '', highest_level: '', year_graduated: '', honors: ''})" class="text-[9px] font-black uppercase tracking-[0.1em] bg-indigo-700 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-800 transition">+ Add Row</button>
                                 </div>
                             </div>
-                            @if($educationReview && $educationReview->remarks)
-                                <div class="mb-6 flex items-start gap-3 border-l-4 border-yellow-300 bg-yellow-50/60 py-3 pl-4 pr-3">
-                                    <svg class="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    <div>
-                                        <span class="block text-[10px] font-black text-yellow-800 uppercase tracking-widest mb-1">HR Remarks ({{ ucfirst($educationReview->status) }})</span>
-                                        <p class="text-sm font-medium text-yellow-900 leading-relaxed">{{ $educationReview->remarks }}</p>
-                                    </div>
-                                </div>
-                            @endif
                             <div class="overflow-x-auto border-b border-slate-100">
                                 <table class="w-full text-xs">
                                     <thead>
@@ -719,7 +713,7 @@
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-50 font-bold text-gray-800">
-                                        <template x-for="(edu, index) in education" :key="index">
+                                        <template x-for="(edu, index) in education" :key="rowKey(edu)">
                                             <tr>
                                                 <td class="p-0.5"><select class="w-full text-[10px] font-bold border-transparent focus:border-indigo-100 bg-transparent px-2" x-model="edu.level" :name="`education[${index}][level]`"><option value="">Select</option>@foreach($utilityOptionSets['education_levels'] as $option)<option value="{{ $option->value }}">{{ $option->label }}</option>@endforeach</select></td>
                                                 <td class="p-0.5"><x-text-input class="w-full text-[10px] font-bold border-transparent focus:border-indigo-100 bg-transparent px-2" x-model="edu.school_name" ::name="`education[${index}][school_name]`" /></td>
@@ -750,21 +744,9 @@
     @php
         $yearOptions = range(now()->year, 1950);
     @endphp
-                                    @if($eligibilityReview && $eligibilityReview->remarks)
-                                        <span class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-1 rounded font-bold border border-yellow-200">Has HR Remarks</span>
-                                    @endif
                                     <button type="button" @click="eligibility.push({title: '', rating: '', date_of_exam: '', place_of_exam: '', license_number: '', license_validity: ''})" class="text-[9px] font-black uppercase tracking-[0.1em] bg-indigo-700 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-800 transition">+ Add Eligibility</button>
                                 </div>
                             </div>
-                            @if($eligibilityReview && $eligibilityReview->remarks)
-                                <div class="mb-6 flex items-start gap-3 border-l-4 border-yellow-300 bg-yellow-50/60 py-3 pl-4 pr-3">
-                                    <svg class="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    <div>
-                                        <span class="block text-[10px] font-black text-yellow-800 uppercase tracking-widest mb-1">HR Remarks ({{ ucfirst($eligibilityReview->status) }})</span>
-                                        <p class="text-sm font-medium text-yellow-900 leading-relaxed">{{ $eligibilityReview->remarks }}</p>
-                                    </div>
-                                </div>
-                            @endif
                             <div class="overflow-x-auto border-b border-slate-100">
                                 <table class="w-full text-xs">
                                     <thead>
@@ -776,11 +758,11 @@
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-50 font-bold">
-                                        <template x-for="(eli, index) in eligibility" :key="index">
+                                        <template x-for="(eli, index) in eligibility" :key="rowKey(eli)">
                                             <tr>
                                                 <td class="p-1"><select class="w-full text-[10px] font-bold border-transparent px-3" x-model="eli.title" :name="`eligibility[${index}][title]`"><option value="">Select</option>@foreach($utilityOptionSets['eligibility_titles'] as $option)<option value="{{ $option->value }}">{{ $option->label }}</option>@endforeach</select></td>
                                                 <td class="p-1"><x-text-input class="w-full text-[10px] font-bold border-transparent px-3" x-model="eli.rating" ::name="`eligibility[${index}][rating]`" /></td>
-                                                <td class="p-1"><x-text-input type="date" class="w-full text-[10px] font-bold border-transparent px-3" x-model="eli.date_of_exam" ::name="`eligibility[${index}][date_of_exam]`" /></td>
+                                                <td class="p-1"><x-text-input type="date" max="{{ now('Asia/Manila')->endOfYear()->toDateString() }}" class="w-full text-[10px] font-bold border-transparent px-3" x-model="eli.date_of_exam" ::name="`eligibility[${index}][date_of_exam]`" /></td>
                                                 <td class="p-1 text-center"><button type="button" @click="eligibility.splice(index, 1)" class="text-red-400 hover:text-red-600">&times;</button></td>
                                             </tr>
                                         </template>
@@ -803,45 +785,40 @@
     @php
         $yearOptions = range(now()->year, 1950);
     @endphp
-                                    @if($workReview && $workReview->remarks)
-                                        <span class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-1 rounded font-bold border border-yellow-200">Has HR Remarks</span>
-                                    @endif
                                     <button type="button" @click="work.push({date_from: '', date_to: '', position_title: '', company: '', monthly_salary: '', salary_grade: '', appointment_status: '', is_gov_service: 0})" class="text-[9px] font-black uppercase tracking-[0.1em] bg-indigo-700 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-800 transition">+ Add Work</button>
                                 </div>
                             </div>
-                            @if($workReview && $workReview->remarks)
-                                <div class="mb-6 flex items-start gap-3 border-l-4 border-yellow-300 bg-yellow-50/60 py-3 pl-4 pr-3">
-                                    <svg class="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    <div>
-                                        <span class="block text-[10px] font-black text-yellow-800 uppercase tracking-widest mb-1">HR Remarks ({{ ucfirst($workReview->status) }})</span>
-                                        <p class="text-sm font-medium text-yellow-900 leading-relaxed">{{ $workReview->remarks }}</p>
-                                    </div>
-                                </div>
-                            @endif
                             <div class="overflow-x-auto border-b border-slate-100">
-                                <table class="w-full text-xs">
+                                <table class="pds-work-table w-full table-fixed text-xs" style="min-width: 1350px">
+                                    <colgroup>
+                                        <col style="width:10%"><col style="width:10%"><col style="width:12%"><col style="width:13%"><col style="width:10%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:12%"><col style="width:7%"><col style="width:3%">
+                                    </colgroup>
                                     <thead>
                                         <tr class="text-left text-[9px] font-black uppercase text-gray-400 bg-gray-50">
                                             <th class="px-4 py-3">From <span class="text-red-500 font-bold ml-0.5">*</span></th>
-                                            <th class="px-4 py-3">To <span class="text-red-500 font-bold ml-0.5">*</span></th>
+                                            <th class="px-4 py-3">To</th>
                                             <th class="px-4 py-3">Position <span class="text-red-500 font-bold ml-0.5">*</span></th>
                                             <th class="px-4 py-3">Company <span class="text-red-500 font-bold ml-0.5">*</span></th>
                                             <th class="px-4 py-3">Salary <span class="text-red-500 font-bold ml-0.5">*</span></th>
                                             <th class="px-4 py-3">Salary Grade</th>
+                                            <th class="px-2 py-3">Step</th>
+                                            <th class="px-2 py-3">Salary Year</th>
                                             <th class="px-4 py-3">Appointment Status</th>
                                             <th class="px-4 py-3">Gov Service</th>
                                             <th class="px-4 py-3 w-8"></th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-50 font-bold">
-                                        <template x-for="(w, index) in work" :key="index">
+                                        <template x-for="(w, index) in work" :key="rowKey(w)">
                                             <tr>
-                                                <td class="p-1"><x-text-input type="date" class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.date_from" ::name="`work_experience[${index}][date_from]`" /></td>
-                                                <td class="p-1"><x-text-input type="date" class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.date_to" ::name="`work_experience[${index}][date_to]`" /></td>
-                                                <td class="p-1"><x-text-input class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.position_title" ::name="`work_experience[${index}][position_title]`" /></td>
-                                                <td class="p-1"><x-text-input class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.company" ::name="`work_experience[${index}][company]`" /></td>
-                                                <td class="p-1"><x-text-input type="number" step="0.01" class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.monthly_salary" ::name="`work_experience[${index}][monthly_salary]`" /></td>
-                                                <td class="p-1"><select class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.salary_grade" :name="`work_experience[${index}][salary_grade]`"><option value="">SG</option>@foreach($utilityOptionSets['salary_grades'] as $option)<option value="{{ $option->value }}">{{ $option->label }}</option>@endforeach</select></td>
+                                                <td class="p-1"><input type="hidden" :name="`work_experience[${index}][hr_salary_assignment]`" :value="w.hr_salary_assignment ? 1 : 0"><x-text-input type="date" max="{{ now('Asia/Manila')->endOfYear()->toDateString() }}" class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.date_from" ::name="`work_experience[${index}][date_from]`" /></td>
+                                                <td class="p-1"><x-text-input type="date" max="{{ now('Asia/Manila')->endOfYear()->toDateString() }}" class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.date_to" ::name="`work_experience[${index}][date_to]`" /></td>
+                                                <td class="p-1"><x-text-input class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.position_title" ::title="w.position_title" ::name="`work_experience[${index}][position_title]`" /></td>
+                                                <td class="p-1"><x-text-input class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.company" ::title="w.company" ::name="`work_experience[${index}][company]`" /></td>
+                                                <td class="p-1"><x-text-input type="text" inputmode="decimal" class="w-full text-[10px] font-bold border-transparent px-3" x-money="w.monthly_salary" ::readonly="!!salaryRateFor(w)" ::name="`work_experience[${index}][monthly_salary]`" /></td>
+                                                <td class="p-1"><select class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.salary_grade" @change="applySalaryRate(w)" :name="`work_experience[${index}][salary_grade]`"><option value="">SG</option>@foreach($utilityOptionSets['salary_grades'] as $option)<option value="{{ $option->value }}">{{ $option->label }}</option>@endforeach</select></td>
+                                                <td class="p-1"><select class="w-full text-[10px] border-transparent px-2" x-model="w.salary_step" @change="applySalaryRate(w)" :name="`work_experience[${index}][salary_step]`"><option value="">Step</option>@foreach($utilityOptionSets['step_increments'] as $option)<option value="{{ $option->value }}">{{ $option->label }}</option>@endforeach</select></td>
+                                                <td class="p-1"><select class="w-full text-[10px] border-transparent px-2" x-model="w.salary_schedule_year" @change="applySalaryRate(w)" :name="`work_experience[${index}][salary_schedule_year]`"><option value="">Select year</option>@foreach($salaryScheduleYears as $salaryYear)<option value="{{ $salaryYear }}">{{ $salaryYear }}</option>@endforeach</select><span x-show="w.salary_grade && w.salary_step && w.salary_schedule_year && !salaryRateFor(w)" class="block text-[9px] text-red-600">No salary rate in Utilities</span></td>
                                                 <td class="p-1"><select class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.appointment_status" :name="`work_experience[${index}][appointment_status]`"><option value="">Status</option>@foreach($utilityOptionSets['appointment_statuses'] as $option)<option value="{{ $option->value }}">{{ $option->label }}</option>@endforeach</select></td>
                                                 <td class="p-1"><select class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.is_gov_service" :name="`work_experience[${index}][is_gov_service]`"><option value="">Select</option><option value="1">Yes</option><option value="0">No</option></select></td>
                                                 <td class="p-1 text-center"><button type="button" @click="work.splice(index, 1)" class="text-red-400 hover:text-red-600">&times;</button></td>
@@ -875,11 +852,11 @@
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-50 font-bold">
-                                        <template x-for="(vol, index) in voluntary" :key="index">
+                                        <template x-for="(vol, index) in voluntary" :key="rowKey(vol)">
                                             <tr>
                                                 <td class="p-1"><x-text-input class="w-full text-[10px] font-bold border-transparent px-3" x-model="vol.organization_name" ::name="`voluntary[${index}][organization_name]`" /></td>
-                                                <td class="p-1"><x-text-input type="date" class="w-full text-[10px] font-bold border-transparent px-3" x-model="vol.date_from" ::name="`voluntary[${index}][date_from]`" /></td>
-                                                <td class="p-1"><x-text-input type="date" class="w-full text-[10px] font-bold border-transparent px-3" x-model="vol.date_to" ::name="`voluntary[${index}][date_to]`" /></td>
+                                                <td class="p-1"><x-text-input type="date" max="{{ now('Asia/Manila')->endOfYear()->toDateString() }}" class="w-full text-[10px] font-bold border-transparent px-3" x-model="vol.date_from" ::name="`voluntary[${index}][date_from]`" /></td>
+                                                <td class="p-1"><x-text-input type="date" max="{{ now('Asia/Manila')->endOfYear()->toDateString() }}" class="w-full text-[10px] font-bold border-transparent px-3" x-model="vol.date_to" ::name="`voluntary[${index}][date_to]`" /></td>
                                                 <td class="p-1"><x-text-input type="number" class="w-full text-[10px] font-bold border-transparent px-3" x-model="vol.number_of_hours" ::name="`voluntary[${index}][number_of_hours]`" /></td>
                                                 <td class="p-1"><x-text-input class="w-full text-[10px] font-bold border-transparent px-3" x-model="vol.position" ::name="`voluntary[${index}][position]`" /></td>
                                                 <td class="p-1 text-center"><button type="button" @click="voluntary.splice(index, 1)" class="text-red-400 hover:text-red-600">&times;</button></td>
@@ -904,21 +881,9 @@
     @php
         $yearOptions = range(now()->year, 1950);
     @endphp
-                                    @if($trainingReview && $trainingReview->remarks)
-                                        <span class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-1 rounded font-bold border border-yellow-200">Has HR Remarks</span>
-                                    @endif
                                     <button type="button" @click="training.push({title: '', date_from: '', date_to: '', number_of_hours: '', attachment_path: '', type: '', conducted_by: ''})" class="text-[9px] font-black uppercase tracking-[0.1em] bg-indigo-700 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-800 transition">+ Add Training</button>
                                 </div>
                             </div>
-                            @if($trainingReview && $trainingReview->remarks)
-                                <div class="mb-6 flex items-start gap-3 border-l-4 border-yellow-300 bg-yellow-50/60 py-3 pl-4 pr-3">
-                                    <svg class="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    <div>
-                                        <span class="block text-[10px] font-black text-yellow-800 uppercase tracking-widest mb-1">HR Remarks ({{ ucfirst($trainingReview->status) }})</span>
-                                        <p class="text-sm font-medium text-yellow-900 leading-relaxed">{{ $trainingReview->remarks }}</p>
-                                    </div>
-                                </div>
-                            @endif
                             <div class="overflow-x-auto border-b border-slate-100">
                                 <table class="w-full text-xs">
                                     <thead>
@@ -932,16 +897,16 @@
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-50 font-bold">
-                                        <template x-for="(t, index) in training" :key="index">
+                                        <template x-for="(t, index) in training" :key="rowKey(t)">
                                             <tr>
                                                 <td class="p-1"><x-text-input class="w-full text-[10px] font-bold border-transparent px-3" x-model="t.title" ::name="`training[${index}][title]`" /></td>
-                                                <td class="p-1"><x-text-input type="date" class="w-full text-[10px] font-bold border-transparent px-3" x-model="t.date_from" ::name="`training[${index}][date_from]`" /></td>
-                                                <td class="p-1"><x-text-input type="date" class="w-full text-[10px] font-bold border-transparent px-3" x-model="t.date_to" ::name="`training[${index}][date_to]`" /></td>
+                                                <td class="p-1"><x-text-input type="date" max="{{ now('Asia/Manila')->endOfYear()->toDateString() }}" class="w-full text-[10px] font-bold border-transparent px-3" x-model="t.date_from" ::name="`training[${index}][date_from]`" /></td>
+                                                <td class="p-1"><x-text-input type="date" max="{{ now('Asia/Manila')->endOfYear()->toDateString() }}" class="w-full text-[10px] font-bold border-transparent px-3" x-model="t.date_to" ::name="`training[${index}][date_to]`" /></td>
                                                 <td class="p-1">
                                                     <input type="hidden" :name="`training[${index}][existing_attachment_path]`" :value="t.attachment_path || ''">
                                                     <input type="file" :name="`training[${index}][attachment]`" accept=".pdf,application/pdf" class="block w-full text-[10px] font-bold text-gray-500 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-[10px] file:font-black file:uppercase file:tracking-widest file:text-indigo-700 hover:file:bg-indigo-100">
                                                     <template x-if="t.attachment_path">
-                                                        <a :href="`/storage/${t.attachment_path}`" target="_blank" class="mt-1 inline-flex text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800">
+                                                        <a :href="`/supporting-documents/open?path=${encodeURIComponent(t.attachment_path)}`" target="_blank" class="mt-1 inline-flex text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800">
                                                             View current file
                                                         </a>
                                                     </template>
@@ -974,7 +939,7 @@
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-50 font-bold">
-                                        <template x-for="(other, index) in others" :key="index">
+                                        <template x-for="(other, index) in others" :key="rowKey(other)">
                                             <tr>
                                                 <td class="p-1">
                                                     <select class="w-full text-[10px] font-bold border-transparent px-3" x-model="other.type" :name="`others[${index}][type]`">
@@ -1002,19 +967,7 @@
     @php
         $yearOptions = range(now()->year, 1950);
     @endphp
-                                @if($referenceReview && $referenceReview->remarks)
-                                    <span class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-1 rounded font-bold border border-yellow-200">Has HR Remarks</span>
-                                @endif
                             </div>
-                            @if($referenceReview && $referenceReview->remarks)
-                                <div class="mb-6 flex items-start gap-3 border-l-4 border-yellow-300 bg-yellow-50/60 py-3 pl-4 pr-3">
-                                    <svg class="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    <div>
-                                        <span class="block text-[10px] font-black text-yellow-800 uppercase tracking-widest mb-1">HR Remarks ({{ ucfirst($referenceReview->status) }})</span>
-                                        <p class="text-sm font-medium text-yellow-900 leading-relaxed">{{ $referenceReview->remarks }}</p>
-                                    </div>
-                                </div>
-                            @endif
                             <div class="grid grid-cols-1 gap-6 border-t border-slate-100 pt-5 md:grid-cols-3">
                                 <template x-for="(ref, index) in references" :key="index">
                                     <div class="space-y-3">
@@ -1092,7 +1045,7 @@
                                                 <td class="px-4 py-3">
                                                     @if($row['key'] === 'q35_b')
                                                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                            <x-text-input type="date" class="w-full text-xs font-bold border-gray-100" name="questionnaire[q35_date_filed]" :value="old('questionnaire.q35_date_filed', $employee->pdsQuestionnaire?->q35_date_filed)" />
+                                                            <x-text-input type="date" max="{{ now('Asia/Manila')->endOfYear()->toDateString() }}" class="w-full text-xs font-bold border-gray-100" name="questionnaire[q35_date_filed]" :value="old('questionnaire.q35_date_filed', $employee->pdsQuestionnaire?->q35_date_filed)" />
                                                             <x-text-input class="w-full text-xs font-bold border-gray-100" name="questionnaire[q35_status]" :value="old('questionnaire.q35_status', $employee->pdsQuestionnaire?->q35_status)" placeholder="Status of case" />
                                                         </div>
                                                     @elseif($row['details'])
@@ -1138,12 +1091,13 @@
                     </div>
 
                     @if(!($isReadOnly ?? false))
-                        <div class="mt-12 flex justify-end gap-3 border-t-2 border-gray-50 pt-8 print:hidden">
-                            <a href="{{ route('dashboard') }}" class="inline-flex items-center px-6 py-2 bg-white border-2 border-gray-200 rounded-xl font-black text-[10px] uppercase tracking-widest text-gray-500 hover:bg-gray-50 transition duration-150">
+                        </fieldset>
+                        <div x-show="editing" x-cloak class="mt-12 flex justify-end gap-3 border-t-2 border-gray-50 pt-8 print:hidden">
+                            <a href="{{ route('pds.edit', ['year' => $selectedYear]) }}" class="inline-flex items-center px-6 py-2 bg-white border-2 border-gray-200 rounded-xl font-black text-[10px] uppercase tracking-widest text-gray-500 hover:bg-gray-50 transition duration-150">
                                 Cancel
                             </a>
                             <button type="submit" class="inline-flex items-center px-8 py-2.5 bg-indigo-700 border-2 border-indigo-800 rounded-xl font-black text-[10px] uppercase tracking-widest text-white hover:bg-indigo-800 shadow-lg shadow-indigo-100 transition duration-150">
-                                Save PDS Data
+                                Save Data
                             </button>
                         </div>
                     @endif
@@ -1154,6 +1108,18 @@
                 @endif
             </div>
 
+            @unless($isReadOnly)
+                @php
+                    $remarksTabs = ['Personal Information' => 'personal', 'Family Background' => 'family', 'Educational Background' => 'education', 'Civil Service Eligibility' => 'eligibility', 'Work Experience' => 'work', 'Voluntary Work' => 'voluntary', 'Training' => 'training', 'Other Information' => 'otherinfo', 'References' => 'declaration'];
+                @endphp
+                @foreach($employee->pdsSectionReviews->filter(fn ($review) => filled($review->remarks)) as $remarksReview)
+                    <div x-show="tab === @js($remarksTabs[$remarksReview->section_name] ?? '')" x-cloak class="mt-5 border-l-4 border-yellow-300 bg-yellow-50 px-4 py-3">
+                        <h4 class="text-xs font-bold uppercase text-yellow-800">HR Remarks ({{ ucfirst($remarksReview->status) }})</h4>
+                        <p class="mt-1 whitespace-pre-line text-sm text-yellow-900">{{ $remarksReview->remarks }}</p>
+                    </div>
+                @endforeach
+            @endunless
+
             @if($isReadOnly ?? false)
                 <div class="mt-6 bg-white px-3 py-5 shadow-sm print:hidden sm:px-4 lg:px-5">
                     <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1161,13 +1127,16 @@
                             <svg class="h-5 w-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             HR Review & Decision
                         </h4>
-                        <form action="{{ route('pds-reviews.approve-all', $employee) }}" method="POST" onsubmit="return confirm('Approve all PDS tabs for this employee? This will clear all changed-field markers.');">
+                        @if($employee->pdsSectionReviews->where('status', 'pending')->isNotEmpty())
+                        <form action="{{ route('pds-reviews.approve-all', $employee) }}" method="POST" onsubmit="return confirm('Approve all pending PDS tabs for this employee?');">
                             @csrf
+                            <input type="hidden" name="year" value="{{ $selectedYear }}">
                             <button type="submit" style="background-color: #0038a8; border-color: #002f8f; color: #ffffff;" class="inline-flex items-center justify-center gap-2 rounded-lg border px-5 py-2.5 text-xs font-black uppercase tracking-wider shadow-sm transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-200 active:scale-95">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 Approve All
                             </button>
                         </form>
+                        @endif
                     </div>
 
                     @php
@@ -1193,14 +1162,16 @@
                             <form action="{{ route('pds-reviews.store', $employee) }}" method="POST" class="space-y-4" onsubmit="const remarks = this.elements['remarks']; if (event.submitter?.value === 'rejected' && !remarks.value.trim()) { remarks.setCustomValidity('Remarks are required when rejecting this section.'); remarks.reportValidity(); event.preventDefault(); return false; } remarks.setCustomValidity('');">
                                 @csrf
                                 <input type="hidden" name="section_name" value="{{ $sName }}">
+                                <input type="hidden" name="year" value="{{ $selectedYear }}">
 
                                 <div class="flex flex-wrap items-center gap-3">
                                     <span class="text-sm font-bold text-gray-700">Active Section: <strong class="text-indigo-900">{{ $sName }}</strong></span>
-                                    <span class="rounded-full px-3 py-1 text-[10px] font-black uppercase {{ $secReview?->status === 'approved' ? 'border border-emerald-200 bg-emerald-100 text-emerald-800' : ($secReview?->status === 'rejected' ? 'border border-red-200 bg-red-100 text-red-800' : 'border border-amber-200 bg-amber-100 text-amber-800') }}">
-                                        Status: {{ ucfirst($secReview?->status ?? 'pending') }}
+                                    <span class="rounded-full px-3 py-1 text-[10px] font-black uppercase {{ !$secReview ? 'border border-slate-200 bg-slate-100 text-slate-600' : ($secReview->status === 'approved' ? 'border border-emerald-200 bg-emerald-100 text-emerald-800' : ($secReview->status === 'rejected' ? 'border border-red-200 bg-red-100 text-red-800' : 'border border-amber-200 bg-amber-100 text-amber-800')) }}">
+                                        {{ $secReview ? 'Status: '.ucfirst($secReview->status) : __('No pending updates') }}
                                     </span>
                                 </div>
 
+                                @if($secReview?->status === 'pending')
                                 <div class="border-l-4 border-rose-300 bg-rose-50/70 px-4 py-3">
                                     <h5 class="text-xs font-black uppercase tracking-wider text-rose-800">Changed fields</h5>
                                     @if(count($updatedItems))
@@ -1232,6 +1203,12 @@
                                         Approve
                                     </button>
                                 </div>
+                                @else
+                                    <p class="text-xs text-slate-600">{{ $secReview ? __('Review completed.') : __('No updates awaiting review.') }}</p>
+                                    @if($secReview?->remarks)
+                                        <p class="whitespace-pre-line text-sm text-slate-700">{{ $secReview->remarks }}</p>
+                                    @endif
+                                @endif
                             </form>
                         </div>
                     @endforeach
@@ -1249,8 +1226,8 @@
         }
         .pds-field-table {
             display: grid;
-            column-gap: 1rem;
-            row-gap: 1.35rem;
+            column-gap: 0.875rem;
+            row-gap: 1.25rem;
             align-items: end;
         }
         .pds-field-table-3 {
@@ -1286,15 +1263,43 @@
         .pds-line-page .pds-form-body input:not([type="radio"]):not([type="checkbox"]):not([type="file"]),
         .pds-line-page .pds-form-body select,
         .pds-line-page .pds-form-body textarea {
-    border: 0 !important;
+    border: 1px solid transparent !important;
     border-bottom: 1px dashed #94a3b8 !important;
     border-radius: 6px !important;
     background: #eef2ff !important;
     box-shadow: none !important;
-    padding: 0.45rem 0.65rem !important;
-    font-size: 1rem !important;
+    padding: 0.375rem 0.5rem !important;
+    font-size: 0.8125rem !important;
+    line-height: 1.125rem !important;
     font-weight: 500 !important;
             color: #475569 !important;
+        }
+        #pds-data-fields input:not([type="radio"]):not([type="checkbox"]):not([type="file"]):not([type="hidden"]),
+        #pds-data-fields select {
+            box-sizing: border-box !important;
+            height: 2.25rem !important;
+            min-height: 2.25rem !important;
+            min-width: 0 !important;
+        }
+        #pds-data-fields label,
+        #pds-data-fields label span,
+        #pds-data-fields th {
+            font-size: 10px !important;
+            line-height: 1.35 !important;
+            letter-spacing: 0 !important;
+        }
+        #pds-data-fields th {
+            padding: 0.5rem !important;
+        }
+        #pds-data-fields .pds-work-table input,
+        #pds-data-fields .pds-work-table select {
+            font-size: 12px !important;
+            padding-left: 0.375rem !important;
+            padding-right: 0.375rem !important;
+        }
+        #pds-data-fields .pds-work-table select {
+            padding-right: 1.25rem !important;
+            background-position: right 0.25rem center !important;
         }
         .pds-line-page .pds-form-body .address-combobox {
             width: 100% !important;
@@ -1313,16 +1318,11 @@
             box-shadow: none !important;
             --tw-ring-shadow: 0 0 #0000 !important;
         }
-        @if($isReadOnly)
         @foreach($pdsReviewChangedInputNames as $inputName)
-        .pds-line-page .pds-form-body [name="{{ $inputName }}"] {
-            border-bottom-color: #dc2626 !important;
-            border-bottom-width: 2px !important;
-            background-color: #fff1f2 !important;
-            color: #991b1b !important;
+        #pds-data-fields [name="{{ $inputName }}"] {
+            border: 1px solid #dc2626 !important;
         }
         @endforeach
-        @endif
         .pds-line-page .pds-form-body table {
             border-collapse: collapse;
         }
@@ -1339,6 +1339,9 @@
         }
         .pds-line-page .pds-section-heading h3 {
             color: #0f172a !important;
+            font-size: 13px !important;
+            line-height: 1.4 !important;
+            font-weight: 700 !important;
             letter-spacing: 0.03em;
         }
         @media print {

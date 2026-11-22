@@ -22,26 +22,29 @@
 
                 $role = strtolower(auth()->user()->role ?? '');
                 $isChief = $role === 'chief';
-                $isHR = in_array($role, ['hrstaff', 'hr staff', 'admin'], true);
+                $isHR = $role === 'hrstaff';
                 $isDirector = in_array($role, ['regional director', 'regionaldirector', 'director'], true);
 
                 $isMyTurn = false;
                 $waitingMessage = '';
+                $hrPending = in_array($leaveApplication->hrstaff_status, [null, 'pending'], true) && $leaveApplication->approved_by_hrstaff === null;
+                $chiefPending = in_array($leaveApplication->chief_status, [null, 'pending'], true) && $leaveApplication->approved_by_chief === null;
+                $rdPending = in_array($leaveApplication->rd_status, [null, 'pending'], true) && $leaveApplication->approved_by_regionaldirector === null;
 
                 if ($leaveApplication->status === 'pending') {
-                    if ($isHR && $leaveApplication->hrstaff_status === 'pending') {
+                    if ($isHR && $hrPending && $chiefPending && $rdPending) {
                         $isMyTurn = true;
-                    } elseif ($isChief && $leaveApplication->chief_status === 'pending') {
+                    } elseif ($isChief && $chiefPending && $rdPending) {
                         if ($leaveApplication->hrstaff_status === 'approved') {
                             $isMyTurn = true;
                         } else {
                             $waitingMessage = 'Waiting for HR Admin verification.';
                         }
-                    } elseif ($isDirector && $leaveApplication->rd_status === 'pending') {
-                        if ($leaveApplication->chief_status === 'approved') {
+                    } elseif ($isDirector && $rdPending) {
+                        if ($leaveApplication->hrstaff_status === 'approved' && $leaveApplication->chief_status === 'approved') {
                             $isMyTurn = true;
                         } else {
-                            $waitingMessage = 'Waiting for Division Chief approval.';
+                            $waitingMessage = $leaveApplication->hrstaff_status === 'approved' ? 'Waiting for Chief approval.' : 'Waiting for HR verification.';
                         }
                     }
                 }
@@ -56,6 +59,7 @@
 
             <x-approval-tracker :payload="$trackedLeavePayload" event="leave-selected" empty="No leave approval process to track yet." compact />
 
+            @include('leaves._monetization-summary', ['leaveRequest' => $leaveApplication])
             {{-- Full Leave Form Preview --}}
             <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
                 <div class="bg-slate-100 px-3 pb-3 pt-6 sm:px-5 sm:pb-5 sm:pt-8">
@@ -115,6 +119,16 @@
                     >
                         @csrf
                         @method('PUT')
+
+                        @if($leaveApplication->is_monetization && $isHR)
+                            <label class="mb-4 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-slate-700">
+                                <input type="checkbox" name="monetization_verified" value="1" required class="mt-1">
+                                <span>I verified the highest monthly salary received, available credits, supporting documents, and availability of funds for this monetization.</span>
+                            </label>
+                            <x-input-error :messages="$errors->get('monetization_verified')" />
+                        @endif
+                        <x-input-error :messages="$errors->get('monetization')" />
+                        <x-input-error :messages="$errors->get('monetization_days')" />
 
                         {{-- Remarks --}}
                         <div>
@@ -268,31 +282,11 @@
                 @endif
             </section>
 
-            @if($leaveApplication->hrstaff_remarks || $leaveApplication->chief_remarks || $leaveApplication->rd_remarks)
-                <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
-                    <div class="text-xs font-black text-indigo-500 uppercase tracking-widest mb-6 inline-block border-b-2 border-indigo-100 pb-1">Approver Remarks</div>
-                    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-                        @if($leaveApplication->hrstaff_remarks)
-                            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                                <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">HR Staff</span>
-                                <p class="mt-2 whitespace-pre-line break-words text-sm font-semibold italic leading-relaxed text-gray-700">"{{ $leaveApplication->hrstaff_remarks }}"</p>
-                            </div>
-                        @endif
-                        @if($leaveApplication->chief_remarks)
-                            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                                <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">Chief</span>
-                                <p class="mt-2 whitespace-pre-line break-words text-sm font-semibold italic leading-relaxed text-gray-700">"{{ $leaveApplication->chief_remarks }}"</p>
-                            </div>
-                        @endif
-                        @if($leaveApplication->rd_remarks)
-                            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                                <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">Regional Director</span>
-                                <p class="mt-2 whitespace-pre-line break-words text-sm font-semibold italic leading-relaxed text-gray-700">"{{ $leaveApplication->rd_remarks }}"</p>
-                            </div>
-                        @endif
-                    </div>
-                </section>
-            @endif
+            <x-approver-remarks :reviews="[
+                ['label' => __('HR Staff'), 'comment' => $leaveApplication->hrstaff_remarks],
+                ['label' => __('Chief'), 'comment' => $leaveApplication->chief_remarks],
+                ['label' => __('Regional Director'), 'comment' => $leaveApplication->rd_remarks],
+            ]" />
             </div>
         </div>
     </div>
@@ -385,7 +379,9 @@
                     decisionDescription.textContent = action === 'approved'
                         ? (isHrReview
                             ? 'Verifying will record the leave-credit certification\nand forward the application to the Division Chief.'
-                            : 'Approving will move this request to the next step\nor mark it as fully approved.')
+                            : (@js(strtolower(auth()->user()->role ?? '')) === 'chief'
+                                ? 'Approving will forward this application to the Regional Director for final approval.'
+                                : 'Approving will mark this application as fully approved.'))
                         : 'Rejecting will mark this request as rejected.';
                 }
 

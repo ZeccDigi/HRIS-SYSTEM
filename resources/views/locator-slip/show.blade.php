@@ -72,7 +72,8 @@
                 </div>
             </section>
 
-            @if($displayStatus === 'rejected' && $locatorSlip->chief_remarks)
+            @php($chiefComment = \App\Support\ApproverRemark::visible($locatorSlip->chief_remarks))
+            @if($chiefComment)
                 <section class="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5 shadow-sm sm:p-6">
                     <div class="flex items-start gap-3">
                         <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
@@ -85,7 +86,7 @@
                             </span>
 
                             <p class="mt-2 whitespace-pre-line break-words text-sm font-medium leading-relaxed text-red-800">
-                                {{ $locatorSlip->chief_remarks }}
+                                {{ $chiefComment }}
                             </p>
                         </div>
                     </div>

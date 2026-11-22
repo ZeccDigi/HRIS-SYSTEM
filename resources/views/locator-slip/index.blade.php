@@ -117,6 +117,9 @@
                                     'directPrintUrl' => route('locator-slips.print', $slip->id),
                                 ];
                                 $qrPayload = [
+                                    'logsUrl' => route('locator-slips.show', $slip),
+                                    'out' => $slip->time_from ? \Carbon\Carbon::parse($slip->time_from)->format('h:i A') : null,
+                                    'in' => $slip->time_to ? \Carbon\Carbon::parse($slip->time_to)->format('h:i A') : null,
                                     'title' => $displayType ?: 'Locator Slip',
                                     'employee' => trim(($slip->employee?->firstname ?? '') . ' ' . ($slip->employee?->lastname ?? '')),
                                     'date' => \Carbon\Carbon::parse($slip->date_covered)->format('M d, Y'),
@@ -378,7 +381,7 @@
                         </button>
                     </div>
 
-                    <div class="min-h-0 flex-1 overflow-hidden bg-white px-5 py-4">
+                    <div class="min-h-0 flex-1 overflow-y-auto bg-white px-5 py-4">
                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div class="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                                 <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
@@ -409,6 +412,16 @@
                             <p class="mx-auto mt-2 max-w-md text-xs font-medium leading-5 text-slate-500">
                                 {{ __('Scan once to record OUT time, then scan again to record IN time.') }}
                             </p>
+                            <div class="mt-3 grid grid-cols-2 gap-3 text-left">
+                                <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                    <p class="text-xs font-semibold text-slate-500">Time OUT</p>
+                                    <p class="mt-1 text-sm font-bold text-slate-800" x-text="qrData.out || '—'"></p>
+                                </div>
+                                <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                    <p class="text-xs font-semibold text-slate-500">Time IN</p>
+                                    <p class="mt-1 text-sm font-bold text-slate-800" x-text="qrData.in || '—'"></p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -455,6 +468,7 @@
                 rows: [],
                 noResults: false,
                 qrModalOpen: false,
+                qrLogsTimer: null,
                 previewModalOpen: false,
                 showRemarks: false,
                 qrData: {
@@ -515,19 +529,38 @@
                 },
 
                 openQrModal(payload) {
+                    clearInterval(this.qrLogsTimer);
                     this.qrData = {
                         ...payload,
                         svg: payload.svg ? atob(payload.svg) : '',
                     };
                     this.qrModalOpen = true;
+                    this.refreshQrLogs();
+                    this.qrLogsTimer = setInterval(() => this.refreshQrLogs(), 5000);
                     document.documentElement.classList.add('overflow-hidden');
                     document.body.classList.add('overflow-hidden');
                 },
 
                 closeQrModal() {
+                    clearInterval(this.qrLogsTimer);
+                    this.qrLogsTimer = null;
                     this.qrModalOpen = false;
                     document.documentElement.classList.remove('overflow-hidden');
                     document.body.classList.remove('overflow-hidden');
+                },
+
+                async refreshQrLogs() {
+                    const url = this.qrData.logsUrl;
+                    if (!this.qrModalOpen || !url) return;
+                    try {
+                        const response = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+                        if (!response.ok) return;
+                        const logs = await response.json();
+                        if (this.qrModalOpen && this.qrData.logsUrl === url) {
+                            this.qrData.out = logs.out;
+                            this.qrData.in = logs.in;
+                        }
+                    } catch (_) {}
                 },
 
                 openPreviewModal(payload) {

@@ -17,23 +17,26 @@
             (string) ($order->status ?: 'pending')
         );
 
-        $tarDeadline = $order->tar_deadline
-            ?: optional($order->travel_date_end)->copy()?->addDays(5);
+        $isTarRequired = (bool) ($order->is_tar_required ?? true);
+
+        $tarDeadline = $order->visible_tar_deadline;
 
         $computedTarStatus = strtolower(
             (string) ($order->tar_status ?: 'pending')
         );
 
-        if (
+        if (!$isTarRequired) {
+            $computedTarStatus = 'not_applicable';
+        } elseif ($order->tar_review_status === 'returned' || $computedTarStatus === 'returned') {
+            $computedTarStatus = 'returned';
+        } elseif (
             $computedTarStatus !== 'submitted' &&
             $mainStatus === 'approved' &&
             $tarDeadline &&
             now()->gt($tarDeadline)
         ) {
             $computedTarStatus = 'overdue';
-        }
-
-        if (
+        } elseif (
             $mainStatus !== 'approved' &&
             $computedTarStatus === 'pending'
         ) {
@@ -140,6 +143,7 @@
         data-search="{{ $searchText }}"
         data-type="{{ $order->travel_type }}"
         data-status="{{ strtolower((string) $order->status) }}"
+        data-tar-status="{{ $computedTarStatus }}"
         data-employee="{{ strtolower($employeeName) }}"
         data-filed="{{ $order->created_at?->timestamp ?? 0 }}"
     >
@@ -223,7 +227,7 @@
 
         {{-- TAR deadline --}}
         <td class="px-2 py-2.5 align-top text-xs text-gray-700">
-            {{ $tarDeadline?->format('M d, Y') ?? __('N/A') }}
+            {{ $tarDeadline?->format('M d, Y') ?? '—' }}
         </td>
 
         {{-- AR status --}}
@@ -238,6 +242,11 @@
                     <i class="fa-solid fa-triangle-exclamation"></i>
                     <span>{{ __('Overdue') }}</span>
                 </span>
+            @elseif($computedTarStatus === 'returned')
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-orange-100 bg-orange-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-orange-700">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>{{ __('Returned') }}</span>
+                </span>
             @elseif($computedTarStatus === 'not_applicable')
                 <span class="text-gray-400">—</span>
             @else
@@ -250,7 +259,7 @@
 
         {{-- Actions --}}
         <td class="px-2 py-2.5 text-center align-top">
-            <div class="mx-auto grid w-[104px] grid-cols-3 place-items-center gap-1 whitespace-nowrap">
+            <div class="mx-auto flex w-fit items-center justify-center gap-1 whitespace-nowrap">
                 <a
                     href="{{ route('travel-orders.show', $order) }}"
                     class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition hover:bg-indigo-50 hover:text-indigo-900"
@@ -259,8 +268,6 @@
                 >
                     <i class="fa-solid fa-eye text-sm"></i>
                 </a>
-
-            
 
                 <a
                     href="{{ route('travel-orders.print', $order) }}"
@@ -274,7 +281,7 @@
                     <i class="fa-solid fa-print text-sm"></i>
                 </a>
 
-                @if($computedTarStatus === 'submitted')
+                @if($computedTarStatus === 'submitted' || $computedTarStatus === 'returned')
                     <a
                         href="{{ $acknowledgementReportUrl }}"
                         target="_blank"
@@ -286,10 +293,22 @@
                     >
                         <i class="fa-solid fa-file-circle-check text-sm"></i>
                     </a>
-                @else
-                    <span class="h-8 w-8" aria-hidden="true"></span>
                 @endif
 
+                @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true))
+                    <form action="{{ route('hr.travel-orders.destroy', $order) }}" method="POST" class="inline-block" data-archive-question="{{ __('Archive this travel authority?') }}">
+                        @csrf
+                        @method('DELETE')
+                        <button
+                            type="submit"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-900"
+                            title="{{ __('Archive') }}"
+                            aria-label="{{ __('Archive travel authority') }}"
+                        >
+                            <i class="fa-solid fa-box-archive text-sm"></i>
+                        </button>
+                    </form>
+                @endif
             </div>
         </td>
     </tr>

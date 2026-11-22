@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TravelOrder extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'employee_id',
         'ta_number',
@@ -35,6 +38,7 @@ class TravelOrder extends Model
         'rd_status',
         'rd_remarks',
         'tar_deadline',
+        'is_tar_required',
         'tar_status',
         'tar_review_status',
         'tar_hr_status',
@@ -70,6 +74,7 @@ class TravelOrder extends Model
             'travel_date_start' => 'date',
             'travel_date_end' => 'date',
             'tar_deadline' => 'date',
+            'is_tar_required' => 'boolean',
             'tar_submitted_at' => 'datetime',
             'tar_approved_at' => 'datetime',
             'tar_activity_date' => 'date',
@@ -140,5 +145,18 @@ class TravelOrder extends Model
             'official_business' => 'Official Business',
             default => ucfirst((string) $this->travel_type),
         };
+    }
+
+    public function getIsFullyApprovedAttribute(): bool
+    {
+        return $this->status === 'approved'
+            && $this->recordofficer_status === 'approved'
+            && $this->rd_status === 'approved';
+    }
+
+    public function getVisibleTarDeadlineAttribute(): ?\Carbon\CarbonInterface
+    {
+        if (!$this->is_fully_approved || !($this->is_tar_required ?? true)) return null;
+        return $this->tar_deadline ?? $this->travel_date_end?->copy()->addDays(5);
     }
 }

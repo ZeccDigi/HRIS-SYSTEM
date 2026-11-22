@@ -11,6 +11,7 @@ use App\Models\LeaveRequest;
 use App\Models\LocatorSlip;
 use App\Models\PdsSnapshot;
 use App\Models\Saln;
+use App\Models\TravelOrder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -23,7 +24,7 @@ class ReportController extends Controller
     public function index(Request $request): View
     {
         $today = now()->toDateString();
-        $firstDay = now()->startOfMonth()->toDateString();
+        $firstDay = now()->startOfYear()->toDateString();
 
         $selectedType = $request->query('type', 'hr_overview');
         $from = $this->validDate($request->query('from'), $firstDay);
@@ -39,6 +40,9 @@ class ReportController extends Controller
         if (Carbon::parse($from)->gt(Carbon::parse($to))) {
             [$from, $to] = [$to, $from];
         }
+        $lastAllowedDate = now()->endOfYear()->toDateString();
+        $from = min($from, $lastAllowedDate);
+        $to = min($to, $lastAllowedDate);
 
         $divisions = Employee::query()
             ->whereNotNull('division')
@@ -103,13 +107,17 @@ class ReportController extends Controller
                 'employee_compliance' => $this->employeeComplianceReport($employees, Carbon::parse($to)->year),
                 'employee_loyalty_awards' => $this->employeeLoyaltyAwardsReport($employees, $reportYear),
                 'employee_education' => $this->employeeEducationReport($employees, Carbon::parse($to)->year),
-                'employee_birthdays' => $this->employeeBirthdayReport($employees, Carbon::parse($to)),
+                'employee_birthdays' => $this->employeeBirthdayReport($employees, $from, $to),
+                'leave_report' => $this->leaveReport($reportDivision, $reportEmploymentStatus, $from, $to),
+                'travel_authority' => $this->travelReport($reportDivision, $reportEmploymentStatus, $from, $to),
+                'travel_tar' => $this->travelReport($reportDivision, $reportEmploymentStatus, $from, $to, true),
+                'attendance_summary' => $this->attendanceReport($employees, $from, $to),
                 'attendance_tardiness' => $this->attendanceTardinessReport($employees, $from, $to),
                 'attendance_awards' => $this->attendanceAwardsReport($employees, $from, $to),
                 'leave_monetization' => $this->leaveMonetizationReport($reportDivision, $reportEmploymentStatus, $from, $to),
                 'leave_mandatory_missing' => $this->missingMandatoryLeaveReport($employees, Carbon::parse($to)->year),
                 'locator_frequency' => $this->locatorFrequencyReport($reportDivision, $reportEmploymentStatus, $from, $to),
-                'leave_balance' => $this->leaveBalanceReport($employees),
+                'leave_balance' => $this->leaveBalanceReport($employees, Carbon::parse($to)->year),
                 'overtime' => $this->overtimeReport($reportDivision, $reportEmploymentStatus, $from, $to),
                 'cto' => $this->ctoReport($employees),
             ],
@@ -171,12 +179,16 @@ class ReportController extends Controller
             ['value' => 'employee_loyalty_awards', 'label' => 'Loyalty Awards', 'filters' => ['year']],
             ['value' => 'employee_education', 'label' => 'Education Qualifications', 'filters' => ['dateRange']],
             ['value' => 'employee_birthdays', 'label' => 'Birthday', 'filters' => ['dateRange']],
+            ['value' => 'attendance_summary', 'label' => 'Attendance Summary', 'filters' => ['dateRange']],
             ['value' => 'attendance_tardiness', 'label' => 'Tardiness', 'filters' => ['dateRange']],
             ['value' => 'attendance_awards', 'label' => 'Attendance Awards', 'filters' => ['dateRange']],
+            ['value' => 'leave_report', 'label' => 'Leave Applications', 'filters' => ['dateRange']],
             ['value' => 'leave_monetization', 'label' => 'Monetization Applications', 'filters' => ['dateRange']],
             ['value' => 'leave_mandatory_missing', 'label' => 'Mandatory/Force Leave Remaining', 'filters' => ['dateRange']],
             ['value' => 'leave_balance', 'label' => 'Leave Balance', 'filters' => ['dateRange']],
             ['value' => 'locator_frequency', 'label' => 'Frequency & Duration', 'filters' => ['dateRange']],
+            ['value' => 'travel_authority', 'label' => 'Travel Authority Summary', 'filters' => ['dateRange', 'division', 'employmentStatus']],
+            ['value' => 'travel_tar', 'label' => 'TAR Submission Status', 'filters' => ['dateRange', 'division', 'employmentStatus']],
             ['value' => 'overtime_cto', 'label' => 'Overtime & CTO Summary', 'filters' => ['dateRange']],
         ];
     }
@@ -187,9 +199,10 @@ class ReportController extends Controller
 
         return collect([
             ['value' => 'employee', 'label' => 'Employee Reports', 'reports' => ['hr_overview', 'employee_compliance', 'employee_loyalty_awards', 'employee_education', 'employee_birthdays']],
-            ['value' => 'attendance', 'label' => 'Attendance Reports', 'reports' => ['attendance_tardiness', 'attendance_awards']],
-            ['value' => 'leave', 'label' => 'Leave Reports', 'reports' => ['leave_monetization', 'leave_mandatory_missing', 'leave_balance']],
+            ['value' => 'attendance', 'label' => 'Attendance Reports', 'reports' => ['attendance_summary', 'attendance_tardiness', 'attendance_awards']],
+            ['value' => 'leave', 'label' => 'Leave Reports', 'reports' => ['leave_report', 'leave_monetization', 'leave_mandatory_missing', 'leave_balance']],
             ['value' => 'locator', 'label' => 'Locator Slip Reports', 'reports' => ['locator_frequency']],
+            ['value' => 'travel', 'label' => 'Travel Authority Reports', 'reports' => ['travel_authority', 'travel_tar']],
             ['value' => 'overtime_cto', 'label' => 'Overtime & CTO Reports', 'reports' => ['overtime_cto']],
         ])->map(function (array $group) use ($subReports) {
             $group['reports'] = collect($group['reports'])
@@ -202,8 +215,62 @@ class ReportController extends Controller
         })->all();
     }
 
+    private function travelReport(string $division, string $employmentStatus, string $from, string $to, bool $tar = false): array
+    {
+        $orders = TravelOrder::query()->with('employee')
+            ->whereDate('travel_date_start', '<=', $to)
+            ->whereDate('travel_date_end', '>=', $from)
+            ->whereHas('employee', fn ($query) => $this->applyEmployeeFilters($query, $division, $employmentStatus))
+            ->orderByDesc('travel_date_start')->get();
+
+        $rows = $orders->map(function (TravelOrder $order) use ($tar) {
+            $status = ucfirst((string) $order->status);
+            if ($tar) {
+                $required = $order->is_tar_required ?? true;
+                $deadline = $order->visible_tar_deadline;
+                $status = match (true) {
+                    !$order->is_fully_approved => 'Awaiting TA Approval',
+                    !$required => 'Not Required',
+                    $order->tar_review_status === 'approved' => 'Approved',
+                    $order->tar_review_status === 'returned' || $order->tar_status === 'returned' => 'Returned',
+                    $order->tar_status === 'submitted' || $order->tar_submitted_at !== null => 'Submitted',
+                    $deadline !== null && now()->gt($deadline->copy()->endOfDay()) => 'Overdue',
+                    default => 'Pending',
+                };
+                $cells = [
+                    $order->ta_number ?: '--', $this->employeeName($order->employee),
+                    $order->employee?->division ?: '--', $deadline?->format('M d, Y') ?? '--',
+                    $order->tar_submitted_at?->format('M d, Y') ?? '--',
+                    $order->tar_submitted_at ? ucfirst($order->tar_chief_status ?: 'pending') : '--',
+                    $order->tar_submitted_at ? ucfirst($order->tar_rd_status ?: 'pending') : '--', $status,
+                ];
+            } else {
+                $cells = [
+                    $order->ta_number ?: '--', $this->employeeName($order->employee),
+                    $order->employee?->division ?: '--', $order->travel_date_start?->format('M d, Y') ?? '--',
+                    $order->travel_date_end?->format('M d, Y') ?? '--', $order->places_of_travel ?: '--',
+                ];
+            }
+            return $this->row($cells, $order->employee, $order->travel_date_start?->toDateString());
+        })->values();
+        $counts = $tar ? $rows->countBy(fn ($row) => last($row['cells']))
+            : $orders->countBy(fn (TravelOrder $order) => ucfirst((string) $order->status));
+
+        return $this->reportPayload(
+            $tar ? 'TAR Submission Status' : 'Travel Authority Summary',
+            [$this->metric('Total Records', $orders->count(), 'blue', 'calendar'),
+                $this->metric('Approved', $counts->get('Approved', 0), 'green', 'check'),
+                $this->metric($tar ? 'Overdue' : 'Pending', $counts->get($tar ? 'Overdue' : 'Pending', 0), 'amber', 'clock')],
+            $tar ? 'TAR Status' : 'TA Status', $this->bars($counts),
+            $tar ? ['TA Stamp', 'Employee', 'Division', 'TAR Deadline', 'Date Submitted', 'Chief', 'Regional Director', 'TAR Status']
+                : ['TA Stamp', 'Employee', 'Division', 'Travel From', 'Travel To', 'Destination'],
+            $rows->all(), $orders->pluck('employee')->filter()
+        );
+    }
+
     private function employeeComplianceReport(Collection $employees, int $year): array
     {
+        $employees->loadMissing(['pdsSectionReviews', 'pdsPersonal']);
         $employeeIds = $employees->pluck('id');
         $pds = PdsSnapshot::query()->where('year', $year)->whereIn('employee_id', $employeeIds)->get()->keyBy('employee_id');
         $salns = Saln::query()
@@ -213,22 +280,22 @@ class ReportController extends Controller
             ->get()
             ->groupBy('employee_id')
             ->map->first();
-        $pdsDeadline = Carbon::create($year, 12, 31)->endOfDay();
-        $salnDeadline = Carbon::create($year + 1, 4, 30)->endOfDay();
-
-        $rows = $employees->map(function (Employee $employee) use ($pds, $salns, $pdsDeadline, $salnDeadline) {
+        $rows = $employees->map(function (Employee $employee) use ($pds, $salns, $year) {
             $pdsRecord = $pds->get($employee->id);
             $saln = $salns->get($employee->id);
-            $pdsDate = $pdsRecord?->updated_at;
+            $useLive = $year === (int) now()->year && $year === (int) ($employee->pds_record_year ?? now()->year);
+            $pdsDate = $pdsRecord?->submitted_at ?? $pdsRecord?->created_at ?? ($useLive ? $employee->pdsPersonal?->created_at : null);
+            $reviews = $useLive ? $employee->pdsSectionReviews : collect($pdsRecord?->reviews ?? []);
+            $pdsComplete = app(\App\Services\PdsCompletionService::class)->summary($reviews)['status'] === 'approved';
             $salnDate = $saln?->submitted_at ?? $saln?->created_at;
 
             return $this->row([
                 $this->employeeName($employee),
                 $employee->division ?: 'N/A',
                 $pdsDate?->format('M d, Y') ?? 'Not Submitted',
-                $this->submissionStatus($pdsDate, $pdsDeadline),
+                !$pdsDate ? 'Not Submitted' : ($pdsComplete ? 'Complete' : 'Incomplete'),
                 $salnDate?->format('M d, Y') ?? 'Not Submitted',
-                $this->submissionStatus($salnDate, $salnDeadline),
+                !$salnDate ? 'Not Submitted' : ($saln->review_status === 'approved' ? 'Complete' : 'Incomplete'),
             ], $employee);
         })->values();
 
@@ -238,7 +305,7 @@ class ReportController extends Controller
                 $this->metric('Employees', $employees->count(), 'blue', 'users'),
                 $this->metric('Missing PDS', $rows->where('cells.2', 'Not Submitted')->count(), 'red', 'x'),
                 $this->metric('Missing SALN', $rows->where('cells.4', 'Not Submitted')->count(), 'red', 'x'),
-                $this->metric('Complete', $rows->filter(fn ($row) => $row['cells'][2] !== 'Not Submitted' && $row['cells'][4] !== 'Not Submitted')->count(), 'green', 'check'),
+                $this->metric('Complete', $rows->filter(fn ($row) => $row['cells'][3] === 'Complete' && $row['cells'][5] === 'Complete')->count(), 'green', 'check'),
             ],
             'Compliance by Division',
             $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned')),
@@ -461,38 +528,48 @@ class ReportController extends Controller
         );
     }
 
-    private function employeeBirthdayReport(Collection $employees, Carbon $selectedDate): array
+    private function employeeBirthdayReport(Collection $employees, string $from, string $to): array
     {
-        $birthdayEmployees = $employees->filter(fn (Employee $employee) => $employee->pdsPersonal?->date_of_birth && Carbon::parse($employee->pdsPersonal->date_of_birth)->month === $selectedDate->month);
-        $rows = $birthdayEmployees->map(function (Employee $employee) use ($selectedDate) {
-            $birthday = Carbon::parse($employee->pdsPersonal->date_of_birth);
-            $isToday = $birthday->month === $selectedDate->month && $birthday->day === $selectedDate->day;
-
-            return $this->row([
-                $this->employeeName($employee),
-                $employee->division ?: 'N/A',
-                $birthday->format('F d'),
-                (string) $birthday->age,
-                $isToday ? 'Birthday Today' : 'This Month',
-            ], $employee);
-        })->sortBy(fn ($row) => Carbon::parse($row['cells'][2])->day)->values();
-
+        $start = Carbon::parse($from)->startOfDay();
+        $end = Carbon::parse($to)->endOfDay();
+        $rows = collect();
+        $birthdayEmployees = collect();
+        foreach ($employees as $employee) {
+            if (!$employee->pdsPersonal?->date_of_birth) continue;
+            try { $birth = Carbon::parse($employee->pdsPersonal->date_of_birth); }
+            catch (\Throwable) { continue; }
+            for ($year = $start->year; $year <= $end->year; $year++) {
+                $occurrence = Carbon::create($year, $birth->month, 1)->startOfDay();
+                if ($birth->day > $occurrence->daysInMonth) continue;
+                $occurrence->day($birth->day);
+                if ($occurrence->lt($start) || $occurrence->gt($end) || $occurrence->lt($birth)) continue;
+                $birthdayEmployees->put($employee->id, $employee);
+                $rows->push($this->row([
+                    $this->employeeName($employee),
+                    $employee->division ?: 'N/A',
+                    $occurrence->format('F d, Y'),
+                    (string) ($year - $birth->year),
+                    $occurrence->isToday() ? 'Birthday Today' : 'Within Selected Period',
+                ], $employee, $occurrence->toDateString()));
+            }
+        }
+        $rows = $rows->sortBy('date')->values();
         return $this->reportPayload(
-            'Employee Birthdays — '.$selectedDate->format('F Y'),
+            'Employee Birthdays — '.$start->format('M d, Y').' to '.$end->format('M d, Y'),
             [
                 $this->metric('Today', $rows->where('cells.4', 'Birthday Today')->count(), 'green', 'calendar'),
-                $this->metric('This Month', $rows->count(), 'blue', 'calendar'),
+                $this->metric('In Selected Period', $rows->count(), 'blue', 'calendar'),
                 $this->metric('Birth Dates Available', $employees->filter(fn ($employee) => $employee->pdsPersonal?->date_of_birth)->count(), 'blue', 'users'),
-                $this->metric('Missing Birth Date', $employees->filter(fn ($employee) => ! $employee->pdsPersonal?->date_of_birth)->count(), 'amber', 'clock'),
+                $this->metric('Missing Birth Date', $employees->filter(fn ($employee) => !$employee->pdsPersonal?->date_of_birth)->count(), 'amber', 'clock'),
             ],
             'Birthdays by Division',
-            $this->bars($birthdayEmployees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned')),
-            ['Employee', 'Division', 'Birthday', 'Age', 'Schedule'],
+            $this->bars($birthdayEmployees->countBy('division')),
+            ['Employee', 'Division', 'Birthday', 'Age Turning', 'Schedule'],
             $rows->all(),
-            $birthdayEmployees,
+            $birthdayEmployees->values(),
             [
                 $this->chart('Birthday Schedule', 'doughnut', $this->countCells($rows, 4)),
-                $this->chart('Birthdays by Division', 'bar', $this->bars($birthdayEmployees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned'))),
+                $this->chart('Birthdays by Division', 'bar', $this->bars($birthdayEmployees->countBy('division'))),
                 $this->chart('Birthdays by Day', 'bar', $rows->map(fn ($row) => ['label' => $row['cells'][2], 'value' => 1])),
             ]
         );
@@ -508,9 +585,38 @@ class ReportController extends Controller
                 $data = $snapshot->data ?? [];
 
                 return ($division === 'All Divisions' || trim((string) ($data['division'] ?? '')) === $division)
-                    && ($employmentStatus === 'All Employment Status' || $this->sameStatus($data['employment_status'] ?? null, $employmentStatus));
+                    && ($employmentStatus === 'All Employment Status' || $this->sameStatus($this->displayEmploymentStatus($data['employment_status'] ?? null), $this->displayEmploymentStatus($employmentStatus)));
             })
             ->values();
+
+        // Current employee data remains available before the monthly snapshot job runs.
+        $missingSnapshot = !EmployeeReportSnapshot::whereDate('snapshot_month', $snapshotMonth->toDateString())->exists();
+        if ($selectedDate->isSameMonth(now()) || $missingSnapshot) {
+            $capturedIds = $snapshots->pluck('employee_id');
+            $liveEmployees = $this->employeeBaseQuery($division, $employmentStatus)
+                ->with(['user', 'pdsPersonal'])
+                ->whereNotIn('id', $capturedIds)
+                ->where(function ($query) use ($selectedDate) {
+                    $query->whereDate('service_start_date', '<=', $selectedDate->toDateString())
+                        ->orWhere(fn ($q) => $q->whereNull('service_start_date')->whereDate('created_at', '<=', $selectedDate->toDateString()));
+                })
+                ->get();
+            foreach ($liveEmployees as $employee) {
+                $snapshots->push(new EmployeeReportSnapshot([
+                    'employee_id' => $employee->id,
+                    'snapshot_month' => $snapshotMonth,
+                    'data' => [
+                        'rfid_number' => $employee->rfid_number,
+                        'employee_name' => $this->employeeName($employee),
+                        'division' => $employee->division,
+                        'position' => $employee->position,
+                        'employment_status' => $employee->employment_status,
+                        'gender' => $employee->pdsPersonal?->sex,
+                        'account_status' => $employee->user?->account_status,
+                    ],
+                ]));
+            }
+        }
 
         $rows = $snapshots->map(function (EmployeeReportSnapshot $snapshot) {
             $data = $snapshot->data ?? [];
@@ -584,6 +690,8 @@ class ReportController extends Controller
             ])->all(),
         ];
 
+        $report['sourceNote'] = $missingSnapshot && !$selectedDate->isSameMonth(now())
+            ? 'No saved snapshot for this month. Showing current details of employees whose recorded service had started by the selected date.' : '';
         return $report;
     }
 
@@ -644,7 +752,8 @@ class ReportController extends Controller
             ->with(['employee.pdsPersonal', 'leaveType'])
             ->whereBetween('date_filed', [$from, Carbon::parse($to)->endOfDay()])
             ->where(function ($query) {
-                $query->whereRaw('LOWER(COALESCE(reason, ?)) LIKE ?', ['', '%monetization%'])
+                $query->where('is_monetization', true)
+                    ->orWhereRaw('LOWER(COALESCE(reason, ?)) LIKE ?', ['', '%monetization%'])
                     ->orWhereHas('leaveType', fn ($leaveType) => $leaveType->whereRaw('LOWER(name) LIKE ?', ['%monetization%']));
             })
             ->whereHas('employee', fn ($query) => $this->applyEmployeeFilters($query, $division, $employmentStatus))
@@ -821,11 +930,11 @@ class ReportController extends Controller
         $rows = $employees->map(function (Employee $employee) use ($records) {
             $employeeRecords = $records->get($employee->id, collect());
             $workingDays = $employeeRecords->pluck('date')->unique()->count();
-            $late = $employeeRecords->filter(fn ($record) => strtolower((string) $record->status) === 'late' || ($record->time_in && Carbon::parse($record->time_in)->format('H:i:s') > '08:00:00'))->count();
+            $late = $employeeRecords->filter(fn ($record) => $this->lateMinutes($record) > 0)->count();
             $absent = $employeeRecords->filter(fn ($record) => strtolower((string) $record->status) === 'absent')->count();
             $present = max($employeeRecords->count() - $absent, 0);
-            $undertime = $employeeRecords->filter(fn ($record) => $record->time_out && Carbon::parse($record->time_out)->format('H:i:s') < '17:00:00')->count();
-            $hours = $employeeRecords->sum(fn ($record) => $this->hoursWorked($record->time_in, $record->time_out));
+            $undertime = $employeeRecords->filter(fn ($record) => $this->undertimeMinutes($record) > 0)->count();
+            $hours = $employeeRecords->sum(fn ($record) => app(\App\Services\AttendanceCalculator::class)->actualMinutes($record, $employee) / 60);
 
             return $this->row([
                 $this->employeeName($employee),
@@ -875,7 +984,8 @@ class ReportController extends Controller
     {
         $requests = LeaveRequest::query()
             ->with(['employee.pdsPersonal', 'leaveType', 'regionalDirector', 'hrstaff', 'chief'])
-            ->whereBetween('start_date', [$from, $to])
+            ->where('is_monetization', false)
+            ->whereDate('start_date', '<=', $to)->whereDate('end_date', '>=', $from)
             ->whereHas('employee', fn ($query) => $this->applyEmployeeFilters($query, $division, $employmentStatus))
             ->latest('start_date')
             ->get();
@@ -921,9 +1031,9 @@ class ReportController extends Controller
         );
     }
 
-    private function leaveBalanceReport(Collection $employees): array
+    private function leaveBalanceReport(Collection $employees, int $year): array
     {
-        $currentYear = now()->year;
+        $currentYear = $year;
         $credits = LeaveCredit::query()
             ->with(['employee.pdsPersonal', 'leaveType'])
             ->where('year', $currentYear)
@@ -935,12 +1045,23 @@ class ReportController extends Controller
             $employeeCredits = $credits->get($employee->id, collect());
             $vacation = $this->creditBalance($employeeCredits, 'Vacation');
             $sick = $this->creditBalance($employeeCredits, 'Sick');
-            $other = $employeeCredits->reject(fn (LeaveCredit $credit) => str_contains(strtolower($credit->leaveType?->name ?? ''), 'vacation') || str_contains(strtolower($credit->leaveType?->name ?? ''), 'sick'))->sum('balance');
+            $force = $this->creditBalance($employeeCredits, 'force');
+            $special = $this->creditBalance($employeeCredits, 'special privilege');
+            $wellness = $this->creditBalance($employeeCredits, 'wellness');
+            $other = $employeeCredits->reject(function (LeaveCredit $credit) {
+                $name = strtolower($credit->leaveType?->name ?? '');
+                return str_contains($name, 'vacation') || str_contains($name, 'sick')
+                    || str_contains($name, 'force') || str_contains($name, 'special privilege')
+                    || str_contains($name, 'wellness');
+            })->sum('balance');
 
             return $this->row([
                 $this->employeeName($employee),
                 number_format((float) $vacation, 2),
                 number_format((float) $sick, 2),
+                number_format((float) $force, 2),
+                number_format((float) $special, 2),
+                number_format((float) $wellness, 2),
                 number_format((float) $other, 2),
             ], $employee);
         })->values();
@@ -956,7 +1077,7 @@ class ReportController extends Controller
             ],
             'Leave Credits and Entitlements by Division',
             $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned')),
-            ['Employee', 'Vacation Leave Balance', 'Sick Leave Balance', 'Other Annual/Statutory Entitlements'],
+            ['Employee', 'Vacation Leave', 'Sick Leave', 'Force Leave', 'Special Privilege Leave', 'Wellness Leave', 'Other Entitlements'],
             $rows->all(),
             $employees,
             [
@@ -964,7 +1085,10 @@ class ReportController extends Controller
                 $this->chart('Leave Credit and Entitlement Totals', 'doughnut', [
                     ['label' => 'Vacation', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][1]), 'color' => '#0038a8'],
                     ['label' => 'Sick', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][2]), 'color' => '#10b981'],
-                    ['label' => 'Other Entitlements', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][3]), 'color' => '#f59e0b'],
+                    ['label' => 'Force Leave', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][3]), 'color' => '#f59e0b'],
+                    ['label' => 'Special Privilege Leave', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][4]), 'color' => '#8b5cf6'],
+                    ['label' => 'Wellness Leave', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][5]), 'color' => '#06b6d4'],
+                    ['label' => 'Other Entitlements', 'value' => $rows->sum(fn ($row) => (float) $row['cells'][6]), 'color' => '#64748b'],
                 ]),
                 $this->chart('Employees with Leave Credits', 'bar', $this->bars($employees->countBy(fn (Employee $employee) => $employee->division ?: 'Unassigned'))),
             ]
@@ -1292,6 +1416,10 @@ class ReportController extends Controller
             return;
         }
 
+        if ($this->sameStatus($employmentStatus, 'Contractual') || $this->sameStatus($employmentStatus, 'Contract of Service')) {
+            $query->whereIn('employment_status', ['Contractual', 'Contract of Service']);
+            return;
+        }
         $query->where('employment_status', $employmentStatus);
     }
 
@@ -1339,32 +1467,12 @@ class ReportController extends Controller
 
     private function lateMinutes(DtrRecord $record): int
     {
-        $minutes = 0;
-
-        if ($record->time_in && Carbon::parse($record->time_in)->format('H:i:s') > '08:00:00') {
-            $minutes += Carbon::parse('08:00:00')->diffInMinutes(Carbon::parse($record->time_in));
-        }
-
-        if ($record->pm_in && Carbon::parse($record->pm_in)->format('H:i:s') > '13:00:00') {
-            $minutes += Carbon::parse('13:00:00')->diffInMinutes(Carbon::parse($record->pm_in));
-        }
-
-        return $minutes;
+        return app(\App\Services\AttendanceCalculator::class)->lateMinutes($record);
     }
 
     private function undertimeMinutes(DtrRecord $record): int
     {
-        $minutes = 0;
-
-        if ($record->am_out && Carbon::parse($record->am_out)->format('H:i:s') < '12:00:00') {
-            $minutes += Carbon::parse($record->am_out)->diffInMinutes(Carbon::parse('12:00:00'));
-        }
-
-        if ($record->time_out && Carbon::parse($record->time_out)->format('H:i:s') < '17:00:00') {
-            $minutes += Carbon::parse($record->time_out)->diffInMinutes(Carbon::parse('17:00:00'));
-        }
-
-        return $minutes;
+        return app(\App\Services\AttendanceCalculator::class)->undertimeMinutes($record);
     }
 
     private function locatorDurationHours(LocatorSlip $slip): float
@@ -1445,6 +1553,7 @@ class ReportController extends Controller
 
     private function validDate($value, string $fallback): string
     {
+        if (blank($value)) return $fallback;
         try {
             return Carbon::parse($value)->toDateString();
         } catch (\Throwable) {

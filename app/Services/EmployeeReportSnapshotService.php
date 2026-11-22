@@ -30,10 +30,11 @@ class EmployeeReportSnapshotService
     {
         $employee->loadMissing(['user', 'pdsPersonal', 'leaveCredits.leaveType']);
 
-        $leaveCredits = $employee->leaveCredits->map(fn ($credit) => [
+        $leaveCredits = $employee->leaveCredits->where('year', $month->year)->map(fn ($credit) => [
             'leave_type' => $credit->leaveType?->name,
             'balance' => (float) $credit->balance,
             'earned' => (float) $credit->earned,
+            'carried_forward' => (float) $credit->carried_forward,
             'used' => (float) $credit->used,
             'adjusted' => (float) $credit->adjusted,
         ])->values()->all();

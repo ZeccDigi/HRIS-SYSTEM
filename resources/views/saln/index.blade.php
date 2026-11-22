@@ -1,9 +1,10 @@
 <x-app-layout>
     <x-slot name="title">{{ __('My SALN') }}</x-slot>
 
-    <div class="p-4 sm:p-6 lg:p-8">
-        <div class="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="p-6 flex justify-between items-center border-b border-gray-100">
+    <div class="min-h-screen bg-slate-50 px-1 py-3 sm:px-2 lg:px-3">
+        <div class="mx-auto w-full min-w-0">
+            <div class="bg-white/80 backdrop-blur-xl rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-4 sm:p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-gray-100">
                 <div>
                     <h2 class="text-2xl font-bold text-gray-800">My SALN</h2>
                     <p class="mt-1 text-sm text-gray-500">Open a saved record for printing, or continue with a new SALN entry.</p>

@@ -5,7 +5,7 @@
         <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-2xl sm:rounded-2xl border border-gray-100 ring-1 ring-black/5">
                 <div class="p-8">
-                    <form method="POST" action="{{ route('leaves.update', $leaf) }}" class="space-y-8" x-data="leaveDateForm('{{ old('start_date', $leaf->start_date?->format('Y-m-d')) }}', '{{ old('end_date', $leaf->end_date?->format('Y-m-d')) }}', '{{ now()->toDateString() }}', {{ Js::from($holidayDates) }})">
+                    <form method="POST" enctype="multipart/form-data" action="{{ route('leaves.update', $leaf) }}" class="space-y-8" x-data="leaveDateForm('{{ old('start_date', $leaf->start_date?->format('Y-m-d')) }}', '{{ old('end_date', $leaf->end_date?->format('Y-m-d')) }}', '{{ now()->toDateString() }}', {{ Js::from($holidayDates) }})">
                         @csrf
                         @method('PUT')
 
@@ -27,7 +27,6 @@
                             selectedId: '{{ old('leave_type_id', $leaf->leave_type_id) }}',
                             selectedName: '',
                             detailType: {{ Js::from(old('leave_detail_type', $leaf->leave_detail_type ?? '')) }},
-                            monetization: {{ Js::from((bool) old('monetization_requested', str_contains(strtolower((string) $leaf->reason), 'monetization'))) }},
                             types: {{ Js::from($leaveTypePicker) }},
                             get info() { return this.types[this.selectedId] || null; },
                             get normalizedName() { return (this.info?.name || '').toLowerCase(); },
@@ -72,6 +71,7 @@
                                 this.applySelectedPolicy();
                                 this.ensureDetailType();
                                 if (!this.canMonetize) this.monetization = false;
+                                if (this.monetization && this.isSickLeave) this.monetizationBasis = 'exceptional';
                             },
                             clearSelectionIfSearching() {
                                 if (this.query !== this.selectedName) {
@@ -87,6 +87,7 @@
                                 this.$nextTick(() => {
                                     this.applySelectedPolicy();
                                     this.ensureDetailType();
+                                    if (this.monetization && this.isSickLeave) this.monetizationBasis = 'exceptional';
                                 });
                             }
                         }" @click.outside="open = false" class="relative">
@@ -176,46 +177,47 @@
                             @php($savedDetail = old('leave_detail', $leaf->leave_detail))
                             <div x-show="isVacationLike || isSickLeave || isWomenLeave || isStudyLeave" x-cloak class="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
                                 <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">{{ __('Details of Leave') }}</p>
-                                <input type="hidden" name="leave_detail_type" :value="detailType" :disabled="!(isVacationLike || isSickLeave || isWomenLeave || isStudyLeave)">
+                                <input type="hidden" name="leave_detail_type" :value="detailType" :disabled="monetization || !(isVacationLike || isSickLeave || isWomenLeave || isStudyLeave)">
 
-                                <div x-show="isVacationLike" class="mt-3 space-y-3">
+                                <div x-show="isVacationLike && !monetization" class="mt-3 space-y-3">
                                     <p class="text-xs font-semibold text-gray-600">{{ __('In case of Vacation/Special Privilege Leave') }}</p>
                                     <div class="grid gap-2 sm:grid-cols-2">
-                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="within_philippines" x-model="detailType" :disabled="!isVacationLike"> {{ __('Within the Philippines') }}</label>
-                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="abroad" x-model="detailType" :disabled="!isVacationLike"> {{ __('Abroad') }}</label>
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="within_philippines" x-model="detailType" :disabled="monetization || !isVacationLike"> {{ __('Within the Philippines') }}</label>
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="abroad" x-model="detailType" :disabled="monetization || !isVacationLike"> {{ __('Abroad') }}</label>
                                     </div>
-                                    <input type="text" name="leave_detail" value="{{ $savedDetail }}" :disabled="!isVacationLike" class="block w-full rounded-lg border-gray-200 bg-white text-sm" placeholder="{{ __('Specify location') }}">
+                                    <input type="text" name="leave_detail" value="{{ $savedDetail }}" :disabled="monetization || !isVacationLike" class="block w-full rounded-lg border-gray-200 bg-white text-sm" placeholder="{{ __('Specify location') }}">
                                 </div>
 
-                                <div x-show="isSickLeave" class="mt-3 space-y-3">
+                                <div x-show="isSickLeave && !monetization" class="mt-3 space-y-3">
                                     <p class="text-xs font-semibold text-gray-600">{{ __('In case of Sick Leave') }}</p>
                                     <div class="grid gap-2 sm:grid-cols-2">
-                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="in_hospital" x-model="detailType" :disabled="!isSickLeave"> {{ __('In Hospital') }}</label>
-                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="out_patient" x-model="detailType" :disabled="!isSickLeave"> {{ __('Out Patient') }}</label>
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="in_hospital" x-model="detailType" :disabled="monetization || !isSickLeave"> {{ __('In Hospital') }}</label>
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="out_patient" x-model="detailType" :disabled="monetization || !isSickLeave"> {{ __('Out Patient') }}</label>
                                     </div>
-                                    <input type="text" name="leave_detail" value="{{ $savedDetail }}" :disabled="!isSickLeave" class="block w-full rounded-lg border-gray-200 bg-white text-sm" placeholder="{{ __('Specify illness') }}">
+                                    <input type="text" name="leave_detail" value="{{ $savedDetail }}" :disabled="monetization || !isSickLeave" class="block w-full rounded-lg border-gray-200 bg-white text-sm" placeholder="{{ __('Specify illness') }}">
                                 </div>
 
-                                <div x-show="isWomenLeave" class="mt-3 space-y-3">
+                                <div x-show="isWomenLeave && !monetization" class="mt-3 space-y-3">
                                     <p class="text-xs font-semibold text-gray-600">{{ __('In case of Special Leave Benefits for Women') }}</p>
-                                    <input type="text" name="leave_detail" value="{{ $savedDetail }}" :disabled="!isWomenLeave" class="block w-full rounded-lg border-gray-200 bg-white text-sm" placeholder="{{ __('Specify illness') }}">
+                                    <input type="text" name="leave_detail" value="{{ $savedDetail }}" :disabled="monetization || !isWomenLeave" class="block w-full rounded-lg border-gray-200 bg-white text-sm" placeholder="{{ __('Specify illness') }}">
                                 </div>
 
-                                <div x-show="isStudyLeave" class="mt-3 space-y-3">
+                                <div x-show="isStudyLeave && !monetization" class="mt-3 space-y-3">
                                     <p class="text-xs font-semibold text-gray-600">{{ __('In case of Study Leave') }}</p>
                                     <div class="grid gap-2 sm:grid-cols-2">
-                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="masters_degree" x-model="detailType" :disabled="!isStudyLeave"> {{ __("Completion of Master's Degree") }}</label>
-                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="board_review" x-model="detailType" :disabled="!isStudyLeave"> {{ __('BAR/Board Examination Review') }}</label>
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="masters_degree" x-model="detailType" :disabled="monetization || !isStudyLeave"> {{ __("Completion of Master's Degree") }}</label>
+                                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold"><input type="radio" value="board_review" x-model="detailType" :disabled="monetization || !isStudyLeave"> {{ __('BAR/Board Examination Review') }}</label>
                                     </div>
                                 </div>
 
                                 <div x-show="canMonetize" class="mt-4 border-t border-indigo-100 pt-3">
                                     <p class="text-xs font-semibold text-gray-600">{{ __('Other Purpose') }}</p>
                                     <label class="mt-2 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold">
-                                        <input type="checkbox" name="monetization_requested" value="1" x-model="monetization" :disabled="!canMonetize">
+                                        <input type="checkbox" name="monetization_requested" value="1" x-model="monetization" @change="if (monetization && isSickLeave) monetizationBasis = 'exceptional'" :disabled="!canMonetize">
                                         {{ __('Monetization of Leave Credits') }}
                                     </label>
                                     <x-input-error class="mt-2" :messages="$errors->get('monetization_requested')" />
+                                    @include('leaves._monetization-fields')
                                 </div>
 
                                 <x-input-error class="mt-2" :messages="$errors->get('leave_detail_type')" />
@@ -224,6 +226,7 @@
 
                         </div>
 
+                        <fieldset x-show="!monetization" :disabled="monetization" class="space-y-4">
                         <!-- Date Range -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <x-weekday-date-picker field="start_date" :label="__('Start Date')" model="startDate" />
@@ -266,6 +269,8 @@
                             <x-input-error class="mt-2" :messages="$errors->get('commutation_requested')" />
                         </div>
 
+                        </fieldset>
+                        <div><label class="mb-1 block text-sm font-semibold">Supporting letter / attachment (PDF)</label><input type="file" name="attachment" accept=".pdf,application/pdf" class="w-full text-sm"><x-input-error :messages="$errors->get('attachment')" /></div>
                         <div class="flex items-center justify-end gap-6 pt-6 border-t border-gray-50">
                             <a href="{{ route('leaves.index') }}" class="text-sm font-black text-gray-400 hover:text-indigo-600 transition-colors duration-300 uppercase tracking-widest">
                                 {{ __('Cancel') }}
@@ -282,6 +287,10 @@
     <script>
         function leaveDateForm(initialStart, initialEnd, minDate, holidayDates = []) {
             return {
+                monetization: {{ Js::from((bool) old('monetization_requested', $leaf->is_monetization)) }},
+                monetizationBasis: {{ Js::from(old('monetization_basis', $leaf->monetization_basis ?? 'regular')) }},
+                monetizationDays: {{ Js::from(old('monetization_days', $leaf->monetization_days ?? '')) }},
+                monetizationSalary: {{ Js::from($monetizationSalarySource['amount'] ?? '') }},
                 startDate: initialStart || '',
                 endDate: initialEnd || '',
                 minDate,

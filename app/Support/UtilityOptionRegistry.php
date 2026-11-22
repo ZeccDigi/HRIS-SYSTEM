@@ -20,6 +20,7 @@ class UtilityOptionRegistry
             'highest_levels' => 'Educational Attainment',
             'eligibility_titles' => 'Eligibility Title',
             'salary_grades' => 'Salary Grade',
+            'salary-schedule' => 'Salary Schedule',
             'step_increments' => 'Step Increment',
             'appointment_statuses' => 'Appointment Status',
             'government_service_options' => 'Government Service',

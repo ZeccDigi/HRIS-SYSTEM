@@ -10,6 +10,7 @@ class PdsChild extends Model
     use HasFactory;
 
     protected $guarded = [];
+    protected $casts = ['date_of_birth' => 'date:Y-m-d'];
 
     public function employee()
     {

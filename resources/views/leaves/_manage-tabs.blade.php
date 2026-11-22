@@ -5,8 +5,9 @@
             {{ __('Pending Leave') }}
         </a>
         <a href="{{ route('leave-applications.all') }}"
-           class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-bold uppercase tracking-widest transition-colors duration-200 {{ request()->routeIs('leave-applications.all') ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' }}">
+           class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-bold uppercase tracking-widest transition-colors duration-200 {{ request()->routeIs('leave-applications.all') && request('tab') !== 'monetization' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' }}">
             {{ __('All Leave Applications') }}
         </a>
+        <a href="{{ route('leave-applications.all', ['tab' => 'monetization']) }}" class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-bold uppercase tracking-widest {{ request('tab') === 'monetization' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500' }}">Manage Monetization</a>
     </nav>
 </div>

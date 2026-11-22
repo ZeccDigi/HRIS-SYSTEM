@@ -16,6 +16,7 @@ class LeaveCreditTransaction extends Model
         'effective_date',
         'description',
         'metadata',
+        'credit_year',
     ];
 
     protected function casts(): array

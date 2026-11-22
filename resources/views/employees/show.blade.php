@@ -7,7 +7,7 @@
             : 'pds';
     @endphp
 
-    <div class="px-4 py-6 sm:px-5 lg:px-6" x-data="{ tab: @js($employeeInitialTab), reviewModalOpen: false, currentSection: '', sectionData: null, changedFields: [], changedEntries: [], reviewStatus: 'pending', reviewRemarks: '', salnModalOpen: false, selectedSaln: null, isChangedField(key, index = null) { return this.changedFields.includes(key) || (index !== null && this.changedEntries.includes(index)); } }" x-init="if (window.location.hash === '#leave-credits') tab = 'leave-credits'">
+    <div class="px-2 py-3 sm:px-3 lg:px-4" x-data="{ tab: @js($employeeInitialTab), reviewModalOpen: false, currentSection: '', sectionData: null, changedFields: [], changedEntries: [], reviewStatus: 'pending', reviewRemarks: '', salnModalOpen: false, selectedSaln: null, isChangedField(key, index = null) { return this.changedFields.includes(key) || (index !== null && this.changedEntries.includes(index)); } }" x-init="if (window.location.hash === '#leave-credits') tab = 'leave-credits'">
         <div class="mx-auto w-full">
             <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <a href="{{ route('employees.index') }}" class="inline-flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50">
@@ -114,65 +114,68 @@
                                 @endif
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
-                                <form method="GET" action="{{ route('employees.show', $employee) }}">
-                                    <input type="hidden" name="tab" value="pds">
-                                    <input type="hidden" name="saln_year" value="{{ $salnYear }}">
-                                    <label for="employee-pds-year" class="sr-only">{{ __('PDS Year') }}</label>
-                                    <select id="employee-pds-year" name="pds_year" onchange="this.form.submit()" class="h-9 rounded-lg border-slate-300 py-1 text-sm">
-                                        @foreach($pdsYears as $year)
-                                            <option value="{{ $year }}" @selected($pdsYear === $year)>{{ $year }}</option>
-                                        @endforeach
-                                    </select>
-                                </form>
+                                <x-employee-document-year-filter :employee="$employee" name="pds_year" :year="$pdsYear" :years="$pdsYears" tab="pds" other-name="saln_year" :other-year="$salnYear" :status="$pdsStatus" />
+                                @if($pdsHasRecord)
                                 <a href="{{ route('employees.pds.print', ['employee' => $employee->id, 'year' => $pdsYear]) }}" data-no-transition class="inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700">
                                     {{ __('Open Preview') }}
                                 </a>
+                                @endif
                             </div>
                         </div>
 
-                        @if($pdsYear !== (int) now()->year)
-                            <p class="text-sm text-slate-600">{{ __('Open Preview to view the saved PDS for this year.') }}</p>
-                        @else
                         <div class="overflow-hidden rounded-xl border border-slate-200">
-                            @if($pdsPendingReviews->isNotEmpty())
+                            @if($pdsHasRecord && ($pdsStatus === 'all' || $pdsStatus === $pdsReviewStatus))
                                 <table class="w-full table-fixed divide-y divide-slate-100">
                                     <thead class="bg-slate-50">
                                         <tr>
-                                            <th class="w-[42%] px-5 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">{{ __('Section') }}</th>
-                                            <th class="w-[30%] px-5 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">{{ __('Updates') }}</th>
-                                            <th class="w-[16%] px-5 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">{{ __('Status') }}</th>
-                                            <th class="w-[12%] px-5 py-4 text-center text-xs font-black uppercase tracking-widest text-slate-500">{{ __('Actions') }}</th>
+                                            <th class="w-[8%] px-3 py-3 text-left text-[10px] font-bold uppercase text-slate-500">{{ __('Year') }}</th>
+                                            <th class="w-[16%] px-3 py-3 text-left text-[10px] font-bold uppercase text-slate-500">{{ __('Date Filed') }}</th>
+                                            <th class="w-[26%] px-3 py-3 text-left text-[10px] font-bold uppercase text-slate-500">{{ __('Record') }}</th>
+                                            <th class="w-[22%] px-3 py-3 text-left text-[10px] font-bold uppercase text-slate-500">{{ __('Updates') }}</th>
+                                            <th class="w-[16%] px-3 py-3 text-left text-[10px] font-bold uppercase text-slate-500">{{ __('Status') }}</th>
+                                            <th class="w-[12%] px-3 py-3 text-center text-[10px] font-bold uppercase text-slate-500">{{ __('Actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-100 bg-white">
-                                        @foreach($pdsPendingReviews as $review)
                                             @php
-                                                $changed = $pdsReviewChangedFields[$review->section_name] ?? ['fields' => [], 'entries' => []];
-                                                $updateCount = count($changed['fields']) + count($changed['entries']);
+                                                $updateCount = collect($pdsReviewChangedFields)->sum(fn ($changed) => count($changed['fields']) + count($changed['entries']));
+                                                $pdsStatusClass = match ($pdsReviewStatus) {
+                                                    'approved' => 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                                                    'rejected' => 'border-red-200 bg-red-50 text-red-700',
+                                                    default => 'border-amber-200 bg-amber-50 text-amber-700',
+                                                };
                                             @endphp
                                             <tr>
-                                                <td class="px-5 py-4 align-middle">
-                                                    <div class="text-sm font-black text-slate-900">{{ $review->section_name }}</div>
+                                                <td class="px-3 py-3 text-xs font-semibold text-slate-700">{{ $pdsYear }}</td>
+                                                <td class="px-3 py-3 text-xs text-slate-600">{{ $pdsDateFiled?->timezone('Asia/Manila')->format('M d, Y') ?? '—' }}</td>
+                                                <td class="px-3 py-3 align-middle">
+                                                    <div class="text-xs font-semibold text-slate-900">Personal Data Sheet</div>
                                                 </td>
-                                                <td class="px-5 py-4 align-middle">
-                                                    <div class="text-sm font-semibold text-slate-600">
+                                                <td class="px-3 py-3 align-middle">
+                                                    <div class="text-xs font-semibold text-slate-600">
                                                         {{ $updateCount }} {{ \Illuminate\Support\Str::plural('updated item', $updateCount) }}
                                                     </div>
                                                 </td>
-                                                <td class="px-5 py-4 align-middle">
-                                                    <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-amber-700">
-                                                        {{ __('Pending') }}
+                                                <td class="px-3 py-3 align-middle">
+                                                    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase {{ $pdsStatusClass }}">
+                                                        {{ ucfirst($pdsReviewStatus) }}
                                                     </span>
                                                 </td>
-                                                <td class="px-5 py-4 align-middle">
-                                                    <div class="flex justify-center">
-                                                        <a href="{{ route('employees.pds.show', $employee) }}" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition-colors hover:bg-indigo-50 hover:text-indigo-900" title="{{ __('View PDS record') }}" aria-label="{{ __('View PDS record') }}">
+                                                <td class="px-3 py-3 align-middle">
+                                                    <div class="flex flex-nowrap justify-center gap-1">
+                                                        <a href="{{ route('employees.pds.show', ['employee' => $employee, 'year' => $pdsYear]) }}" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition-colors hover:bg-indigo-50 hover:text-indigo-900" title="{{ __('View PDS record') }}" aria-label="{{ __('View PDS record') }}">
                                                             <i class="fa-solid fa-eye text-sm" aria-hidden="true"></i>
                                                         </a>
+                                                        @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true))
+                                                            <form method="POST" action="{{ route('employees.pds.archive', ['employee' => $employee, 'year' => $pdsYear]) }}" data-archive-question="Archive the {{ $pdsYear }} PDS record?">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" title="Archive" aria-label="Archive PDS" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 hover:bg-red-50"><i class="fa-solid fa-box-archive text-sm" aria-hidden="true"></i></button>
+                                                            </form>
+                                                        @endif
                                                     </div>
                                                 </td>
                                             </tr>
-                                        @endforeach
                                     </tbody>
                                 </table>
                             @else
@@ -182,8 +185,8 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                         </svg>
                                     </div>
-                                    <p class="text-sm font-black text-slate-900">{{ __('No pending PDS updates.') }}</p>
-                                    <p class="mt-1 text-sm font-medium text-slate-500">{{ __('Employee changes that need verification will appear here.') }}</p>
+                                    <p class="text-sm font-semibold text-slate-900">{{ __('No PDS records match the selected year and status.') }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ __('Archived PDS records are available on the Archive page.') }}</p>
                                 </div>
                             @endif
                         </div>
@@ -284,7 +287,6 @@
                                 </a>
                             </div>
                         </div>
-                        @endif
                     </div>
                 </div>
 
@@ -306,7 +308,7 @@
                                         type="search"
                                         x-model.debounce.150ms="leaveCreditSearch"
                                         placeholder="{{ __('Search leave type...') }}"
-                                        class="block h-9 w-full rounded-lg border-gray-300 bg-white pl-10 pr-3 text-sm font-medium shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-indigo-500"
+                                        class="block h-9 w-full rounded-lg border-gray-300 bg-white pl-10 pr-3 text-xs font-medium shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-indigo-500"
                                     >
                                 </div>
                                 <button type="button" @click="adjustModalOpen = true" class="inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700">
@@ -319,23 +321,25 @@
                         </div>
 
                         <div class="max-h-[34rem] overflow-y-auto overflow-x-hidden rounded-xl border border-gray-100">
-                            <table class="w-full table-fixed divide-y divide-gray-100">
+                            <table class="w-full table-fixed divide-y divide-gray-100 [&_td]:py-2 [&_td]:text-[11px] [&_th]:text-[9px] [&_th]:tracking-normal">
                                 <colgroup>
-                                    <col class="w-[42%]">
+                                    <col class="w-[37%]">
                                     <col class="w-[15%]">
+                                    <col class="w-[9%]">
+                                    <col class="w-[8%]">
                                     <col class="w-[12%]">
-                                    <col class="w-[11%]">
-                                    <col class="w-[10%]">
-                                    <col class="w-[10%]">
+                                    <col class="w-[12%]">
+                                    <col class="w-[7%]">
                                 </colgroup>
                                 <thead class="bg-gray-50">
                                     <tr>
-                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Leave Type') }}</th>
-                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Available Balance') }}</th>
-                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Earned') }}</th>
-                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Used') }}</th>
-                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Adjustment') }}</th>
-                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('As Of') }}</th>
+                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Leave Type') }}</th>
+                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Available Balance') }}</th>
+                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Earned') }}</th>
+                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Used') }}</th>
+                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Adjustment') }}</th>
+                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('As Of') }}</th>
+                                        <th scope="col" class="sticky top-0 z-10 bg-gray-50 px-2 py-2.5 text-center text-[10px] font-bold uppercase text-gray-500">{{ __('Actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 bg-white">
@@ -355,37 +359,37 @@
                                             x-show="@js($searchText).includes(leaveCreditSearch.toLowerCase().trim())"
                                             class="hover:bg-gray-50/70 transition-colors"
                                         >
-                                            <td class="px-6 py-4 align-middle">
-                                                <div class="text-sm font-bold text-gray-900">{{ $credit->leaveType?->name ?? __('Leave Type') }}</div>
-                                                @if($credit->leaveType?->legal_basis)
-                                                    <div
-                                                        class="mt-1 text-xs italic leading-5 text-gray-400"
-                                                        style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"
-                                                        title="{{ $credit->leaveType->legal_basis }}"
-                                                    >
-                                                        {{ $credit->leaveType->legal_basis }}
-                                                    </div>
-                                                @endif
+                                            <td class="px-3 py-2.5 align-middle">
+                                                <div class="text-[11px] font-semibold text-gray-900" title="{{ $credit->leaveType?->legal_basis }}">{{ $credit->leaveType?->name ?? __('Leave Type') }}</div>
+                                                <span class="mt-0.5 block truncate text-[10px] leading-4 text-slate-500" title="{{ $credit->leaveType?->legal_basis }}">{{ $credit->leaveType?->legal_basis ?: '--' }}</span>
                                             </td>
-                                            <td class="px-4 py-4 align-middle text-sm font-black leading-5 text-gray-900">
+                                            <td class="px-3 py-2.5 align-middle text-xs font-bold leading-5 text-gray-900">
                                                 {{ number_format((float) $credit->balance, 3) }} {{ Str::plural('day', $credit->balance) }}
+                                                @if((float) $credit->carried_forward > 0)<span class="block text-[10px] font-normal text-slate-500">{{ __('Carryover') }}: {{ number_format((float) $credit->carried_forward, 3) }}</span>@endif
                                             </td>
-                                            <td class="px-4 py-4 align-middle text-sm font-bold text-gray-700">
+                                            <td class="px-3 py-2.5 align-middle text-xs font-bold text-gray-700">
                                                 {{ number_format((float) $credit->earned, 3) }}
                                             </td>
-                                            <td class="px-4 py-4 align-middle text-sm font-bold text-gray-700">
+                                            <td class="px-3 py-2.5 align-middle text-xs font-bold text-gray-700">
                                                 {{ number_format((float) $credit->used, 3) }}
                                             </td>
-                                            <td class="px-4 py-4 align-middle text-sm font-bold {{ (float) $credit->adjusted < 0 ? 'text-red-600' : ((float) $credit->adjusted > 0 ? 'text-emerald-600' : 'text-gray-700') }}">
+                                            <td class="px-3 py-2.5 align-middle text-xs font-bold {{ (float) $credit->adjusted < 0 ? 'text-red-600' : ((float) $credit->adjusted > 0 ? 'text-emerald-600' : 'text-gray-700') }}">
                                                 {{ (float) $credit->adjusted > 0 ? '+' : '' }}{{ number_format((float) $credit->adjusted, 3) }}
                                             </td>
-                                            <td class="px-4 py-4 align-middle text-sm font-medium text-gray-500">
+                                            <td class="whitespace-nowrap px-3 py-2.5 text-right align-middle text-xs font-medium text-gray-500">
                                                 {{ $credit->accrued_as_of?->format('M d, Y') ?? '-' }}
+                                            </td>
+                                            <td class="px-2 py-2 text-center align-middle">
+                                                @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff'], true))
+                                                    <button type="button" data-credit-history-trigger @click="$dispatch('hr-leave-credit-history', { id: {{ $credit->leave_type_id }}, name: @js($credit->leaveType?->name ?? 'Leave'), year: {{ $credit->year }} })" aria-label="{{ __('View :type credit history', ['type' => $credit->leaveType?->name]) }}" title="{{ __('View credit history') }}" class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-indigo-700 hover:bg-indigo-50"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
+                                                @else
+                                                    <button type="button" disabled aria-label="Credit history unavailable" class="inline-flex h-7 w-7 items-center justify-center text-slate-300"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="6" class="px-6 py-10 text-center text-sm font-medium text-gray-400">
+                                            <td colspan="7" class="px-6 py-10 text-center text-xs font-medium text-gray-400">
                                                 {{ __('No leave credits found for this employee.') }}
                                             </td>
                                         </tr>
@@ -394,6 +398,9 @@
                             </table>
                         </div>
 
+                        @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff'], true))
+                            <x-leave-credit-history :history-url="route('employees.leave-credit-history', $employee)" event-name="hr-leave-credit-history" :history-year="(int) now()->year" history-id="hr-leave-history" />
+                        @endif
                         <div x-show="adjustModalOpen" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="leave-credit-adjustment-title" role="dialog" aria-modal="true">
                             <div class="flex min-h-screen items-center justify-center px-4 py-6 text-center">
                                 <div x-show="adjustModalOpen" x-transition.opacity class="fixed inset-0 bg-slate-900/50" @click="adjustModalOpen = false"></div>
@@ -467,7 +474,7 @@
                 </div>
 
                 <!-- CTO Credits Tab -->
-                <div x-show="tab === 'cto-credits'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;">
+                <div x-show="tab === 'cto-credits'" x-data="{ ctoCreditModalOpen: {{ $errors->ctoCredit->any() ? 'true' : 'false' }} }" @keydown.escape.window="ctoCreditModalOpen = false" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;">
                     @php
                         $ctoRequests = $employee->ctoRequests->sortByDesc('created_at');
                         $approvedCtoRequests = $employee->ctoRequests->where('status', 'approved');
@@ -477,89 +484,87 @@
                     @endphp
 
                     <div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
-                        <div class="mb-4">
+                        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
                             <h3 class="text-lg font-black tracking-tight text-gray-900">{{ __('CTO Credits') }}</h3>
                             <p class="mt-0.5 text-xs font-medium text-gray-500">{{ __('Current compensatory time-off balance and activity for this employee.') }}</p>
+                            </div>
+                            @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff'], true))
+                                <button type="button" @click="ctoCreditModalOpen = true" class="inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M12 5v14m7-7H5" /></svg>
+                                    {{ __('Add Credits') }}
+                                </button>
+                            @endif
                         </div>
 
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-                            <div class="rounded-xl border border-indigo-100 bg-indigo-50 p-5">
-                                <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600">{{ __('Available Balance') }}</p>
-                                <p class="mt-2 text-3xl font-black text-gray-900">{{ number_format((float) $employee->cto_balance, 2) }}</p>
-                                <p class="mt-1 text-xs font-bold text-gray-500">{{ __('hours') }}</p>
-                            </div>
+                        @if(session('cto_credit_success'))
+                            <p role="status" class="mb-4 text-sm font-semibold text-emerald-700">{{ session('cto_credit_success') }}</p>
+                        @endif
 
-                            <div class="rounded-xl border border-emerald-100 bg-white p-5">
-                                <p class="text-[10px] font-black uppercase tracking-widest text-emerald-600">{{ __('Approved Earned') }}</p>
-                                <p class="mt-2 text-2xl font-black text-gray-900">{{ number_format($earnedCtoHours, 2) }}</p>
-                                <p class="mt-1 text-xs font-bold text-gray-500">{{ __('hours') }}</p>
+                        @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff'], true))
+                            <div x-show="ctoCreditModalOpen" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="cto-credit-modal-title" role="dialog" aria-modal="true">
+                              <div class="flex min-h-screen items-center justify-center px-4 py-6 text-center">
+                                <div x-show="ctoCreditModalOpen" x-transition.opacity class="fixed inset-0 bg-slate-900/50" @click="ctoCreditModalOpen = false"></div>
+                                <div x-show="ctoCreditModalOpen" x-transition class="relative w-full max-w-2xl overflow-visible rounded-2xl bg-white text-left shadow-xl">
+                                  <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+                                    <div>
+                                      <p class="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-600">{{ __('CTO Credits') }}</p>
+                                      <h3 id="cto-credit-modal-title" class="mt-1 text-xl font-black text-gray-900">{{ __('Add Credits') }}</h3>
+                                    </div>
+                                    <button type="button" @click="ctoCreditModalOpen = false" aria-label="Close" class="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+                                      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                  </div>
+                                <form method="POST" action="{{ route('employees.cto-credits.store', $employee) }}" class="space-y-5 px-6 py-6">
+                                    @csrf
+                                    <div class="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
+                                    <div>
+                                        <x-coc-date-picker :value="old('overtime_date', '')" />
+                                        <x-input-error :messages="$errors->ctoCredit->get('overtime_date')" />
+                                    </div>
+                                    <div>
+                                        <label for="cto-credit-hours" class="mb-1 block text-sm font-bold text-gray-700">{{ __('Hours Rendered') }}</label>
+                                        <input id="cto-credit-hours" name="hours" type="number" min="2" max="999999.99" step="0.01" value="{{ old('hours') }}" required class="mt-1 block w-full rounded-xl border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <x-input-error :messages="$errors->ctoCredit->get('hours')" />
+                                    </div>
+                                    <x-coc-calculation :employee-id="$employee->id" />
+                                    </div>
+                                    <div class="flex justify-end gap-3 border-t border-gray-100 pt-5">
+                                        <button type="button" @click="ctoCreditModalOpen = false" class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-xs font-black uppercase tracking-widest text-gray-600 transition hover:bg-gray-50">{{ __('Cancel') }}</button>
+                                        <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700">{{ __('Add Credits') }}</button>
+                                    </div>
+                                </form>
+                                </div>
+                              </div>
                             </div>
+                        @endif
 
-                            <div class="rounded-xl border border-amber-100 bg-white p-5">
-                                <p class="text-[10px] font-black uppercase tracking-widest text-amber-600">{{ __('Approved Used') }}</p>
-                                <p class="mt-2 text-2xl font-black text-gray-900">{{ number_format($usedCtoHours, 2) }}</p>
-                                <p class="mt-1 text-xs font-bold text-gray-500">{{ __('hours') }}</p>
+                        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                            <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-3">
+                                <p class="text-[10px] font-semibold uppercase text-indigo-700">{{ __('Available Balance') }}</p>
+                                <p class="mt-1 text-xl font-bold text-gray-900">{{ number_format((float) $employee->cto_balance, 2) }} <span class="text-[10px] font-normal text-slate-500">hrs</span></p>
                             </div>
-
-                            <div class="rounded-xl border border-slate-100 bg-white p-5">
-                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">{{ __('Pending Requests') }}</p>
-                                <p class="mt-2 text-2xl font-black text-gray-900">{{ $pendingCtoCount }}</p>
-                                <p class="mt-1 text-xs font-bold text-gray-500">{{ __('requests') }}</p>
+                            <div class="rounded-lg border border-slate-200 bg-white p-3">
+                                <p class="text-[10px] font-semibold uppercase text-slate-500">{{ __('Approved Earned') }}</p>
+                                <p class="mt-1 text-xl font-bold text-gray-900">{{ number_format($earnedCtoHours, 2) }} <span class="text-[10px] font-normal text-slate-500">hrs</span></p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 bg-white p-3">
+                                <p class="text-[10px] font-semibold uppercase text-slate-500">{{ __('Approved Used') }}</p>
+                                <p class="mt-1 text-xl font-bold text-gray-900">{{ number_format($usedCtoHours, 2) }} <span class="text-[10px] font-normal text-slate-500">hrs</span></p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 bg-white p-3">
+                                <p class="text-[10px] font-semibold uppercase text-slate-500">{{ __('Pending Requests') }}</p>
+                                <p class="mt-1 text-xl font-bold text-gray-900">{{ $pendingCtoCount }}</p>
                             </div>
                         </div>
-
-                        <div class="mt-6 overflow-x-auto rounded-xl border border-gray-100">
-                            <table class="min-w-full divide-y divide-gray-100">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Date') }}</th>
-                                        <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Type') }}</th>
-                                        <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Hours') }}</th>
-                                        <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Status') }}</th>
-                                        <th scope="col" class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">{{ __('Balance After') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 bg-white">
-                                    @forelse($ctoRequests->take(8) as $ctoRequest)
-                                        @php
-                                            $statusClass = match ($ctoRequest->status) {
-                                                'approved' => 'bg-emerald-50 text-emerald-700 border-emerald-100',
-                                                'rejected' => 'bg-red-50 text-red-700 border-red-100',
-                                                default => 'bg-amber-50 text-amber-700 border-amber-100',
-                                            };
-                                        @endphp
-                                        <tr class="hover:bg-gray-50/70 transition-colors">
-                                            <td class="px-6 py-4 text-sm font-semibold text-gray-700">
-                                                {{ $ctoRequest->date_start?->format('M d, Y') ?? '-' }}
-                                            </td>
-                                            <td class="px-6 py-4 text-sm font-bold text-gray-900">
-                                                {{ $ctoRequest->type_label }}
-                                            </td>
-                                            <td class="px-6 py-4 text-sm font-bold text-gray-700">
-                                                {{ number_format((float) $ctoRequest->hours, 2) }}
-                                            </td>
-                                            <td class="px-6 py-4">
-                                                <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider {{ $statusClass }}">
-                                                    {{ ucfirst($ctoRequest->status) }}
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 text-sm font-bold text-gray-700">
-                                                {{ $ctoRequest->cto_balance_after !== null ? number_format((float) $ctoRequest->cto_balance_after, 2).' hrs' : '-' }}
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="5" class="px-6 py-10 text-center text-sm font-medium text-gray-400">
-                                                {{ __('No CTO requests found for this employee.') }}
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
+                        @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff'], true))
+                            @php
+                                $cocHistoryYears = \App\Models\CtoRequest::withTrashed()->where('employee_id', $employee->id)->pluck('date_start')->filter()->map(fn ($date) => $date->year)->push((int) now()->year)->unique()->sortDesc()->values();
+                            @endphp
+                            <x-leave-credit-history :history-url="route('employees.coc-credit-history', $employee)" event-name="hr-coc-credit-history" :history-year="(int) now()->year" unit="Hours" :precision="2" history-id="hr-coc-history" :always-open="true" :year-options="$cocHistoryYears" />
+                        @endif
                     </div>
                 </div>
-
                 <!-- Core Time Tab -->
                 <div
                     x-show="tab === 'core-time'"
@@ -611,16 +616,7 @@
                                 <p class="mt-0.5 text-xs font-medium text-slate-500">{{ __('Employee Statement of Assets, Liabilities, and Net Worth records.') }}</p>
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
-                                <form method="GET" action="{{ route('employees.show', $employee) }}">
-                                    <input type="hidden" name="tab" value="saln">
-                                    <input type="hidden" name="pds_year" value="{{ $pdsYear }}">
-                                    <label for="employee-saln-year" class="sr-only">{{ __('SALN Year') }}</label>
-                                    <select id="employee-saln-year" name="saln_year" onchange="this.form.submit()" class="h-9 rounded-lg border-slate-300 py-1 text-sm">
-                                        @foreach($salnYears as $year)
-                                            <option value="{{ $year }}" @selected($salnYear === $year)>{{ $year }}</option>
-                                        @endforeach
-                                    </select>
-                                </form>
+                                <x-employee-document-year-filter :employee="$employee" name="saln_year" :year="$salnYear" :years="$salnYears" tab="saln" other-name="pds_year" :other-year="$pdsYear" :status="$salnStatus" />
                                 @if($latestSalnRecord = $salnRecords->first())
                                     <a href="{{ route('salns.show', ['saln' => $latestSalnRecord, 'back' => $salnBackUrl]) }}" data-no-transition class="inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-700">
                                         {{ __('Open Preview') }}
@@ -633,16 +629,20 @@
                             <div class="overflow-hidden rounded-xl border border-gray-100">
                                 <table class="w-full table-fixed divide-y divide-gray-200">
                                     <colgroup>
-                                        <col class="w-[13%]">
-                                        <col class="w-[13%]">
-                                        <col class="w-[17%]">
-                                        <col class="w-[17%]">
-                                        <col class="w-[17%]">
-                                        <col class="w-[13%]">
+                                        <col class="w-[5%]">
+                                        <col class="w-[11%]">
+                                        <col class="w-[11%]">
+                                        <col class="w-[12%]">
+                                        <col class="w-[14%]">
+                                        <col class="w-[14%]">
+                                        <col class="w-[15%]">
                                         <col class="w-[10%]">
+                                        <col class="w-[8%]">
                                     </colgroup>
                                     <thead class="bg-gray-50">
                                         <tr>
+                                            <th scope="col" class="px-3 py-3 text-left text-[10px] font-black text-gray-500 uppercase tracking-widest">Year</th>
+                                            <th scope="col" class="px-2 py-3 text-left text-[10px] font-bold uppercase text-gray-500">Date Filed</th>
                                             <th scope="col" class="px-3 py-3 text-left text-[10px] font-black text-gray-500 uppercase tracking-widest">As of Date</th>
                                             <th scope="col" class="px-3 py-3 text-left text-[10px] font-black text-gray-500 uppercase tracking-widest">Filing Type</th>
                                             <th scope="col" class="px-3 py-3 text-left text-[10px] font-black text-gray-500 uppercase tracking-widest">Total Assets</th>
@@ -652,7 +652,7 @@
                                             <th scope="col" class="px-3 py-3 text-center text-[10px] font-black text-gray-500 uppercase tracking-widest">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="bg-white divide-y divide-gray-100 text-sm">
+                                    <tbody class="bg-white divide-y divide-gray-100 text-xs">
                                         @foreach($salnRecords as $saln)
                                             @php
                                                 $salnReviewStatus = strtolower((string) ($saln->review_status ?? 'pending'));
@@ -668,20 +668,31 @@
                                                 };
                                             @endphp
                                             <tr class="hover:bg-gray-50 transition-colors">
-                                                <td class="px-3 py-4 font-bold text-gray-900">{{ $saln->as_of_date->format('M d, Y') }}</td>
-                                                <td class="px-3 py-4 text-gray-600">{{ str_replace('_', ' ', $saln->type_of_filing) }}</td>
-                                                <td class="px-3 py-4 text-gray-600">₱ {{ number_format($saln->total_assets, 2) }}</td>
-                                                <td class="px-3 py-4 text-gray-600">₱ {{ number_format($saln->total_liabilities, 2) }}</td>
-                                                <td class="px-3 py-4 font-bold text-emerald-600">₱ {{ number_format($saln->net_worth, 2) }}</td>
-                                                <td class="px-3 py-4">
-                                                    <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider {{ $salnStatusClass }}">{{ $salnStatusLabel }}</span>
+                                                <td class="px-2 py-2.5 font-semibold text-gray-700">{{ $saln->as_of_date->year }}</td>
+                                                <td class="px-2 py-2.5 text-gray-600">{{ ($saln->submitted_at ?? $saln->created_at)?->timezone('Asia/Manila')->format('M d, Y') ?? '—' }}</td>
+                                                <td class="px-2 py-2.5 font-semibold text-gray-900">{{ $saln->as_of_date->format('M d, Y') }}</td>
+                                                <td class="px-2 py-2.5 text-gray-600">{{ ucwords(str_replace('_', ' ', $saln->type_of_filing)) }}</td>
+                                                <td class="px-2 py-2.5 whitespace-nowrap text-gray-600">₱{{ number_format($saln->total_assets, 2) }}</td>
+                                                <td class="px-2 py-2.5 whitespace-nowrap text-gray-600">₱{{ number_format($saln->total_liabilities, 2) }}</td>
+                                                <td class="px-2 py-2.5 whitespace-nowrap font-semibold text-emerald-600">₱{{ number_format($saln->net_worth, 2) }}</td>
+                                                <td class="px-2 py-2.5">
+                                                    <span class="inline-flex rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase {{ $salnStatusClass }}">{{ $salnStatusLabel }}</span>
                                                 </td>
-                                                <td class="px-3 py-4 text-center text-sm font-medium">
-                                                    <div class="flex items-center justify-center gap-1.5">
+                                                <td class="px-1 py-2.5 text-center font-medium">
+                                                    <div class="flex flex-nowrap items-center justify-center gap-1">
                                                     <a href="{{ route('salns.show', ['saln' => $saln, 'back' => $salnBackUrl]) }}" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 transition-colors hover:bg-indigo-50 hover:text-indigo-900" title="View SALN Preview" aria-label="View SALN Preview">
                                                         <i class="fa-solid fa-eye text-sm" aria-hidden="true"></i>
                                                         <span class="sr-only">View SALN Preview</span>
                                                     </a>
+                                                    @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true))
+                                                        <form method="POST" action="{{ route('salns.destroy', $saln) }}" data-archive-question="{{ __('Archive this SALN record?') }}">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" title="{{ __('Archive') }}" aria-label="{{ __('Archive SALN') }}" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50">
+                                                                <i class="fa-solid fa-box-archive text-sm" aria-hidden="true"></i>
+                                                            </button>
+                                                        </form>
+                                                    @endif
                                                     </div>
                                                 </td>
                                             </tr>

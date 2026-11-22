@@ -1,13 +1,17 @@
-@props(['field', 'label', 'model'])
+@props(['field', 'label', 'model', 'plainLabel' => false])
 
 <div class="relative" @click.outside="if (activePicker === '{{ $field }}') activePicker = null">
-    <x-input-label :for="$field" :value="$label" class="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] mb-2" />
+    @if($plainLabel)
+        <label for="{{ $field }}" class="mb-1 block text-sm font-bold text-gray-700">{{ $label }}</label>
+    @else
+        <x-input-label :for="$field" :value="$label" class="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] mb-2" />
+    @endif
     <input type="hidden" id="{{ $field }}" name="{{ $field }}" x-bind:value="{{ $model }}" required>
 
     <button
         type="button"
         @click.stop="openPicker('{{ $field }}')"
-        class="mt-1 flex w-full items-center justify-between rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 text-left text-sm font-bold text-gray-900 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        class="mt-1 flex {{ $plainLabel ? 'h-11' : '' }} w-full items-center justify-between rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 text-left text-sm font-bold text-gray-900 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
         :class="activePicker === '{{ $field }}' ? 'border-indigo-500 ring-2 ring-indigo-500' : 'hover:border-indigo-200'"
     >
         <span x-text="formatDate({{ $model }}) || 'Select date'" :class="{{ $model }} ? 'text-gray-900' : 'text-gray-400'"></span>
@@ -16,14 +20,14 @@
         </svg>
     </button>
 
-    <div x-show="activePicker === '{{ $field }}'" x-transition x-cloak @click.stop class="absolute z-50 mt-2 w-full rounded-2xl border border-gray-100 bg-white p-4 shadow-2xl">
+    <div x-show="activePicker === '{{ $field }}'" x-transition x-cloak @click.stop class="absolute left-0 z-50 mt-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-2xl" style="width: 19rem; max-width: calc(100vw - 3rem);">
         <div class="mb-3 flex items-center justify-between">
             <button type="button" @click.stop="moveMonth(-1)" class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-indigo-50 hover:text-indigo-700">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                 </svg>
             </button>
-            <div class="text-xs font-black uppercase tracking-widest text-gray-700" x-text="monthLabel"></div>
+            <div class="whitespace-nowrap text-xs font-black uppercase tracking-wide text-gray-700" x-text="monthLabel"></div>
             <button type="button" @click.stop="moveMonth(1)" class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-indigo-50 hover:text-indigo-700">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -31,7 +35,7 @@
             </button>
         </div>
 
-        <div class="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
+        <div class="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-normal text-gray-400">
             <span>Sun</span>
             <span>Mon</span>
             <span>Tue</span>

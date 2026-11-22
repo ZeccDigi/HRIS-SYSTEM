@@ -81,11 +81,11 @@
                     </div>
 
                     {{-- Dates --}}
+                    <div class="grid grid-cols-1 items-end gap-4" :class="type === 'earn' ? 'sm:grid-cols-3' : ''">
                     <template x-if="type === 'earn'">
                     <div>
-                        <x-weekday-date-picker field="date_start" :label="__('Overtime Date')" model="dateStart" />
+                        <x-weekday-date-picker field="date_start" :label="__('Authorized Overtime Date')" model="dateStart" :plain-label="true" />
                         <input type="hidden" name="date_end" :value="dateStart">
-                        <p class="mt-2 text-xs leading-5 text-slate-500">Choose the date you rendered overtime. Earn COC is based on the actual PM time-out in your DTR.</p>
                     </div>
                     </template>
 
@@ -102,44 +102,37 @@
                             <span x-show="type === 'use'">Hours to Use</span>
                             <span class="text-red-500">*</span>
                         </label>
-                        <input type="number" id="hours" name="hours" value="{{ old('hours', ($ctoRequest ?? null)?->hours) }}" step="0.5" min="0.5" required class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" x-bind:placeholder="type === 'earn' ? 'e.g. 3' : 'e.g. 8'">
+                        <input type="number" id="hours" name="hours" value="{{ old('hours', ($ctoRequest ?? null)?->rendered_hours ?? ($ctoRequest ?? null)?->hours) }}" step="0.5" :min="type === 'earn' ? 2 : 0.5" required class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" x-bind:placeholder="type === 'earn' ? 'Minimum 2 hours' : 'e.g. 8'">
                         @error('hours') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                     </div>
 
-                    {{-- Purpose --}}
-                    <div>
-                        <label for="purpose" class="block text-sm font-bold text-gray-700 mb-1">
-                            <span x-show="type === 'earn'">Description of Work Rendered</span>
-                            <span x-show="type === 'use'">Purpose / Reason</span>
-                            <span class="text-red-500">*</span>
-                        </label>
-                        <textarea id="purpose" name="purpose" rows="4" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="Provide details..." required>{{ old('purpose', ($ctoRequest ?? null)?->purpose) }}</textarea>
-                        @error('purpose') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
+                    <div x-show="type === 'earn'" x-cloak class="contents"><x-coc-calculation /></div>
                     </div>
 
-                    <div x-show="type === 'earn'" x-cloak>
-                        <label for="overtime_authority_reference" class="mb-1 block text-sm font-bold text-gray-700">Overtime Memo / Authority Reference</label>
-                        <input id="overtime_authority_reference" name="overtime_authority_reference" value="{{ old('overtime_authority_reference', ($ctoRequest ?? null)?->overtime_authority_reference) }}" type="text" class="block w-full rounded-xl border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="e.g. Office Order No. 2026-014 or memo title">
-                        <p class="mt-1 text-xs text-slate-500">Add the memo or office-order reference when one was issued.</p>
+                    {{-- Purpose --}}
+                    <div x-show="type === 'use'" x-cloak>
+                        <label for="purpose" class="block text-sm font-bold text-gray-700 mb-1">
+                            <span x-show="type === 'use'">Purpose / Reason</span>
+                        </label>
+                        <textarea id="purpose" name="purpose" rows="3" maxlength="2000" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" :disabled="type === 'earn'">{{ old('purpose', ($ctoRequest ?? null)?->purpose) }}</textarea>
+                        @error('purpose') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                     </div>
 
                     {{-- Attach File --}}
                     <div x-data="{ fileName: '' }">
-                        <label for="attachment" class="block text-sm font-bold text-gray-700 mb-1">
-                            {{ __('Attach File') }}
-                            <span class="text-gray-400 font-normal text-xs">- Optional</span>
-                        </label>
+                        <label for="attachment" class="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600">{{ __('Supporting document') }} <span x-show="type === 'earn'" class="text-red-500">*</span></label>
                         <div class="relative group">
                             <input type="file"
                                 name="attachment"
                                 id="attachment"
                                 x-ref="attachment"
-                                class="hidden"
+                                :required="type === 'earn' && @js(!(($ctoRequest ?? null)?->attachment_path))"
+                                class="sr-only"
                                 @change="fileName = $event.target.files[0]?.name || ''"
                                 accept=".pdf,application/pdf">
 
                             <label for="attachment"
-                                class="flex items-center justify-between w-full border-2 border-dashed border-gray-200 group-hover:border-indigo-400 rounded-xl p-4 bg-gray-50/50 cursor-pointer transition-all duration-300">
+                                class="flex w-full cursor-pointer items-center justify-between rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/70 p-3.5 transition-all duration-200 group-hover:border-blue-400 group-hover:bg-blue-50/40">
                                 <div class="flex items-center gap-3">
                                     <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -147,9 +140,9 @@
                                         </svg>
                                     </div>
                                     <div>
-                                        <span x-show="!fileName" class="text-sm font-bold text-gray-500">{{ __('Attach PDF File') }}</span>
+                                        <span x-show="!fileName" class="text-sm font-bold uppercase tracking-tight text-gray-500">{{ __('Attach PDF File') }}</span>
                                         <span x-show="fileName" x-text="fileName" class="text-sm font-bold text-indigo-700 truncate max-w-xs"></span>
-                                        <p class="text-xs text-gray-400">{{ __('PDF file only (Max 5MB)') }}</p>
+                                        <p class="text-[10px] text-gray-400">{{ __('PDF file only (Max 5MB)') }}</p>
                                     </div>
                                 </div>
 

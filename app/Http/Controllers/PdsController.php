@@ -121,16 +121,11 @@ class PdsController extends Controller
         abort_unless($snapshots->hasYear($employee, $selectedYear), 404);
         $pdsYears = $snapshots->yearsFor($employee);
         $liveEmployee = $employee;
-        $employee = $snapshots->employeeForYear($employee, $selectedYear);
-        $employee->setRelation('pdsSectionReviews', $selectedYear === (int) now()->year
-            ? $liveEmployee->pdsSectionReviews()->get()
-            : collect());
+        $employee = $snapshots->draftForYear($liveEmployee, $selectedYear);
 
         $isHrPreview = true;
         $backUrl = route('employees.show', ['employee' => $employee, 'tab' => 'pds', 'pds_year' => $selectedYear]);
-        $pendingPdsReviewCount = $selectedYear === (int) now()->year
-            ? $employee->pdsSectionReviews->where('status', 'pending')->count()
-            : 0;
+        $pendingPdsReviewCount = $employee->pdsSectionReviews->where('status', 'pending')->count();
 
         return view('pds.print-2025', compact('employee', 'isHrPreview', 'backUrl', 'pendingPdsReviewCount', 'selectedYear', 'pdsYears'));
     }
@@ -147,7 +142,7 @@ class PdsController extends Controller
         $selectedYear = (int) $request->query('year', now()->year);
         abort_unless($snapshots->hasYear($employee, $selectedYear), 404);
 
-        $employee = $snapshots->employeeForYear($employee, $selectedYear);
+        $employee = $snapshots->employeeForYear($employee, $selectedYear, false);
 
         try {
             return $exporter->download($employee, 'inline');
@@ -166,7 +161,18 @@ class PdsController extends Controller
             abort(404, 'Employee record not found for this user.');
         }
 
-        $employee->load([
+        $selectedYear = (int) request('year', now()->year);
+        abort_unless($snapshots->hasYear($employee, $selectedYear), 404);
+        $pdsYears = $snapshots->yearsFor($employee);
+        $isPdsArchived = $snapshots->isArchivedForYear($employee, $selectedYear);
+        if ($selectedYear === (int) now()->year && !$isPdsArchived) {
+            app(\App\Services\EmployeeSalaryService::class)->prefillMissingContacts($employee);
+            app(\App\Services\EmployeeSalaryService::class)->prefillMissingEmployment($employee);
+            $employee->refresh();
+        }
+        $employee = $snapshots->draftForYear($employee, $selectedYear);
+
+        $employee->loadMissing([
             'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation',
             'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks',
             'pdsTrainings', 'pdsOthers', 'pdsQuestionnaire', 'pdsReferences', 'pdsGovId',
@@ -200,15 +206,18 @@ class PdsController extends Controller
         ];
 
         $cityZipCodes = $this->cityZipCodes();
-        $selectedYear = (int) now()->year;
-        $pdsYears = $snapshots->yearsFor($employee);
 
-        return view('pds.edit', compact('employee', 'utilityOptionSets', 'locationOptionSets', 'cityZipCodes', 'selectedYear', 'pdsYears'));
+        $pdsReviewChangedInputNames = $this->pdsReviewChangedInputNames($employee);
+        return view('pds.edit', compact('employee', 'utilityOptionSets', 'locationOptionSets', 'cityZipCodes', 'selectedYear', 'pdsYears', 'pdsReviewChangedInputNames', 'isPdsArchived'));
     }
 
-    public function showForHr(Employee $employee): View
+    public function showForHr(Employee $employee, PdsSnapshotService $snapshots): View
     {
-        $employee->load([
+        $selectedYear = (int) request('year', now()->year);
+        abort_unless($snapshots->hasYear($employee, $selectedYear), 404);
+        $pdsYears = $snapshots->yearsFor($employee);
+        $employee = $snapshots->draftForYear($employee, $selectedYear);
+        $employee->loadMissing([
             'user',
             'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation',
             'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks',
@@ -247,7 +256,7 @@ class PdsController extends Controller
         $pdsReviewUpdates = $this->pdsReviewUpdates($employee);
         $pdsReviewChangedInputNames = $this->pdsReviewChangedInputNames($employee);
 
-        return view('pds.edit', compact('employee', 'utilityOptionSets', 'locationOptionSets', 'cityZipCodes', 'isReadOnly', 'pdsReviewUpdates', 'pdsReviewChangedInputNames'));
+        return view('pds.edit', compact('employee', 'utilityOptionSets', 'locationOptionSets', 'cityZipCodes', 'isReadOnly', 'pdsReviewUpdates', 'pdsReviewChangedInputNames', 'selectedYear', 'pdsYears'));
     }
 
     public function update(Request $request, PdsSnapshotService $snapshots): RedirectResponse
@@ -258,7 +267,16 @@ class PdsController extends Controller
             abort(404);
         }
 
+        $request->validate(['year' => ['nullable', 'integer']]);
+        $selectedYear = (int) $request->input('year', now()->year);
+        abort_unless($snapshots->hasYear($employee, $selectedYear), 422, 'Select a year within the employee service period.');
+        abort_if($snapshots->isArchivedForYear($employee, $selectedYear), 409, 'This PDS year is archived. HR must restore it before editing.');
+
         $personal = $request->input('personal', []);
+        if (array_key_exists('email_address', $personal)) {
+            $personal['email_address'] = strtolower(trim((string) $personal['email_address']));
+            $request->merge(['personal' => $personal]);
+        }
         if (array_key_exists('height_m', $personal)) {
             $personal['height_m'] = PdsFormatter::heightCm($personal['height_m'], '');
             $request->merge(['personal' => $personal]);
@@ -320,6 +338,10 @@ class PdsController extends Controller
             $request->merge(['personal' => $personal]);
         }
 
+        $request->merge(['work_experience' => collect($request->input('work_experience', []))->map(function ($row) {
+            if (isset($row['monthly_salary']) && is_string($row['monthly_salary'])) $row['monthly_salary'] = str_replace(',', '', $row['monthly_salary']);
+            return $row;
+        })->all()]);
         $request->validate([
             'personal.surname' => 'nullable|string',
             'personal.firstname' => 'nullable|string',
@@ -361,19 +383,31 @@ class PdsController extends Controller
             'personal.perm_zip_code' => 'nullable|string',
             'personal.telephone_no' => 'nullable|string',
             'personal.mobile_no' => ['nullable', 'regex:/^09\d{2}-\d{3}-\d{4}$/'],
-            'personal.email_address' => 'nullable|email',
+            'personal.email_address' => $selectedYear === (int) now()->year
+                ? ['sometimes', 'required', 'email', 'max:255', \Illuminate\Validation\Rule::unique('employees', 'notification_email')->ignore($employee->id)]
+                : ['nullable', 'email', 'max:255'],
             'family.spouse_surname' => 'nullable|string',
             'family.spouse_firstname' => 'nullable|string',
+            'family.spouse_middlename' => 'nullable|string|max:255',
+            'family.spouse_employer' => 'nullable|string|max:255',
+            'family.spouse_business_address' => 'nullable|string|max:255',
+            'family.spouse_telephone_no' => 'nullable|string|max:255',
             'family.spouse_extension' => 'nullable|string',
             'family.father_surname' => 'nullable|string',
             'family.mother_maiden_surname' => 'nullable|string',
-            'children.*.fullname' => 'nullable|string',
-            'children.*.date_of_birth' => 'nullable|date',
+            'children.*.fullname' => 'required_with:children.*.date_of_birth|nullable|string',
+            'children.*.date_of_birth' => 'required_with:children.*.fullname|nullable|date|before_or_equal:today',
             'education.*.level' => 'required_with:education.*.school_name|nullable|string',
             'education.*.school_name' => 'nullable|string',
             'eligibility.*.title' => 'nullable|string',
             'work_experience.*.position_title' => 'nullable|string',
             'work_experience.*.company' => 'nullable|string',
+            'work_experience.*.date_to' => 'nullable|date|after_or_equal:work_experience.*.date_from',
+            'work_experience.*.hr_salary_assignment' => 'nullable|boolean',
+            'work_experience' => 'nullable|array',
+            'work_experience.*.salary_step' => 'nullable|string|max:50',
+            'work_experience.*.salary_schedule_year' => 'nullable|integer|min:2000|max:2100',
+            'work_experience.*.monthly_salary' => 'nullable|numeric|min:0|max:99999999.99',
             'training.*.title' => 'nullable|string',
             'training.*.attachment' => 'nullable|file|mimes:pdf|max:5120',
             'others.*.type' => 'nullable|in:Skill,Distinction,Membership',
@@ -396,26 +430,32 @@ class PdsController extends Controller
             'personal.tin_no.regex' => 'The TIN must be 12 digits in this format: 000-000-000-000.',
         ]);
 
-        $employee->load([
-            'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation',
-            'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks',
-            'pdsTrainings', 'pdsOthers', 'pdsQuestionnaire', 'pdsReferences', 'pdsGovId',
-            'pdsSectionReviews',
-        ]);
-
+        $request->merge(['work_experience' => app(\App\Services\SalaryScheduleService::class)->normalizeWorkRows($request->input('work_experience', []))]);
+        $employee = $snapshots->draftForYear($employee, $selectedYear);
         $changedFieldsBySection = $this->changedFieldsBySection($employee, $request);
 
-        DB::transaction(function () use ($employee, $request, $changedFieldsBySection) {
+        if ($selectedYear !== (int) now()->year || $selectedYear !== (int) ($employee->pds_record_year ?? now()->year)) {
+            $snapshots->saveHistoricalDraft($employee, $selectedYear, $request, $changedFieldsBySection);
+            if ($selectedYear === (int) now()->year && $request->has('personal.email_address')) {
+                app(\App\Services\EmployeeEmailService::class)->sync($employee, $request->input('personal.email_address'), true);
+            }
+            AuditLogListener::logActivity('Update PDS', 'Employees', "Updated {$selectedYear} PDS for employee #{$employee->id}.", Auth::user());
+            $this->notifyPdsReviewers($employee, $selectedYear);
+            return redirect()->route('pds.edit', ['year' => $selectedYear])->with('success', "{$selectedYear} PDS saved for HR review.");
+        }
+
+        DB::transaction(function () use ($employee, $request, $changedFieldsBySection, $snapshots) {
+            $employee->lockForUpdate()->findOrFail($employee->id);
+            $employee->forceFill(['pds_record_year' => (int) now()->year])->save();
+            $snapshots->ensureApprovedBaseline($employee);
             $employee->pdsPersonal()->updateOrCreate(['employee_id' => $employee->id], $request->input('personal', []));
+            if ($request->has('personal.email_address')) {
+                app(\App\Services\EmployeeEmailService::class)->sync($employee, $request->input('personal.email_address'), true);
+            }
             $employee->pdsFamily()->updateOrCreate(['employee_id' => $employee->id], $request->input('family', []));
             $employee->pdsQuestionnaire()->updateOrCreate(['employee_id' => $employee->id], $request->input('questionnaire', []));
 
             if ($request->hasFile('pds_photo')) {
-                if ($employee->profile_picture) {
-                    Storage::disk('public_uploads')->delete($employee->profile_picture);
-                    Storage::disk('public')->delete($employee->profile_picture);
-                }
-
                 $employee->update([
                     'profile_picture' => $request->file('pds_photo')->store('profile_pictures', 'public_uploads'),
                 ]);
@@ -423,14 +463,6 @@ class PdsController extends Controller
 
             $govIdData = $request->input('gov_id', []);
             if ($request->hasFile('pds_signature')) {
-                $existingSignature = $employee->pdsGovId?->signature_path;
-                if ($existingSignature && $existingSignature !== $employee->e_signature_path) {
-                    Storage::disk('public')->delete($existingSignature);
-                }
-                if ($employee->e_signature_path) {
-                    Storage::disk('public')->delete($employee->e_signature_path);
-                }
-
                 $signaturePath = $request->file('pds_signature')->store('employee-signatures', 'public');
                 $govIdData['signature_path'] = $signaturePath;
                 $employee->update(['e_signature_path' => $signaturePath]);
@@ -466,16 +498,15 @@ class PdsController extends Controller
                 }
             }
 
+            $existingTrainingPaths = $employee->pdsTrainings()->pluck('attachment_path')->filter();
             $employee->pdsTrainings()->delete();
             foreach ($request->input('training', []) as $index => $train) {
                 if (! empty($train['title'])) {
+                    unset($train['attachment_path']);
                     if ($request->hasFile("training.$index.attachment")) {
-                        if (! empty($train['existing_attachment_path'])) {
-                            Storage::disk('public')->delete($train['existing_attachment_path']);
-                        }
-
-                        $train['attachment_path'] = $request->file("training.$index.attachment")->store('pds-training-attachments', 'public');
+                        $train['attachment_path'] = $request->file("training.$index.attachment")->store('pds-training-attachments', 'documents');
                     } elseif (! empty($train['existing_attachment_path'])) {
+                        abort_unless($existingTrainingPaths->containsStrict($train['existing_attachment_path']), 403);
                         $train['attachment_path'] = $train['existing_attachment_path'];
                     }
 
@@ -512,7 +543,8 @@ class PdsController extends Controller
         });
 
         $employee->unsetRelations();
-        $snapshots->capture($employee, (int) now()->year);
+        $snapshots->capture($snapshots->employeeForYear($employee, (int) now()->year), (int) now()->year);
+        $snapshots->syncLiveDraft($employee, true);
 
         AuditLogListener::logActivity(
             'Update PDS',
@@ -521,7 +553,13 @@ class PdsController extends Controller
             Auth::user()
         );
 
-        // Notify HR users (ADMIN / HRSTAFF) about the PDS update
+        $this->notifyPdsReviewers($employee, $selectedYear);
+        return redirect()->route('pds.edit', $request->has('year') ? ['year' => $selectedYear] : [])->with('success', 'Personal Data Sheet successfully updated.');
+    }
+
+    private function notifyPdsReviewers(Employee $employee, int $year): void
+    {
+        // Notify HR users (ADMIN / HRSTAFF) about the selected year's PDS update.
         $hrUsers = User::whereHas('employee', function ($q) {
             $q->whereIn('account_role', ['ADMIN', 'HRSTAFF', 'admin', 'hrstaff', 'hr staff']);
         })->get();
@@ -532,12 +570,21 @@ class PdsController extends Controller
                 $hrUser->notify(new PdsUpdatedNotification(
                     employee: $employee,
                     title: 'PDS Updated',
-                    message: "{$employeeName} updated their Personal Data Sheet."
+                    message: "{$employeeName} updated their {$year} Personal Data Sheet.",
+                    year: $year,
                 ));
             }
         }
 
-        return redirect()->route('pds.edit')->with('success', 'Personal Data Sheet successfully updated.');
+    }
+
+    public function archiveYear(Employee $employee, int $year, PdsSnapshotService $snapshots): RedirectResponse
+    {
+        abort_unless($snapshots->hasYear($employee, $year), 404);
+        $snapshots->archiveYear($employee, $year);
+        AuditLogListener::logActivity('Archive PDS', 'Employees', "Archived {$year} PDS for employee #{$employee->id}.", auth()->user());
+        return redirect()->route('employees.show', ['employee' => $employee, 'tab' => 'pds', 'pds_year' => $year])
+            ->with('success', "{$year} PDS moved to Archive.");
     }
 
     private function pdsReviewUpdates(Employee $employee): array
@@ -660,6 +707,7 @@ class PdsController extends Controller
         $review->status = 'pending';
         $review->changed_fields = array_values(array_unique(array_merge($existingFields, $changedFields)));
         $review->reviewed_by_id = null;
+        $review->remarks = null;
         $review->save();
     }
 
@@ -838,7 +886,7 @@ class PdsController extends Controller
 
     private function workFieldLabels(): array
     {
-        return ['date_from' => 'Work date from', 'date_to' => 'Work date to', 'position_title' => 'Position title', 'company' => 'Department/agency/company', 'monthly_salary' => 'Monthly salary', 'salary_grade' => 'Salary grade', 'appointment_status' => 'Appointment status', 'is_gov_service' => 'Government service'];
+        return ['date_from' => 'Work date from', 'date_to' => 'Work date to', 'position_title' => 'Position title', 'company' => 'Department/agency/company', 'monthly_salary' => 'Monthly salary', 'salary_grade' => 'Salary grade', 'salary_step' => 'Salary step', 'salary_schedule_year' => 'Salary schedule year', 'appointment_status' => 'Appointment status', 'is_gov_service' => 'Government service'];
     }
 
     private function voluntaryFieldLabels(): array

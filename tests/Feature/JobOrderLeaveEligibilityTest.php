@@ -44,3 +44,17 @@ test('regular employees retain access to standard and wellness leave types', fun
     expect(jobOrderIsEligibleFor($wellness, $employee))->toBeTrue()
         ->and(jobOrderIsEligibleFor($vacation, $employee))->toBeTrue();
 });
+
+test('default credit cards include wellness and show wellness alone for job order employees', function () {
+    foreach (['Vacation Leave', 'Sick Leave', 'Mandatory/Force Leave', 'Special Privilege Leave', 'Wellness Leave'] as $name) {
+        LeaveType::create(['name' => $name, 'is_active' => true, 'days_per_year' => 5]);
+    }
+    foreach (['Regular' => 5, 'Contract of Service' => 5, 'Job Order' => 1] as $status => $count) {
+        $user = \App\Models\User::factory()->create(['must_change_password' => false]);
+        $employee = Employee::factory()->for($user)->create(['account_role' => 'employee', 'employment_status' => $status]);
+        $response = $this->actingAs($user)->get(route('leaves.index', ['tab' => 'credits']))->assertOk();
+        $cards = $response->viewData('creditCards');
+        expect($cards)->toHaveCount($count)->and($cards->pluck('leaveType.name')->all())->toContain('Wellness Leave');
+        if ($status === 'Job Order') expect($cards->pluck('leaveType.name')->all())->toBe(['Wellness Leave']);
+    }
+});

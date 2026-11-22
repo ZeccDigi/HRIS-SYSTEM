@@ -6,8 +6,10 @@
         $selectedSaln = $selectedSaln ?? null;
         $salns = $salns ?? collect();
         $isSalnIndex = $isSalnIndex ?? false;
-        $declarantDefaults = $selectedSaln?->declarant_info ?? [];
-        $spouseDefaults = $selectedSaln?->spouse_info ?? [];
+        $pdsDefaultsService = app(\App\Services\SalnPdsDefaultsService::class);
+        $pdsDefaults = $pdsDefaultsService->defaults($employee, (int) $selectedYear);
+        $declarantDefaults = $pdsDefaultsService->merge($selectedSaln?->declarant_info, $pdsDefaults['declarant_info']);
+        $spouseDefaults = $pdsDefaultsService->merge($selectedSaln?->spouse_info, $pdsDefaults['spouse_info']);
 
         $oldFilingType = old('type_of_filing', $selectedSaln?->type_of_filing ?? 'annual_filing');
         $oldAsOfDate = old('as_of_date', $selectedSaln?->as_of_date?->format('Y-m-d'));
@@ -38,9 +40,9 @@
         .saln-entry-page label.block > span:first-child,
         .saln-entry-page th {
             color: #64748b;
-            font-size: 10px;
-            font-weight: 900;
-            letter-spacing: .06em;
+            font-size: 10px !important;
+            font-weight: 700;
+            letter-spacing: .03em;
             text-transform: uppercase;
         }
 
@@ -50,25 +52,44 @@
         }
 
         /* Match the PDS field appearance without changing typography */
+        .saln-entry-page input:not([type]),
         .saln-entry-page input[type="text"],
         .saln-entry-page input[type="number"],
         .saln-entry-page input[type="date"],
         .saln-entry-page textarea,
-        .saln-entry-page select {
+        .saln-entry-page select:not(#saln-edit-year) {
             border: 0 !important;
             border-bottom: 1px dashed #94a3b8 !important;
             border-radius: 6px !important;
-            background: #eef2ff !important;
+            background-color: #eef2ff !important;
             box-shadow: none !important;
             padding: .5rem .7rem !important;
             color: #475569;
-            font-size: .875rem;
-            font-weight: 700;
+            font-size: 12px !important;
+            font-weight: 500;
+        }
+
+        #salnForm input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]),
+        #salnForm select {
+            box-sizing: border-box;
+            height: 34px !important;
+            min-height: 34px !important;
+            font-size: 12px !important;
+            line-height: 18px !important;
+            font-weight: 500 !important;
+            padding: 0.375rem 0.5rem !important;
+        }
+
+        #salnForm select {
+            appearance: auto !important;
+            -webkit-appearance: menulist !important;
+            background-image: none !important;
+            padding-right: 1.5rem !important;
         }
 
         .saln-entry-page input:focus,
         .saln-entry-page textarea:focus,
-        .saln-entry-page select:focus {
+        .saln-entry-page select:not(#saln-edit-year):focus {
             border-bottom-color: #2b428f !important;
             outline: 0 !important;
             box-shadow: none !important;
@@ -141,14 +162,14 @@
             border: 1px solid #e2e8f0;
             border-radius: .75rem;
             background: #f8fafc;
-            padding: 1.5rem;
+            padding: 1rem;
         }
 
         .saln-entry-page .saln-subsection-title {
             color: #111827;
-            font-size: .78rem;
-            font-weight: 900;
-            letter-spacing: .06em;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .03em;
             text-transform: uppercase;
         }
 
@@ -218,7 +239,23 @@
         }
 
         .saln-entry-page .pds-form-body {
-            padding: 2rem !important;
+            padding: 1rem !important;
+            font-size: 13px;
+        }
+
+        .saln-entry-page [x-ref="salnTabs"] > button {
+            font-size: 11px !important;
+            font-weight: 700;
+            letter-spacing: .06em;
+        }
+
+        .saln-entry-page #salnForm .text-sm {
+            font-size: 12px !important;
+        }
+
+        .saln-entry-page #salnForm .text-xs,
+        .saln-entry-page .saln-table-heading button {
+            font-size: 11px !important;
         }
 
         @media (max-width: 640px) {
@@ -229,7 +266,7 @@
     </style>
 
     <div
-        class="saln-entry-page pds-line-page min-h-screen bg-white py-8 font-sans"
+        class="saln-entry-page pds-line-page min-h-screen bg-slate-50 px-2 py-3 font-sans"
         x-data="salnForm(@js([
             'children' => old('children', $selectedSaln?->children ?? []),
             'real_properties' => old('real_properties', $selectedSaln?->real_properties ?? []),
@@ -246,7 +283,7 @@
             'exit_date' => $oldExitDate,
         ]))"
     >
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto w-full min-w-0">
             <div class="mb-5 flex items-center justify-between gap-3">
                 <a href="{{ route('salns.index', ['year' => $selectedYear]) }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,6 +291,15 @@
                     </svg>
                     Back
                 </a>
+                <form method="GET" action="{{ route('salns.index') }}" class="ml-auto flex items-center gap-2">
+                    <input type="hidden" name="edit" value="1">
+                    <label for="saln-edit-year" class="text-sm font-semibold text-gray-700">Year</label>
+                    <select id="saln-edit-year" name="year" onchange="this.form.submit()" class="h-10 w-28 rounded-lg border-gray-300 bg-white pl-4 pr-10 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        @foreach($documentYears as $year)
+                            <option value="{{ $year }}" @selected((int) $selectedYear === (int) $year)>{{ $year }}</option>
+                        @endforeach
+                    </select>
+                </form>
                 <button
                     type="submit"
                     form="salnForm"
@@ -302,7 +348,7 @@
                 </div>
                 </div>
 
-                <form id="salnForm" method="POST" action="{{ route('salns.store') }}" class="pds-form-body px-8 pb-8 pt-8">
+                <form id="salnForm" method="POST" action="{{ route('salns.store') }}" class="pds-form-body mt-4 rounded-xl border border-slate-200 bg-white px-3 pb-6 pt-4 shadow-sm sm:px-4">
                     @csrf
                     @if($selectedSaln)
                         <input type="hidden" name="saln_id" value="{{ $selectedSaln->id }}">
@@ -457,11 +503,11 @@
                                                 <td class="px-4 py-3"><input :name="'real_properties['+index+'][description]'" x-model="row.description" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
                                                 <td class="px-4 py-3"><select :name="'real_properties['+index+'][kind]'" x-model="row.kind" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"><option value=""></option>@foreach($salnOptionSets['property_kinds'] as $option)<option value="{{ $option->value }}">{{ $option->label }}</option>@endforeach</select></td>
                                                 <td class="px-4 py-3"><input :name="'real_properties['+index+'][location]'" x-model="row.location" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
-                                                <td class="px-4 py-3"><input type="number" step="0.01" min="0" :name="'real_properties['+index+'][assessed_value]'" x-model="row.assessed_value" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
-                                                <td class="px-4 py-3"><input type="number" step="0.01" min="0" :name="'real_properties['+index+'][fair_market_value]'" x-model="row.fair_market_value" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
+                                                <td class="px-4 py-3"><input type="text" inputmode="decimal" :name="'real_properties['+index+'][assessed_value]'" x-money="row.assessed_value" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
+                                                <td class="px-4 py-3"><input type="text" inputmode="decimal" :name="'real_properties['+index+'][fair_market_value]'" x-money="row.fair_market_value" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
                                                 <td class="px-4 py-3"><input maxlength="4" :name="'real_properties['+index+'][acquisition_year]'" x-model="row.acquisition_year" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
                                                 <td class="px-4 py-3"><select :name="'real_properties['+index+'][acquisition_mode]'" x-model="row.acquisition_mode" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"><option value=""></option>@foreach($salnOptionSets['acquisition_modes'] as $option)<option value="{{ $option->value }}">{{ $option->label }}</option>@endforeach</select></td>
-                                                <td class="px-4 py-3"><input type="number" step="0.01" min="0" :name="'real_properties['+index+'][acquisition_cost]'" x-model="row.acquisition_cost" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
+                                                <td class="px-4 py-3"><input type="text" inputmode="decimal" :name="'real_properties['+index+'][acquisition_cost]'" x-money="row.acquisition_cost" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
                                                 <td class="px-4 py-3 text-right"><button type="button" @click="removeRealProperty(index)" class="text-sm font-bold text-red-500">Remove</button></td>
                                             </tr>
                                         </template>
@@ -491,7 +537,7 @@
                                             <tr>
                                                 <td class="px-4 py-3"><input :name="'personal_properties['+index+'][description]'" x-model="row.description" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
                                                 <td class="px-4 py-3"><input maxlength="4" :name="'personal_properties['+index+'][acquisition_year]'" x-model="row.acquisition_year" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
-                                                <td class="px-4 py-3"><input type="number" step="0.01" min="0" :name="'personal_properties['+index+'][acquisition_cost]'" x-model="row.acquisition_cost" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
+                                                <td class="px-4 py-3"><input type="text" inputmode="decimal" :name="'personal_properties['+index+'][acquisition_cost]'" x-money="row.acquisition_cost" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
                                                 <td class="px-4 py-3 text-right"><button type="button" @click="removePersonalProperty(index)" class="text-sm font-bold text-red-500">Remove</button></td>
                                             </tr>
                                         </template>
@@ -527,7 +573,7 @@
                                             <tr>
                                                 <td class="px-4 py-3"><input :name="'liabilities['+index+'][nature]'" x-model="row.nature" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
                                                 <td class="px-4 py-3"><input :name="'liabilities['+index+'][creditor]'" x-model="row.creditor" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
-                                                <td class="px-4 py-3"><input type="number" step="0.01" min="0" :name="'liabilities['+index+'][outstanding_balance]'" x-model="row.outstanding_balance" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
+                                                <td class="px-4 py-3"><input type="text" inputmode="decimal" :name="'liabilities['+index+'][outstanding_balance]'" x-money="row.outstanding_balance" class="w-full border-0 border-b border-dashed border-slate-300 bg-transparent px-0 py-1 outline-none focus:border-[#2b428f] focus:ring-0"></td>
                                                 <td class="px-4 py-3 text-right"><button type="button" @click="removeLiability(index)" class="text-sm font-bold text-red-500">Remove</button></td>
                                             </tr>
                                         </template>

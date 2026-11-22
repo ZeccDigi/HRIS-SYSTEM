@@ -398,8 +398,8 @@ class Cs212PdfGenerator
             $this->writeAt($pdf, $c['to'], $y, 20, $work->date_to ? PdsFormatter::date($work->date_to) : 'PRESENT');
             $this->writeAt($pdf, $c['position'], $y, 72, $work->position_title);
             $this->writeAt($pdf, $c['company'], $y, 75, $work->company);
-            $this->writeAt($pdf, $c['salary'], $y, 12, PdsFormatter::val($work->monthly_salary));
-            $this->writeAt($pdf, $c['grade'], $y, 16, PdsFormatter::val($work->salary_grade));
+            $this->writeAt($pdf, $c['salary'], $y, 12, is_numeric($work->monthly_salary) ? number_format((float) $work->monthly_salary, 2) : PdsFormatter::val($work->monthly_salary));
+            $this->writeAt($pdf, $c['grade'], $y, 16, PdsFormatter::val($work->salary_grade.($work->salary_step ? ' / '.$work->salary_step : '')));
             $this->writeAt($pdf, $c['status'], $y, 22, PdsFormatter::val($work->appointment_status));
             $this->writeAt($pdf, $c['gov'], $y, 12, $work->is_gov_service ? 'Y' : 'N');
             $y += $wCfg['row_h'];

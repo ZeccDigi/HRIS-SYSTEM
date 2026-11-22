@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="title">{{ __('Leave Records History') }}</x-slot>
+    <x-slot name="title">{{ request('tab') === 'monetization' ? __('Manage Monetization') : __('Leave Records History') }}</x-slot>
 
     @php
         $currentYear = now()->year;
@@ -34,6 +34,7 @@
                 class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:flex-row sm:items-center"
             >
                 <input type="hidden" name="per_page" value="{{ request('per_page', 5) }}">
+                @if(request('tab') === 'monetization')<input type="hidden" name="tab" value="monetization">@endif
                 {{-- Search --}}
                 <div class="relative min-w-0 sm:flex-1">
                     <label

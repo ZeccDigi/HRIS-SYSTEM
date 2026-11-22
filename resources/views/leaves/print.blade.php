@@ -673,17 +673,19 @@
     $leaveTypeLower = strtolower($leaveType);
     $reason = trim((string) $leaveRequest->reason);
     $reasonLower = strtolower($reason);
+    $isMonetization = (bool) $leaveRequest->is_monetization || str_contains($reasonLower, 'monetization');
     $detailType = trim((string) $leaveRequest->leave_detail_type);
     $detailText = trim((string) $leaveRequest->leave_detail);
     $hasStructuredDetail = $detailType !== '';
-    $start = Carbon::parse($leaveRequest->start_date);
-    $end = Carbon::parse($leaveRequest->end_date);
+    $start = Carbon::parse($leaveRequest->start_date ?? $leaveRequest->date_filed);
+    $end = Carbon::parse($leaveRequest->end_date ?? $leaveRequest->date_filed);
     $dateFiled = $leaveRequest->date_filed ? Carbon::parse($leaveRequest->date_filed)->format('F j, Y') : '';
     $inclusiveDates = $start->isSameDay($end)
         ? $start->format('F j, Y')
         : $start->format('M. j, Y') . ' - ' . $end->format('M. j, Y');
     $duration = (float) $leaveRequest->duration;
     $durationText = fmod($duration, 1.0) === 0.0 ? (string) (int) $duration : number_format($duration, 1);
+    if ($isMonetization) $inclusiveDates = '';
     $year = $start->year;
     $employee?->ensureLeaveCredits($year);
     $credits = $employee?->leaveCredits ?? collect();
@@ -700,6 +702,16 @@
     $sickEarned = number_format($sickCurrent, 1);
     $vacationBalance = number_format($vacationCurrent - $vacationLessValue, 1);
     $sickBalance = number_format($sickCurrent - $sickLessValue, 1);
+    if ($isMonetization) {
+        $before = (float) ($leaveRequest->monetization_credit_before ?? ($isSick ? $sickCurrent : $vacationCurrent));
+        $after = (float) ($leaveRequest->monetization_credit_after ?? max(0, $before - $duration));
+        $vacationEarned = number_format($isSick ? $vacationCurrent : $before, 3);
+        $sickEarned = number_format($isSick ? $before : $sickCurrent, 3);
+        $vacationBalance = number_format($isSick ? $vacationCurrent : $after, 3);
+        $sickBalance = number_format($isSick ? $after : $sickCurrent, 3);
+        $vacationLess = !$isSick ? number_format($duration, 3) : '';
+        $sickLess = $isSick ? number_format($duration, 3) : '';
+    }
     $formatName = fn ($person) => trim(($person?->firstname ?? '') . ' ' . ($person?->middlename ? Str::substr($person->middlename, 0, 1) . '. ' : '') . ($person?->lastname ?? ''));
     $chiefName = $formatName($leaveRequest->chief) ?: 'LOUIE JAY C. LOSARIA';
     $hrName = $formatName($leaveRequest->hrstaff) ?: 'MANILYN JOY P. VELITA';
@@ -720,12 +732,12 @@
     ])->filter()->implode(' '));
     $check = fn (bool $condition) => $condition ? '✓' : '';
     $typeCheck = fn (string $needle) => str_contains($leaveTypeLower, $needle);
-    $isVacationLike = $typeCheck('vacation') || $typeCheck('special privilege');
+    $isVacationLike = !$isMonetization && ($typeCheck('vacation') || $typeCheck('special privilege'));
     $isAbroad = $hasStructuredDetail ? $detailType === 'abroad' : str_contains($reasonLower, 'abroad');
     $isHospital = $hasStructuredDetail ? $detailType === 'in_hospital' : str_contains($reasonLower, 'hospital');
     $isMaster = $hasStructuredDetail ? $detailType === 'masters_degree' : str_contains($reasonLower, 'master');
     $isBar = $hasStructuredDetail ? $detailType === 'board_review' : (str_contains($reasonLower, 'bar') || str_contains($reasonLower, 'board'));
-    $isMonetization = str_contains($reasonLower, 'monetization') || str_contains($leaveTypeLower, 'monetization');
+    $isMonetization = $isMonetization || str_contains($leaveTypeLower, 'monetization');
     $isTerminal = str_contains($reasonLower, 'terminal') || str_contains($leaveTypeLower, 'terminal');
 @endphp
 
@@ -811,7 +823,7 @@
                         </div>
                         <div class="field-group">
                             <span>5. SALARY</span>
-                            <span class="line value">{{ $employee?->salary ?? 'N/A' }}</span>
+                            <span class="line value">{{ $isMonetization && $leaveRequest->monetization_salary ? '₱'.number_format((float) $leaveRequest->monetization_salary, 2) : ($employee?->salary ?? 'N/A') }}</span>
                         </div>
                     </div>
                 </td>
@@ -859,8 +871,8 @@
                     </div>
                     <div class="detail-block compact">
                         <div class="detail-title">In case of Sick Leave:</div>
-                        <div class="detail-row"><span class="box">{{ $check($isSick && $isHospital) }}</span><span class="detail-text">In Hospital (Specify Illness)</span><span class="detail-line">{{ $isSick && $isHospital ? ($detailText ?: $reason) : '' }}</span></div>
-                        <div class="detail-row"><span class="box">{{ $check($isSick && ! $isHospital) }}</span><span class="detail-text">Out Patient (Specify Illness)</span><span class="detail-line">{{ $isSick && ! $isHospital ? ($detailText ?: $reason) : '' }}</span></div>
+                        <div class="detail-row"><span class="box">{{ $check(!$isMonetization && $isSick && $isHospital) }}</span><span class="detail-text">In Hospital (Specify Illness)</span><span class="detail-line">{{ !$isMonetization && $isSick && $isHospital ? ($detailText ?: $reason) : '' }}</span></div>
+                        <div class="detail-row"><span class="box">{{ $check(!$isMonetization && $isSick && ! $isHospital) }}</span><span class="detail-text">Out Patient (Specify Illness)</span><span class="detail-line">{{ !$isMonetization && $isSick && ! $isHospital ? ($detailText ?: $reason) : '' }}</span></div>
                         <span class="full-detail-line"></span>
                     </div>
                     <div class="detail-block compact">
@@ -892,7 +904,7 @@
             <tr>
                 <td>
                     <div class="workday-label">6.C&nbsp;&nbsp;NUMBER OF WORKING DAYS APPLIED FOR</div>
-                    <span class="workday-value">{{ $durationText }}</span>
+                    <span class="workday-value">{{ $isMonetization ? '' : $durationText }}</span>
                     <div class="inclusive-label">INCLUSIVE DATES</div>
                     <span class="workday-value">{{ $inclusiveDates }}</span>
                 </td>
@@ -978,8 +990,8 @@
             <tr>
                 <td>
                     <div>7.C APPROVED FOR:</div>
-                    <div class="approved-row"><span class="approved-line">{{ $isApproved && $leaveRequest->is_paid ? $durationText : '' }}</span><span>days with pay</span></div>
-                    <div class="approved-row"><span class="approved-line">{{ $isApproved && ! $leaveRequest->is_paid ? $durationText : '' }}</span><span>days without pay</span></div>
+                    <div class="approved-row"><span class="approved-line">{{ !$isMonetization && $isApproved && $leaveRequest->is_paid ? $durationText : '' }}</span><span>days with pay</span></div>
+                    <div class="approved-row"><span class="approved-line">{{ !$isMonetization && $isApproved && ! $leaveRequest->is_paid ? $durationText : '' }}</span><span>days without pay</span></div>
                     <div class="approved-row"><span class="approved-line"></span><span>others (Specify)</span></div>
                 </td>
                 <td>

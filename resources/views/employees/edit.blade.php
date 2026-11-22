@@ -41,7 +41,7 @@
                                 </div>
                                 <div>
                                     <x-input-label for="contact_number" :value="__('Contact Number')" />
-                                    <x-text-input id="contact_number" name="contact_number" type="text" class="mt-1 block w-full" :value="old('contact_number', $employee->contact_number)" placeholder="e.g., 09123456789" />
+                                    <x-text-input id="contact_number" name="contact_number" inputmode="numeric" minlength="11" maxlength="11" pattern="[0-9]{11}" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)" type="text" class="mt-1 block w-full" :value="old('contact_number', $employee->contact_number)" placeholder="e.g., 09123456789" />
                                     <x-input-error class="mt-2" :messages="$errors->get('contact_number')" />
                                 </div>
                                 <div>
@@ -119,6 +119,7 @@
                             </div>
                         </div>
 
+                        @include('employees.partials.salary-fields', ['employee' => $employee])
                         <div class="pt-4">
                             <div class="mb-5">
                                 <h3 class="text-lg font-medium text-gray-900 mb-1">{{ __('Account Access') }}</h3>

@@ -27,6 +27,7 @@ test('employee submits structured post activity report and views the official fo
     $this->travelTo(\Carbon\Carbon::parse('2026-11-17 09:00:00', 'Asia/Manila'));
     Notification::fake();
     Storage::fake('public');
+    \Illuminate\Support\Facades\Storage::fake('documents');
     [$user, $employee] = travelReportEmployee();
     travelReportEmployee('Division Head', 'chief');
 
@@ -70,7 +71,7 @@ test('employee submits structured post activity report and views the official fo
 
     $travelOrder->refresh();
     expect($travelOrder->tar_status)->toBe('submitted')
-        ->and($travelOrder->tar_review_status)->toBe('pending_hr')
+        ->and($travelOrder->tar_review_status)->toBe('pending_chief')
         ->and($travelOrder->tar_activity)->toBe('Regional coordination meeting')
         ->and($travelOrder->tar_activity_date?->toDateString())->toBe('2026-11-05')
         ->and($travelOrder->tar_venue)->toBe('Davao City')
@@ -104,7 +105,7 @@ test('submitted TAR cannot be overwritten unless returned for correction', funct
         'status' => 'approved',
         'tar_status' => 'submitted',
         'tar_submitted_at' => now(),
-        'tar_review_status' => 'pending_hr',
+        'tar_review_status' => 'pending_chief',
         'tar_objectives' => 'Original objective',
     ]);
 
@@ -136,7 +137,7 @@ test('returned TAR can be corrected and resubmitted', function () {
         'tar_status' => 'submitted',
         'tar_submitted_at' => now()->subDay(),
         'tar_review_status' => 'returned',
-        'tar_hr_status' => 'returned',
+        'tar_chief_status' => 'returned',
     ]);
 
     $this->actingAs($user)->post(route('travel-orders.submit-tar', $travelOrder), [
@@ -149,8 +150,8 @@ test('returned TAR can be corrected and resubmitted', function () {
     ])->assertRedirect(route('travel-orders.index'));
 
     $travelOrder->refresh();
-    expect($travelOrder->tar_review_status)->toBe('pending_hr')
-        ->and($travelOrder->tar_hr_status)->toBe('pending')
+    expect($travelOrder->tar_review_status)->toBe('pending_chief')
+        ->and($travelOrder->tar_hr_status)->toBe('not_applicable')
         ->and($travelOrder->tar_objectives)->toBe('Corrected objective');
 });
 
@@ -182,10 +183,10 @@ test('regional director cannot approve TA before record officer review', functio
         ->and($travelOrder->approved_by_regionaldirector)->toBeNull();
 });
 
-test('post activity report follows hr division chief and regional director approval', function () {
+test('post activity report follows division chief and regional director approval', function () {
     Notification::fake();
     [$employeeUser, $employee] = travelReportEmployee('Report Owner');
-    [$hrUser, $hrEmployee] = travelReportEmployee('HR Reviewer', 'hrstaff');
+    [$hrUser] = travelReportEmployee('HR Reviewer', 'hrstaff');
     [$chiefUser, $chiefEmployee] = travelReportEmployee('Division Chief', 'chief');
     [$rdUser, $rdEmployee] = travelReportEmployee('Regional Director', 'regionaldirector');
 
@@ -200,18 +201,16 @@ test('post activity report follows hr division chief and regional director appro
         'status' => 'approved',
         'tar_status' => 'submitted',
         'tar_submitted_at' => now(),
-        'tar_review_status' => 'pending_hr',
+        'tar_review_status' => 'pending_chief',
     ]);
 
     $this->actingAs($hrUser)->patch(route('travel-orders.tar.review', $travelOrder), [
         'action' => 'approve',
         'remarks' => 'Documents are complete.',
-    ])->assertRedirect(route('travel-orders.ar.show', $travelOrder));
+    ])->assertForbidden();
 
     $travelOrder->refresh();
-    expect($travelOrder->tar_hr_status)->toBe('approved')
-        ->and($travelOrder->tar_reviewed_by_hr)->toBe($hrEmployee->id)
-        ->and($travelOrder->tar_review_status)->toBe('pending_chief');
+    expect($travelOrder->tar_review_status)->toBe('pending_chief');
 
     $this->actingAs($chiefUser)->patch(route('travel-orders.tar.review', $travelOrder), [
         'action' => 'approve',
@@ -252,7 +251,7 @@ test('division chief cannot review a report from another division', function () 
         'tar_status' => 'submitted',
         'tar_submitted_at' => now(),
         'tar_review_status' => 'pending_chief',
-        'tar_hr_status' => 'approved',
+        'tar_hr_status' => 'not_applicable',
     ]);
 
     $this->actingAs($chiefUser)->patch(route('travel-orders.tar.review', $travelOrder), [

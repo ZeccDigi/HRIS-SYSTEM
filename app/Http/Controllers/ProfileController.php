@@ -26,15 +26,12 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
-
-        $request->user()->save();
-
-        if ($request->user()->employee) {
-            $request->user()->employee->update([
-                'notification_email' => $request->validated('notification_email'),
-            ]);
-        }
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
+            $request->user()->update(['name' => $request->validated('name')]);
+            if ($employee = $request->user()->employee) {
+                app(\App\Services\EmployeeEmailService::class)->sync($employee, $request->validated('notification_email'));
+            }
+        });
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }

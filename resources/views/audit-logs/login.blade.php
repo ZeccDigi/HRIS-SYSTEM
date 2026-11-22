@@ -289,7 +289,7 @@
                                             {{ $audit->login_at ? $audit->login_at->format('M d, Y') : '-' }}
                                         </td>
                                         <td class="px-3 py-2.5 text-xs tabular-nums text-gray-500">
-                                            {{ $audit->login_at ? $audit->login_at->format('h:i:s') . '.00 ' . $audit->login_at->format('A') : '-' }}
+                                            {{ $audit->login_at ? $audit->login_at->format('h.i.s A') : '-' }}
                                         </td>
                                         <td class="px-3 py-2.5 text-xs font-semibold tabular-nums text-slate-700">
                                             @if($audit->status === 'successful')
@@ -302,8 +302,8 @@
                                         </td>
                                         <td class="px-3 py-2.5 text-center">
                                             @if($audit->status === 'successful')
-                                                <span class="px-2 py-0.5 inline-flex text-[10px] leading-5 font-semibold rounded-full bg-emerald-100 text-emerald-800">
-                                                    {{ __('Successful') }}
+                                                <span class="px-2 py-0.5 inline-flex text-[10px] leading-5 font-semibold rounded-full {{ $audit->logout_at ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800' }}">
+                                                    {{ $audit->logout_at ? __('LOGOUT') : __('LOGIN') }}
                                                 </span>
                                             @else
                                                 <span class="px-2 py-0.5 inline-flex text-[10px] leading-5 font-semibold rounded-full bg-red-100 text-red-800">
@@ -352,11 +352,6 @@
             <!-- TAB 2: ACTIVITY AUDIT PANEL -->
             <div class="w-full max-w-full min-w-0 overflow-hidden bg-white shadow-sm sm:rounded-lg border border-gray-100" x-show="tab === 'activity'" x-cloak>
                 <div class="min-w-0 p-4 text-gray-900">
-                    <div class="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900">
-                        <p class="font-bold">HR privacy guidance</p>
-                        <p class="mt-1">Use page-visit records only for legitimate HR, security, and operational review. Time shown is an approximate active-page duration: counting pauses when the tab is hidden or after {{ (int) ceil(config('activity-tracking.idle_seconds', 300) / 60) }} minutes without interaction. Page-visit records move to Archive after {{ (int) config('activity-tracking.retention_days', 365) }} days.</p>
-                    </div>
-                    
                     <!-- Search, Filter & Sort Bar -->
                     <form id="activityFilterForm" method="GET" action="{{ route('audit-logs.activity') }}" class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/70 p-2 sm:flex-row sm:items-center">
                         <input type="hidden" name="date" value="{{ $selectedDate }}" />
@@ -432,7 +427,7 @@
                                             {{ $act->created_at ? $act->created_at->format('M d, Y') : '-' }}
                                         </td>
                                         <td class="px-3 py-2 text-xs tabular-nums text-gray-500">
-                                            {{ $act->created_at ? $act->created_at->format('h:i:s') . '.00 ' . $act->created_at->format('A') : '-' }}
+                                            {{ $act->created_at ? $act->created_at->format('h.i.s A') : '-' }}
                                         </td>
                                         <td class="px-3 py-2 text-xs font-semibold tabular-nums text-slate-700">
                                             {{ $act->page_duration }}

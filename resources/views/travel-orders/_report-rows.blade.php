@@ -1,14 +1,20 @@
 @forelse($orders as $order)
     @php
         $employeeName = trim(($order->employee?->firstname ?? '') . ' ' . ($order->employee?->lastname ?? '')) ?: 'N/A';
-        $reviewStage = $order->tar_review_status ?: 'pending_hr';
+        $reviewStage = $order->tar_review_status ?: 'pending_chief';
         $stageLabels = [
-            'pending_hr' => 'Pending HR',
-            'pending_chief' => 'Pending Division Chief',
-            'pending_rd' => 'Pending Regional Director',
+            'pending_chief' => 'Pending',
+            'pending_rd' => 'Pending',
             'approved' => 'Approved',
             'returned' => 'Returned',
         ];
+        $approvalDotClass = fn (string $status) => match (strtolower($status)) {
+            'approved' => 'bg-green-500',
+            'returned', 'rejected' => 'bg-red-500',
+            default => 'bg-gray-300',
+        };
+        $chiefStatus = strtolower((string) ($order->tar_chief_status ?: 'pending'));
+        $regionalDirectorStatus = strtolower((string) ($order->tar_rd_status ?: 'pending'));
         $searchText = strtolower(implode(' ', array_filter([
             $order->ta_number,
             $employeeName,
@@ -25,11 +31,20 @@
         data-status="{{ strtolower((string) $order->status) }}"
         data-filed="{{ $order->tar_submitted_at?->timestamp ?? $order->created_at?->timestamp ?? 0 }}"
     >
-        <td class="truncate px-2 py-2.5 align-middle text-xs text-slate-600">{{ $order->tar_submitted_at?->format('M d, Y') ?? 'N/A' }}</td>
-        <td class="truncate px-2 py-2.5 align-middle text-xs font-bold text-slate-900">{{ $order->ta_number }}</td>
-        <td class="truncate px-2 py-2.5 align-middle text-xs font-semibold text-slate-900" title="{{ $employeeName }}">{{ $employeeName }}</td>
-        <td class="truncate px-2 py-2.5 align-middle text-xs text-slate-600" title="{{ $order->employee?->division_abbreviation ?: $order->employee?->division ?: 'N/A' }}">{{ $order->employee?->division_abbreviation ?: $order->employee?->division ?: 'N/A' }}</td>
-        <td class="truncate px-2 py-2.5 align-middle text-xs text-slate-600">{{ $order->tar_deadline?->format('M d, Y') ?? 'N/A' }}</td>
+        <td class="px-2 py-2.5 align-middle text-xs leading-5 text-slate-600">{{ $order->tar_submitted_at?->format('M d, Y') ?? 'N/A' }}</td>
+        <td class="break-words px-2 py-2.5 align-middle text-xs font-bold leading-5 text-slate-900">{{ $order->ta_number }}</td>
+        <td class="break-words px-2 py-2.5 align-middle text-xs font-semibold leading-5 text-slate-900" title="{{ $employeeName }}">{{ $employeeName }}</td>
+        <td class="px-2 py-2.5 text-center align-middle">
+            <div class="flex justify-center">
+                <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($chiefStatus) }}" title="{{ __('Chief') }}: {{ ucfirst($chiefStatus) }}"></span>
+            </div>
+        </td>
+        <td class="px-2 py-2.5 text-center align-middle">
+            <div class="flex justify-center">
+                <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $approvalDotClass($regionalDirectorStatus) }}" title="{{ __('Regional Director') }}: {{ ucfirst($regionalDirectorStatus) }}"></span>
+            </div>
+        </td>
+        <td class="px-2 py-2.5 align-middle text-xs leading-5 text-slate-600">{{ $order->visible_tar_deadline?->format('M d, Y') ?? '—' }}</td>
         <td class="px-2 py-2.5 align-middle">
             <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider {{ $reviewStage === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : ($reviewStage === 'returned' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-700') }}">
                 {{ $stageLabels[$reviewStage] ?? ucfirst(str_replace('_', ' ', $reviewStage)) }}
@@ -42,5 +57,5 @@
         </td>
     </tr>
 @empty
-    <tr><td colspan="7" class="px-6 py-10 text-center text-sm text-gray-500">{{ __('No TAR records have been submitted.') }}</td></tr>
+    <tr><td colspan="8" class="px-6 py-10 text-center text-sm text-gray-500">{{ __('No TAR records have been submitted.') }}</td></tr>
 @endforelse

@@ -19,6 +19,7 @@ class LeaveRequest extends Model
         'leave_detail_type',
         'leave_detail',
         'attachment_path',
+        'attachment_original_name',
         'status',
         'approved_by_chief',
         'chief_status',
@@ -32,6 +33,11 @@ class LeaveRequest extends Model
         'remarks',
         'is_paid',
         'commutation_requested',
+        'is_monetization', 'monetization_basis', 'monetization_days', 'monetization_salary',
+        'monetization_amount', 'monetization_factor', 'monetization_justification',
+        'monetization_credit_before', 'monetization_credit_after',
+        'monetization_verified_at', 'monetization_posted_at',
+        'monetization_salary_grade', 'monetization_salary_step', 'monetization_salary_year',
     ];
 
     public function canBeEditedBy(?Employee $employee): bool
@@ -80,8 +86,10 @@ class LeaveRequest extends Model
     /**
      * Get the duration of the leave request excluding weekends and holidays.
      */
-    public function getDurationAttribute(): int
+    public function getDurationAttribute(): float
     {
+        if ($this->is_monetization && $this->monetization_days !== null) return (float) $this->monetization_days;
+        if (!$this->start_date || !$this->end_date) return 0;
         return static::calculateBusinessDays($this->start_date, $this->end_date);
     }
 
@@ -117,6 +125,11 @@ class LeaveRequest extends Model
     protected function casts(): array
     {
         return [
+            'is_monetization' => 'boolean',
+            'monetization_days' => 'decimal:3', 'monetization_salary' => 'decimal:2',
+            'monetization_amount' => 'decimal:2', 'monetization_factor' => 'decimal:7',
+            'monetization_credit_before' => 'decimal:3', 'monetization_credit_after' => 'decimal:3',
+            'monetization_verified_at' => 'datetime', 'monetization_posted_at' => 'datetime',
             'start_date' => 'date',
             'end_date' => 'date',
             'date_filed' => 'datetime',

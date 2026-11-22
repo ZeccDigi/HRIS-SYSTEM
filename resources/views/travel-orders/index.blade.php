@@ -154,17 +154,21 @@
                                         $rdStatus = strtolower((string) ($order->rd_status ?: 'pending'));
                                         $mainStatus = strtolower((string) ($order->status ?: 'pending'));
                                         $isTravelOrderOwner = $order->employee_id === auth()->user()->employee?->id;
+                                        $isTarRequired = (bool) ($order->is_tar_required ?? true);
                                         $canSubmitTar = $isTravelOrderOwner
                                             && $mainStatus === 'approved'
+                                            && $isTarRequired
                                             && ($order->tar_submitted_at === null || $order->tar_review_status === 'returned');
-                                        $tarDeadline = $order->tar_deadline ?: optional($order->travel_date_end)->copy()?->addDays(5);
+                                        $tarDeadline = $order->visible_tar_deadline;
                                         $computedTarStatus = strtolower((string) ($order->tar_status ?: 'pending'));
 
-                                        if ($computedTarStatus !== 'submitted' && $mainStatus === 'approved' && $tarDeadline && now()->gt($tarDeadline)) {
+                                        if (!$isTarRequired) {
+                                            $computedTarStatus = 'not_applicable';
+                                        } elseif ($order->tar_review_status === 'returned' || $computedTarStatus === 'returned') {
+                                            $computedTarStatus = 'returned';
+                                        } elseif ($computedTarStatus !== 'submitted' && $mainStatus === 'approved' && $tarDeadline && now()->gt($tarDeadline)) {
                                             $computedTarStatus = 'overdue';
-                                        }
-
-                                        if ($mainStatus !== 'approved' && $computedTarStatus === 'pending') {
+                                        } elseif ($mainStatus !== 'approved' && $computedTarStatus === 'pending') {
                                             $computedTarStatus = 'not_applicable';
                                         }
 
@@ -262,7 +266,7 @@
                                                 {{ ucfirst($mainStatus) }}
                                             </span>
                                         </td>
-                                        <td class="px-1.5 py-2 align-middle text-xs text-gray-700">{{ $tarDeadline?->format('M d, Y') ?? __('N/A') }}</td>
+                                        <td class="px-1.5 py-2 align-middle text-xs text-gray-700">{{ $tarDeadline?->format('M d, Y') ?? '—' }}</td>
                                         <td class="px-1.5 py-2 text-center align-middle text-xs font-semibold">
                                             @if($computedTarStatus === 'submitted')
                                                 <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">
@@ -273,6 +277,11 @@
                                                 <span class="inline-flex items-center gap-1.5 rounded-full border border-red-100 bg-red-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-red-700">
                                                     <i class="fa-solid fa-triangle-exclamation"></i>
                                                     <span>{{ __('Overdue') }}</span>
+                                                </span>
+                                            @elseif($computedTarStatus === 'returned')
+                                                <span class="inline-flex items-center gap-1.5 rounded-full border border-orange-100 bg-orange-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-orange-700">
+                                                    <i class="fa-solid fa-rotate-left"></i>
+                                                    <span>{{ __('Returned') }}</span>
                                                 </span>
                                             @elseif($computedTarStatus === 'not_applicable')
                                                 <span class="text-gray-400">—</span>
@@ -288,15 +297,23 @@
                                                 <a href="{{ route('travel-orders.print', $order) }}" target="_blank" rel="noopener" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-50 hover:text-slate-900" title="{{ __('Print') }}">
                                                     <i class="fa-solid fa-print text-sm"></i>
                                                 </a>
-                                                @if($computedTarStatus === 'submitted')
+                                                @if($computedTarStatus === 'submitted' || $computedTarStatus === 'returned')
                                                     <a href="{{ $acknowledgementReportUrl }}" target="_blank" rel="noopener" data-no-transition class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-700 transition hover:bg-blue-50 hover:text-blue-900" title="{{ __('View TAR') }}" aria-label="{{ __('View TAR') }}">
                                                         <i class="fa-solid fa-file-circle-check text-sm"></i>
                                                     </a>
+                                                @else
+                                                    <span class="inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg text-slate-300" title="{{ __('No TAR has been submitted.') }}" aria-label="{{ __('View TAR unavailable') }}" aria-disabled="true">
+                                                        <i class="fa-solid fa-file-circle-check text-sm"></i>
+                                                    </span>
                                                 @endif
                                                 @if($canSubmitTar)
                                                     <button type="button" @click.stop.prevent="$dispatch('open-tar-submission', { action: @js(route('travel-orders.submit-tar', $order)), title: @js($taNumber), defaults: @js($arDefaults) })" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900" title="{{ $computedTarStatus === 'overdue' ? __('Upload overdue TAR') : __('Submit TAR') }}" aria-label="{{ __('Open TAR submission form') }}">
                                                         <i class="fa-solid fa-file-arrow-up text-sm"></i>
                                                     </button>
+                                                @else
+                                                    <span class="inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg text-slate-300" title="{{ __('TAR upload is not available for this travel authority.') }}" aria-label="{{ __('Submit TAR unavailable') }}" aria-disabled="true">
+                                                        <i class="fa-solid fa-file-arrow-up text-sm"></i>
+                                                    </span>
                                                 @endif
                                             </div>
                                         </td>

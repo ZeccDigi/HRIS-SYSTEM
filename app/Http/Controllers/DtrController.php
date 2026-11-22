@@ -144,8 +144,11 @@ class DtrController extends Controller
             ];
 
             $attendanceRecords = $employees->map(function ($employee) use ($dtrRecords, $approvedEvents, $selectedDate, &$stats) {
+                $calculator = app(\App\Services\AttendanceCalculator::class);
+                $blankDay = $calculator->isBlankDay($employee, $selectedDate);
                 $record = $dtrRecords->get($employee->id)?->first();
                 $approvedEvent = $approvedEvents->get($employee->id . '|' . $selectedDate);
+                if ($blankDay) { $record = null; $approvedEvent = null; }
 
                 $timeIn = $record?->time_in;
                 $amOut = $record?->am_out;
@@ -154,15 +157,22 @@ class DtrController extends Controller
                 $remarks = $approvedEvent['remarks'] ?? ($record?->status ?? '');
 
                 $hasScan = $timeIn || $amOut || $pmIn || $timeOut;
-                $lateMinutes = $this->lateMinutes($record);
-                $workedMinutes = $this->actualWorkedMinutes($record);
-                $undertimeMinutes = $this->undertimeMinutes($record);
+                $calculator = app(\App\Services\AttendanceCalculator::class);
+                $lateMinutes = $calculator->lateMinutes($record, $employee);
+                $workedMinutes = $calculator->actualMinutes($record, $employee);
+                $undertimeMinutes = $calculator->undertimeMinutes($record, $employee);
+                $incomplete = $calculator->isIncomplete($record, $employee, $selectedDate, $approvedEvent['slot_labels'] ?? []);
+                if ($incomplete) {
+                    $remarks = $approvedEvent['remarks'] ?? '';
+                }
                 $hoursWorked = number_format($workedMinutes / 60, 2);
 
                 if ($approvedEvent) {
                     $status = $approvedEvent['status'];
-                    $lateMinutes = 0;
-                    $undertimeMinutes = 0;
+                    if (!($approvedEvent['locator_only'] ?? false)) {
+                        $lateMinutes = 0;
+                        $undertimeMinutes = 0;
+                    }
                     $hoursWorked = number_format($workedMinutes / 60, 2);
                 } elseif ($hasScan) {
                     $stats['scanned']++;
@@ -183,11 +193,16 @@ class DtrController extends Controller
                     }
                 } else {
                     $status = $approvedEvent['status'] ?? 'Not Yet In';
-                    $stats['no_record']++;
+                    if (!$blankDay) $stats['no_record']++;
                 }
+
+                if ($incomplete && !$approvedEvent) $status = '';
+                if ($blankDay) { $status = ''; $remarks = Carbon::parse($selectedDate)->isWeekend() ? 'Weekend' : ''; $hoursWorked = ''; }
+                if (!Carbon::parse($selectedDate)->isWeekend() && !$calculator->hasDayEnded($selectedDate)) $remarks = '';
 
                 return [
                     'employee' => $employee,
+                    'blank_day' => $blankDay,
                     'time_in' => $timeIn,
                     'am_out' => $amOut,
                     'pm_in' => $pmIn,
@@ -241,13 +256,13 @@ class DtrController extends Controller
                             $employee->division ?? 'N/A',
                             $employee->position ?? 'N/A',
                             $employee->employment_status ?? 'N/A',
-                            $item['time_in'] ? Carbon::parse($item['time_in'])->format('h:i A') : ($item['slot_labels']['time_in'] ?? 'N/A'),
-                            $item['time_out'] ? Carbon::parse($item['time_out'])->format('h:i A') : ($item['slot_labels']['time_out'] ?? 'N/A'),
+                            $item['time_in'] ? Carbon::parse($item['time_in'])->format('h:i A') : ($item['slot_labels']['time_in'] ?? ($item['blank_day'] ? '' : 'N/A')),
+                            $item['time_out'] ? Carbon::parse($item['time_out'])->format('h:i A') : ($item['slot_labels']['time_out'] ?? ($item['blank_day'] ? '' : 'N/A')),
                             $item['hours_worked'],
-                            number_format((float) ($item['late_minutes'] ?: 0), 3, '.', ''),
-                            number_format((float) ($item['undertime_minutes'] ?: 0), 3, '.', ''),
+                            $item['blank_day'] ? '' : number_format((float) ($item['late_minutes'] ?: 0), 2, '.', ''),
+                            $item['blank_day'] ? '' : number_format((float) ($item['undertime_minutes'] ?: 0), 2, '.', ''),
                             $item['status'],
-                            $item['remarks'] ?: 'N/A',
+                            $item['remarks'] ?: ($item['blank_day'] ? '' : 'N/A'),
                         ]);
                     }
 
@@ -293,8 +308,11 @@ class DtrController extends Controller
         $dtrRecords = $showAttendance && $employee
             ? DtrRecord::where('employee_id', $employee->id)
                 ->whereBetween('date', [$selectedDate->toDateString(), $selectedDate->copy()->endOfMonth()->toDateString()])
-                ->orderBy('date')->orderBy('time_in')->get()
+                ->with('employee')->orderBy('date')->orderBy('time_in')->get()
             : collect();
+
+        $calculator = app(\App\Services\AttendanceCalculator::class);
+        $dtrRecords = $dtrRecords->reject(fn ($record) => $calculator->isBlankDay($employee, $record->date))->values();
 
         $attendanceEventsByDate = collect();
         if ($employee && $showAttendance) {
@@ -368,6 +386,11 @@ class DtrController extends Controller
             ->get();
 
         foreach ($leaves as $leave) {
+            // Monetization changes leave credits, not attendance or worked hours.
+            if ($leave->is_monetization || strcasecmp(trim((string) $leave->reason), 'Monetization of Leave Credits') === 0) {
+                continue;
+            }
+
             $leaveReference = $this->leaveReferenceNumber($leave);
             $rangeStart = Carbon::parse($leave->start_date)->max($start);
             $rangeEnd = Carbon::parse($leave->end_date)->min($end);
@@ -425,7 +448,8 @@ class DtrController extends Controller
         }
 
         $locatorSlips = LocatorSlip::query()
-            ->where('status', 'approved')
+            ->with('employee')
+            ->whereIn('status', ['approved', 'approved by chief'])
             ->whereIn('employee_id', $employeeIds)
             ->whereBetween('date_covered', [$start->toDateString(), $end->toDateString()])
             ->get();
@@ -450,7 +474,8 @@ class DtrController extends Controller
                 $locatorType,
                 $locatorType,
                 $locatorType,
-                $this->locatorSlipSlotLabels($locatorSlip, $locatorType)
+                $this->locatorSlipSlotLabels($locatorSlip, $locatorType),
+                true
             );
         }
 
@@ -486,7 +511,11 @@ class DtrController extends Controller
             }
         }
 
-        return $events;
+        $employees = Employee::with('coreTimeSchedules')->whereIn('id', $employeeIds)->get()->keyBy('id');
+        return $events->filter(function ($event, $key) use ($employees) {
+            [$employeeId, $date] = explode('|', $key, 2);
+            return !app(\App\Services\AttendanceCalculator::class)->isBlankDay($employees->get($employeeId), $date);
+        });
     }
 
     private function leaveReferenceNumber(LeaveRequest $leave): string
@@ -507,8 +536,16 @@ class DtrController extends Controller
 
     private function locatorSlipSlotLabels(LocatorSlip $locatorSlip, string $reference): array
     {
-        if (! $locatorSlip->time_from || ! $locatorSlip->time_to) {
-            return array_fill_keys(['time_in', 'am_out', 'pm_in', 'time_out'], $reference);
+        $schedule = app(\App\Services\AttendanceCalculator::class)->schedule($locatorSlip->employee, $locatorSlip->date_covered);
+        if (! $locatorSlip->time_from) {
+            return [];
+        }
+
+        if (! $locatorSlip->time_to) {
+            // An OUT scan does not establish a return or a full-day absence.
+            $departure = Carbon::parse($locatorSlip->time_from);
+            $pmStart = !empty($schedule['pm_start']) ? Carbon::parse($schedule['pm_start']) : null;
+            return [$pmStart && $departure->format('H:i:s') >= $pmStart->format('H:i:s') ? 'time_out' : 'am_out' => $reference];
         }
 
         $from = Carbon::parse($locatorSlip->time_from);
@@ -520,12 +557,12 @@ class DtrController extends Controller
             $toMinutes += 24 * 60;
         }
 
-        $slotMinutes = [
-            'time_in' => 8 * 60,
-            'am_out' => 12 * 60,
-            'pm_in' => 13 * 60,
-            'time_out' => 17 * 60,
-        ];
+        $slotMinutes = [];
+        foreach (['time_in' => 'am_start', 'am_out' => 'am_end', 'pm_in' => 'pm_start', 'time_out' => 'pm_end'] as $slot => $key) {
+            if (empty($schedule[$key])) continue;
+            $time = Carbon::parse($schedule[$key]);
+            $slotMinutes[$slot] = $time->hour * 60 + $time->minute;
+        }
 
         return collect($slotMinutes)
             ->filter(fn (int $minutes) => $minutes >= $fromMinutes && $minutes <= $toMinutes)
@@ -540,7 +577,8 @@ class DtrController extends Controller
         string $status,
         string $remarks,
         string $printLabel,
-        ?array $slotLabels = null
+        ?array $slotLabels = null,
+        bool $locatorOnly = false
     ): void {
         $key = $employeeId . '|' . $date;
         $existing = $events->get($key);
@@ -552,89 +590,35 @@ class DtrController extends Controller
                 'remarks' => $remarks,
                 'print_label' => $printLabel,
                 'slot_labels' => $slotLabels,
+                'locator_only' => $locatorOnly,
             ]);
 
             return;
         }
 
-        $mergedSlotLabels = $existing['slot_labels'] ?? [];
-        foreach ($slotLabels as $slot => $label) {
-            $mergedSlotLabels[$slot] = isset($mergedSlotLabels[$slot])
-                ? $mergedSlotLabels[$slot] . ' / ' . $label
-                : $label;
-        }
-
         $events->put($key, [
-            'status' => $existing['status'] . ' / ' . $status,
-            'remarks' => $existing['remarks'] . '; ' . $remarks,
-            'print_label' => $existing['print_label'] . ' / ' . $printLabel,
-            'slot_labels' => $mergedSlotLabels,
+            'status' => 'Overlapping applications',
+            'remarks' => 'Overlapping applications',
+            'print_label' => '',
+            'slot_labels' => [],
+            'has_overlap' => true,
+            'locator_only' => ($existing['locator_only'] ?? false) && $locatorOnly,
         ]);
     }
 
-    private function actualWorkedMinutes(?DtrRecord $record): int
+    private function actualWorkedMinutes(?DtrRecord $record): int|float
     {
-        if (! $record) {
-            return 0;
-        }
-
-        $minutes = 0;
-
-        if ($record->time_in && $record->am_out) {
-            $minutes += Carbon::parse($record->time_in)->diffInMinutes(Carbon::parse($record->am_out));
-        }
-
-        if ($record->pm_in && $record->time_out) {
-            $minutes += Carbon::parse($record->pm_in)->diffInMinutes(Carbon::parse($record->time_out));
-        }
-
-        if ($minutes === 0 && $record->time_in && $record->time_out) {
-            $minutes = Carbon::parse($record->time_in)->diffInMinutes(Carbon::parse($record->time_out));
-
-            if ($minutes > 240) {
-                $minutes -= 60;
-            }
-        }
-
-        return max(0, $minutes);
+        return app(\App\Services\AttendanceCalculator::class)->actualMinutes($record);
     }
 
     private function lateMinutes(?DtrRecord $record): int
     {
-        if (! $record) {
-            return 0;
-        }
-
-        $minutes = 0;
-
-        if ($record->time_in) {
-            $minutes += $this->minutesAfterExpectedIn($record->time_in, '08:00:00');
-        }
-
-        if ($record->pm_in) {
-            $minutes += $this->minutesAfterExpectedIn($record->pm_in, '13:00:00');
-        }
-
-        return $minutes;
+        return app(\App\Services\AttendanceCalculator::class)->lateMinutes($record);
     }
 
     private function undertimeMinutes(?DtrRecord $record): int
     {
-        if (! $record) {
-            return 0;
-        }
-
-        $minutes = 0;
-
-        if ($record->am_out) {
-            $minutes += $this->minutesBeforeExpectedOut($record->am_out, '12:00:00');
-        }
-
-        if ($record->time_out) {
-            $minutes += $this->minutesBeforeExpectedOut($record->time_out, '17:00:00');
-        }
-
-        return $minutes;
+        return app(\App\Services\AttendanceCalculator::class)->undertimeMinutes($record);
     }
 
     private function minutesAfterExpectedIn(string $time, string $expectedIn): int

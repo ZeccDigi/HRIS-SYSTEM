@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Employee;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Saln extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -59,6 +60,7 @@ class Saln extends Model
             'net_worth' => 'decimal:2',
             'reviewed_at' => 'datetime',
             'submitted_at' => 'datetime',
+            'approved_data' => 'array',
         ];
     }
 

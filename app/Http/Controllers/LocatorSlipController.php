@@ -10,6 +10,7 @@ use App\Notifications\LocatorSlipNotification;
 use App\Notifications\LocatorSlipQrReadyNotification;
 use App\Services\LocatorSlipPdfExporter;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,8 +20,6 @@ use Illuminate\Validation\ValidationException;
 
 class LocatorSlipController extends Controller
 {
-    private const MAX_LOCATOR_SLIP_HOURS = 8;
-
     public function index(Request $request)
     {
         $employee = Auth::user()->employee;
@@ -286,7 +285,7 @@ class LocatorSlipController extends Controller
         return view('locator-slip.hr.show', compact('locatorSlip'));
     }
 
-    public function show(LocatorSlip $locatorSlip)
+    public function show(Request $request, LocatorSlip $locatorSlip)
     {
         if (Auth::user()->employee?->id !== $locatorSlip->employee_id && ! in_array(strtolower(Auth::user()->role), ['admin', 'hrstaff', 'chief', 'regionaldirector'], true)) {
             abort(403);
@@ -300,6 +299,12 @@ class LocatorSlipController extends Controller
             abort(403);
         }
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'out' => $locatorSlip->time_from ? Carbon::parse($locatorSlip->time_from)->format('h:i A') : null,
+                'in' => $locatorSlip->time_to ? Carbon::parse($locatorSlip->time_to)->format('h:i A') : null,
+            ])->header('Cache-Control', 'private, no-store');
+        }
         return view('locator-slip.show', compact('locatorSlip'));
     }
 
@@ -374,33 +379,25 @@ class LocatorSlipController extends Controller
             ], 422);
         }
 
-        $now = now();
+        $now = now('Asia/Manila');
+
+        if ($locatorSlip->date_covered->toDateString() !== $now->toDateString()) {
+            return response()->view('locator-slip.scan', [
+                'title' => 'Locator Slip QR',
+                'message' => 'This locator slip can only be scanned on its scheduled date.',
+                'status' => 'warning',
+                'locatorSlip' => $locatorSlip->load('employee'),
+            ], 422);
+        }
 
         if (! $locatorSlip->time_from) {
             $locatorSlip->time_from = $now->format('H:i:s');
             $locatorSlip->out_scanned_at = $now;
             $locatorSlip->save();
 
-            $returnDeadline = $now->copy()->addHours(self::MAX_LOCATOR_SLIP_HOURS);
-            $message = 'OUT time recorded successfully. Please scan again to record your IN time on or before '
-                .$returnDeadline->format('h:i A').'.';
+            $message = 'OUT time recorded successfully. You may scan IN until the end of this scheduled date.';
             $status = 'success';
         } elseif (! $locatorSlip->time_to) {
-            $outAt = $locatorSlip->out_scanned_at
-                ? $locatorSlip->out_scanned_at->copy()
-                : Carbon::parse($locatorSlip->date_covered->format('Y-m-d').' '.$locatorSlip->time_from);
-            $returnDeadline = $outAt->copy()->addHours(self::MAX_LOCATOR_SLIP_HOURS);
-
-            if ($now->gt($returnDeadline)) {
-                return response()->view('locator-slip.scan', [
-                    'title' => 'Locator Slip QR',
-                    'message' => 'The 8-hour return window expired at '.$returnDeadline->format('h:i A')
-                        .'. IN time was not recorded. Please contact HR for assistance.',
-                    'status' => 'warning',
-                    'locatorSlip' => $locatorSlip->fresh()->load('employee'),
-                ], 422);
-            }
-
             $locatorSlip->time_to = $now->format('H:i:s');
             $locatorSlip->save();
 
@@ -533,9 +530,9 @@ class LocatorSlipController extends Controller
     {
         $coveredDate = Carbon::parse($date)->startOfDay();
 
-        if ($coveredDate->lt(today()) || $coveredDate->isWeekend()) {
+        if ($coveredDate->lt(today()) || ($coveredDate->isWeekend() && !config('locator_slips.allow_weekends'))) {
             throw ValidationException::withMessages([
-                'date_covered' => 'Please select today or a future weekday. Saturdays and Sundays are disabled.',
+                'date_covered' => config('locator_slips.allow_weekends') ? 'Please select today or a future date.' : 'Please select today or a future weekday. Saturdays and Sundays are disabled.',
             ]);
         }
     }
@@ -558,7 +555,13 @@ class LocatorSlipController extends Controller
         );
 
         $locatorSlip->scan_url = $scanUrl;
-        $locatorSlip->qr_svg = $this->buildQrSvg($scanUrl);
+        if (!$locatorSlip->qr_token) {
+            // Keep one unpredictable token per slip, including concurrent page/email loads.
+            LocatorSlip::whereKey($locatorSlip->id)->whereNull('qr_token')->update(['qr_token' => bin2hex(random_bytes(16))]);
+            $locatorSlip->qr_token = LocatorSlip::whereKey($locatorSlip->id)->value('qr_token');
+        }
+        $locatorSlip->qr_payload = 'LSQR:'.strtoupper($locatorSlip->qr_token);
+        $locatorSlip->qr_svg = $this->buildQrSvg($locatorSlip->qr_payload);
 
         return $locatorSlip;
     }
@@ -576,7 +579,7 @@ class LocatorSlipController extends Controller
             $user->notify(new LocatorSlipQrReadyNotification(
                 $locatorSlip,
                 $locatorSlip->qr_svg,
-                $this->buildQrPngData($locatorSlip->scan_url)
+                $this->buildQrPngData($locatorSlip->qr_payload)
             ));
         } catch (\Throwable $exception) {
             Log::warning('Unable to send approved locator slip QR email.', [
@@ -598,9 +601,18 @@ class LocatorSlipController extends Controller
         require_once $barcodeClass;
 
         try {
-            $barcode = new \TCPDF2DBarcode($value, 'QRCODE,H');
-
-            return $barcode->getBarcodeSVGCode(5, 5, 'black');
+            $barcode = new \TCPDF2DBarcode($value, 'QRCODE,M');
+            $matrix = $barcode->getBarcodeArray();
+            $size = $matrix['num_cols'] + 8;
+            $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '.$size.' '.$size.'" width="'.($size * 8).'" height="'.($size * 8).'" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="white"/><g fill="black">';
+            foreach ($matrix['bcode'] as $row => $cells) {
+                foreach ($cells as $column => $dark) {
+                    if ($dark) {
+                        $svg .= '<rect x="'.($column + 4).'" y="'.($row + 4).'" width="1" height="1"/>';
+                    }
+                }
+            }
+            return $svg.'</g></svg>';
         } catch (\Throwable $exception) {
             return null;
         }
@@ -621,16 +633,34 @@ class LocatorSlipController extends Controller
         require_once $barcodeClass;
 
         try {
-            $barcode = new \TCPDF2DBarcode($value, 'QRCODE,H');
+            $barcode = new \TCPDF2DBarcode($value, 'QRCODE,M');
             $png = $barcode->getBarcodePngData(8, 8, [0, 0, 0]);
 
             if ($png instanceof \Imagick) {
+                $png->setImageBackgroundColor('white');
+                $png = $png->mergeImageLayers(\Imagick::LAYERMETHOD_FLATTEN);
+                $png->borderImage('white', 32, 32);
                 $png->setImageFormat('png');
 
                 return $png->getImagesBlob();
             }
 
-            return is_string($png) ? $png : null;
+            if (!is_string($png) || !function_exists('imagecreatefromstring')) {
+                return null;
+            }
+            $source = imagecreatefromstring($png);
+            if ($source === false) {
+                return null;
+            }
+            $image = imagecreatetruecolor(imagesx($source) + 64, imagesy($source) + 64);
+            if ($image === false) {
+                return null;
+            }
+            imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+            imagecopy($image, $source, 32, 32, 0, 0, imagesx($source), imagesy($source));
+            ob_start();
+            imagepng($image);
+            return ob_get_clean();
         } catch (\Throwable $exception) {
             Log::warning('Unable to generate locator slip QR PNG.', [
                 'message' => $exception->getMessage(),
@@ -638,5 +668,21 @@ class LocatorSlipController extends Controller
 
             return null;
         }
+    }
+
+    public function destroy(LocatorSlip $locatorSlip): RedirectResponse
+    {
+        abort_unless(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true), 403);
+
+        $locatorSlip->delete();
+
+        AuditLogListener::logActivity(
+            'Archive Locator Slip',
+            'Locator Slip',
+            "Archived locator slip (#{$locatorSlip->id}) for " . trim(($locatorSlip->employee?->firstname ?? '') . ' ' . ($locatorSlip->employee?->lastname ?? '')),
+            auth()->user()
+        );
+
+        return redirect()->back()->with('success', 'Locator slip moved to Archive.');
     }
 }

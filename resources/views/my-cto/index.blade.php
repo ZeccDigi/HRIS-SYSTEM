@@ -79,35 +79,27 @@
                         <div class="rounded-2xl bg-blue-900 p-6 text-white shadow-xl shadow-blue-200 md:col-span-1">
                             <span class="text-[10px] font-black uppercase tracking-widest text-blue-100">{{ __('Available Balance') }}</span>
                             <div class="mt-2 flex items-baseline gap-2">
-                                <span class="text-4xl font-black">{{ number_format($employee->cto_balance, 1) }}</span>
+                                <span class="text-4xl font-black">{{ number_format($employee->cto_balance, 2) }}</span>
                                 <span class="text-sm font-bold uppercase text-blue-100">{{ __('Hours') }}</span>
                             </div>
-                            <p class="mt-2 text-xs text-blue-100">{{ __('Compensatory time-off credits available to use') }}</p>
+                            <p class="mt-2 whitespace-nowrap text-[9px] leading-tight text-blue-100">{{ __('Compensatory time-off credits available to use') }}</p>
+                            <button type="button" data-credit-history-trigger @click="$dispatch('open-coc-credit-history', { id: 0, name: 'COC' })" class="mt-3 rounded-lg border border-white/40 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"><i class="fa-solid fa-clock-rotate-left mr-1" aria-hidden="true"></i>{{ __('Credit History') }}</button>
                         </div>
 
-                        <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:col-span-2">
-                            <span class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ __('Quick Guide') }}</span>
-                            <div class="mt-3 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                                <div class="flex items-start gap-3">
-                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-xs font-black text-emerald-600">+</span>
-                                    <div>
-                                        <p class="font-bold text-gray-900">{{ __('Earn COC') }}</p>
-                                        <p class="mt-0.5 text-xs text-gray-500">{{ __('File overtime or extra work rendered to earn credits.') }}</p>
-                                    </div>
-                                </div>
-
-                                <div class="flex items-start gap-3">
-                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xs font-black text-blue-600">-</span>
-                                    <div>
-                                        <p class="font-bold text-gray-900">{{ __('Use CTO') }}</p>
-                                        <p class="mt-0.5 text-xs text-gray-500">{{ __('Apply to use earned credits as time off.') }}</p>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ __('Approved Earned') }}</p>
+                            <p class="mt-3 text-3xl font-black text-gray-900">{{ number_format($earnedCtoHours, 2) }} <span class="text-sm font-semibold text-gray-500">{{ __('Hours') }}</span></p>
+                        </div>
+                        <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ __('Approved Used') }}</p>
+                            <p class="mt-3 text-3xl font-black text-gray-900">{{ number_format($usedCtoHours, 2) }} <span class="text-sm font-semibold text-gray-500">{{ __('Hours') }}</span></p>
                         </div>
                     </div>
                 </div>
 
+                <div x-show="tab === 'credits'" x-cloak class="mb-4">
+                    <x-leave-credit-history :history-url="route('my-cto.credit-history')" :history-year="(int) $year" event-name="open-coc-credit-history" unit="Hours" :precision="2" history-id="my-coc-history" />
+                </div>
                 <div
                     x-show="tab === 'applications'"
                     x-transition:enter="transition ease-out duration-300"
@@ -198,6 +190,7 @@
                                         <span class="font-medium leading-5 text-gray-900">
                                             {{ $request->type_label }}
                                         </span>
+                                        @if($request->credit_source === 'hr_direct')<span class="block text-[10px] font-semibold text-indigo-700">{{ __('Filed by HR') }}</span>@endif
                                     </td>
                                     <td class="px-2 py-3 align-middle">
                                         <div class="flex min-w-0 items-center justify-center gap-1.5">
@@ -386,7 +379,7 @@
     <script>
         function myCtoRequestsTable() {
             return {
-                tab: 'applications',
+                tab: @js(request('tab') === 'credits' ? 'credits' : 'applications'),
                 search: @js($search),
                 month: @js($month),
                 status: @js($status),
@@ -398,6 +391,7 @@
                 },
                 applyFilters() {
                     const url = new URL(@js(route('my-cto.index')));
+                    if (this.tab === 'credits') url.searchParams.set('tab', 'credits');
 
                     if (this.search.trim()) {
                         url.searchParams.set('search', this.search.trim());

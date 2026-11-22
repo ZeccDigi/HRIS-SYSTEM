@@ -45,20 +45,31 @@ it('records the return scan within eight hours', function (string $type) {
     Carbon::setTestNow();
 })->with(['Pass Slip', 'Official Business']);
 
-it('rejects the return scan after the eight-hour limit', function (string $type) {
+it('allows a return after eight hours until the scheduled date ends', function (string $type) {
     Carbon::setTestNow('2026-11-03 08:00:00');
     $slip = approvedLocatorSlip($type);
     $url = URL::temporarySignedRoute('locator-slips.scan', now()->addDay(), ['locatorSlip' => $slip]);
 
     $this->get($url)->assertOk();
 
-    Carbon::setTestNow('2026-11-03 16:00:01');
+    Carbon::setTestNow('2026-11-03 23:59:59');
     $this->get($url)
-        ->assertStatus(422)
-        ->assertSee('8-hour return window expired');
+        ->assertOk()
+        ->assertSee('IN time recorded successfully');
 
+    expect($slip->fresh()->time_to)->not->toBeNull();
+
+    Carbon::setTestNow();
+})->with(['Pass Slip', 'Official Business']);
+
+it('rejects a scan on a different Philippine date without changing the slip', function (string $type) {
+    Carbon::setTestNow('2026-11-03 08:00:00');
+    $slip = approvedLocatorSlip($type);
+    $url = URL::temporarySignedRoute('locator-slips.scan', now()->addDays(2), ['locatorSlip' => $slip]);
+    $this->get($url)->assertOk();
+    Carbon::setTestNow('2026-11-04 00:00:00');
+    $this->get($url)->assertStatus(422)->assertSee('scheduled date');
     expect($slip->fresh()->time_to)->toBeNull();
-
     Carbon::setTestNow();
 })->with(['Pass Slip', 'Official Business']);
 

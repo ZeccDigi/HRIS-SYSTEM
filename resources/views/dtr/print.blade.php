@@ -22,22 +22,14 @@
         $regionalDirectorName = $regionalDirector
             ? trim(($regionalDirector->firstname ?? '') . ' ' . ($regionalDirector->middlename ? mb_substr($regionalDirector->middlename, 0, 1) . '. ' : '') . ($regionalDirector->lastname ?? ''))
             : 'MARIA CAROLINA B. AGDAMAG';
-        $undertimeMinutesForRecord = function ($record) {
-            if (! $record) return 0;
-            $minutes = 0;
-            if ($record->am_out && \Carbon\Carbon::parse($record->am_out)->format('H:i:s') < '12:00:00') {
-                $minutes += \Carbon\Carbon::parse($record->am_out)->diffInMinutes(\Carbon\Carbon::parse('12:00:00'));
-            }
-            if ($record->time_out && \Carbon\Carbon::parse($record->time_out)->format('H:i:s') < '17:00:00') {
-                $minutes += \Carbon\Carbon::parse($record->time_out)->diffInMinutes(\Carbon\Carbon::parse('17:00:00'));
-            }
-            return $minutes;
-        };
-        $printDays = collect(range(1, 31))->map(function ($dayNumber) use ($selectedDate, $recordsByDate, $attendanceEventsByDate, $undertimeMinutesForRecord) {
+        $calculator = app(\App\Services\AttendanceCalculator::class);
+        $undertimeMinutesForRecord = fn ($record) => $calculator->undertimeMinutes($record, $employee);
+        $printDays = collect(range(1, 31))->map(function ($dayNumber) use ($selectedDate, $recordsByDate, $attendanceEventsByDate, $undertimeMinutesForRecord, $calculator, $employee) {
             $day = $dayNumber <= $selectedDate->daysInMonth ? $selectedDate->copy()->day($dayNumber) : null;
             $record = $day ? $recordsByDate->get($day->format('Y-m-d'), collect())->first() : null;
             $approvedEvent = $day ? $attendanceEventsByDate->get($day->format('Y-m-d')) : null;
-            $undertimeMinutes = $day && ! $day->isWeekend() && ! $approvedEvent ? $undertimeMinutesForRecord($record) : 0;
+            if ($day && $calculator->isBlankDay($employee, $day)) { $record = null; $approvedEvent = null; }
+            $undertimeMinutes = $day && (!$approvedEvent || ($approvedEvent['locator_only'] ?? false)) ? $undertimeMinutesForRecord($record) : 0;
 
             return [
                 'day_number' => $dayNumber,

@@ -1,0 +1,31 @@
+.pds-form-body input[type="date"]::-webkit-calendar-picker-indicator,
+.reports-main-filters input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"][name="service_start_date"]::-webkit-calendar-picker-indicator {
+    pointer-events: none;
+}
+.profile-date-calendar {
+    position: fixed;
+    z-index: 10000;
+    width: 256px;
+    max-width: calc(100vw - 24px);
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: white;
+    color: #374151;
+    box-shadow: 0 8px 24px -6px #0f172a26;
+    font: 12px Arial, sans-serif;
+}
+.profile-date-calendar[hidden] { display: none; }
+.profile-date-header { display: grid; grid-template-columns: 24px minmax(0, 1fr) 62px 24px; align-items: center; gap: 3px; margin-bottom: 6px; }
+.profile-date-header select { width: 100%; min-width: 0; height: 30px; padding: 3px 16px 3px 5px; border: 1px solid #e5e7eb; border-radius: 6px; font: 600 11px Arial, sans-serif; background-color: #f8fafc; background-position: right 3px center; background-size: 12px; box-shadow: none; }
+.profile-date-header button { width: 24px; height: 28px; padding: 0; border-radius: 6px; color: #64748b; background: transparent; font-size: 20px; line-height: 1; }
+.profile-date-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; text-align: center; }
+.profile-date-grid span { padding: 5px 0; color: #94a3b8; font-size: 9px; font-weight: 600; text-transform: none; }
+.profile-date-grid button { height: 28px; padding: 0; border-radius: 5px; font-family: Arial, sans-serif; font-size: 11px; font-weight: 500; }
+.profile-date-calendar button:hover { background: #eef2ff; color: #4338ca; }
+.profile-date-grid button.selected { color: white; background: #0038a8; }
+.profile-date-grid button:disabled { color: #cbd5e1; background: #f8fafc; cursor: not-allowed; }
+.profile-date-calendar button:focus-visible { outline: 2px solid #0038a8; outline-offset: 1px; }
+.profile-date-footer { display: flex; justify-content: space-between; margin-top: 6px; border-top: 1px solid #f1f5f9; padding-top: 5px; }
+.profile-date-footer button { padding: 4px 6px; color: #0038a8; border-radius: 6px; font-size: 11px; }

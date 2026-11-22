@@ -25,7 +25,7 @@ class CtoRequestNotification extends Notification
     {
         return [
             'type' => 'cto_request',
-            'title' => $this->title,
+            'title' => \App\Support\NotificationTitle::format($this->title),
             'message' => $this->message,
             'cto_request_id' => $this->ctoRequest->id,
             'action_url' => route('my-cto.show', $this->ctoRequest->id),

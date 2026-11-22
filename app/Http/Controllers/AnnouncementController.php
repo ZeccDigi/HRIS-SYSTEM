@@ -213,7 +213,7 @@ class AnnouncementController extends Controller
         ]);
 
         if ($request->hasFile('attachment')) {
-            $validated['attachment_path'] = $request->file('attachment')->store('announcement-attachments', 'public');
+            $validated['attachment_path'] = $request->file('attachment')->store('announcement-attachments', 'documents');
         }
         unset($validated['attachment']);
 
@@ -259,11 +259,11 @@ class AnnouncementController extends Controller
     {
         $this->ensureCanViewAnnouncement($announcement);
 
-        if (!$announcement->attachment_path || !Storage::disk('public')->exists($announcement->attachment_path)) {
+        if (!$announcement->attachment_path || !Storage::disk('documents')->exists($announcement->attachment_path)) {
             abort(404);
         }
 
-        return response()->file(Storage::disk('public')->path($announcement->attachment_path), [
+        return response()->file(Storage::disk('documents')->path($announcement->attachment_path), [
             'Content-Type' => 'application/pdf',
         ]);
     }
@@ -297,10 +297,10 @@ class AnnouncementController extends Controller
 
         if ($request->hasFile('attachment')) {
             if ($announcement->attachment_path) {
-                Storage::disk('public')->delete($announcement->attachment_path);
+                Storage::disk('documents')->delete($announcement->attachment_path);
             }
 
-            $validated['attachment_path'] = $request->file('attachment')->store('announcement-attachments', 'public');
+            $validated['attachment_path'] = $request->file('attachment')->store('announcement-attachments', 'documents');
         }
         unset($validated['attachment']);
 

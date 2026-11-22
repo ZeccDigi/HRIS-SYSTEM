@@ -64,12 +64,15 @@
                 resetLink.addEventListener('click', (event) => {
                     event.preventDefault();
                     form.querySelectorAll('input').forEach((input) => {
-                        input.value = '';
+                        if (input.name !== 'tab') input.value = '';
                     });
                     form.querySelectorAll('select').forEach((select) => {
                         select.selectedIndex = 0;
                     });
-                    filterLeaveApplications(new URLSearchParams());
+                    const resetParams = new URLSearchParams();
+                    const tab = form.querySelector('input[name="tab"]')?.value;
+                    if (tab) resetParams.set('tab', tab);
+                    filterLeaveApplications(resetParams);
                 });
             });
         });

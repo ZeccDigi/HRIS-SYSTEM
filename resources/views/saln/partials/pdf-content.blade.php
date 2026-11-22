@@ -1,4 +1,9 @@
 @php
+    $saln = clone $saln;
+    $identityDefaults = array_fill_keys(\App\Services\SalnPdsDefaultsService::FIELDS, 'N/A');
+    $identityService = app(\App\Services\SalnPdsDefaultsService::class);
+    $saln->declarant_info = $identityService->merge($saln->declarant_info, $identityDefaults);
+    $saln->spouse_info = $identityService->merge($saln->spouse_info, $identityDefaults);
     $realProperties = collect($saln->real_properties ?? [])->values();
     $personalProperties = collect($saln->personal_properties ?? [])->values();
     $liabilities = collect($saln->liabilities ?? [])->values();

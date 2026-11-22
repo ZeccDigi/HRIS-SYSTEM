@@ -19,6 +19,16 @@ use Illuminate\View\View;
 
 class MyLeaveController extends Controller
 {
+    public function creditHistory(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $employee = $request->user()->employee;
+        abort_unless($employee, 403);
+        $data = $request->validate(['leave_type_id' => 'required|integer|exists:leave_types,id', 'year' => 'nullable|integer|min:2000|max:2100']);
+        $type = LeaveType::findOrFail($data['leave_type_id']);
+        abort_unless(in_array(strtolower(trim($type->name)), ['vacation leave', 'sick leave'], true), 404);
+        $year = (int) ($data['year'] ?? now()->year);
+        return response()->json(app(\App\Services\LeaveCreditHistoryService::class)->history($employee, $type->id, $year));
+    }
     /**
      * Display a listing of the resource.
      */
@@ -48,6 +58,7 @@ class MyLeaveController extends Controller
             ->values();
 
         $leaves = $employee->leaveRequests()
+            ->where('is_monetization', $request->query('tab') === 'monetization')
             ->with(['leaveType', 'employee', 'chief', 'hrstaff', 'regionalDirector'])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
@@ -107,15 +118,23 @@ class MyLeaveController extends Controller
             ->latest()
             ->paginate($perPage)
             ->withQueryString();
-        $credits = $employee->leaveCredits()->with('leaveType')->get();
+        $credits = $employee->leaveCredits()->with('leaveType')->where('year', (int) $year)->get();
+        $jobOrder = strtolower(trim((string) $employee->employment_status)) === 'job order';
+        $creditCards = $credits->filter(function ($credit) use ($jobOrder) {
+            $name = strtolower(trim((string) $credit->leaveType?->name));
+            return $jobOrder ? $name === 'wellness leave'
+                : in_array($name, ['vacation leave', 'sick leave', 'mandatory/force leave', 'special privilege leave', 'wellness leave'], true);
+        });
 
         return view('leaves.index', [
             'leaves' => $leaves,
             'credits' => $credits,
+            'creditCards' => $creditCards,
             'search' => $search,
             'year' => $year,
             'month' => $month,
             'status' => $status,
+            'monetizationTab' => $request->query('tab') === 'monetization',
         ]);
     }
 
@@ -133,7 +152,8 @@ class MyLeaveController extends Controller
         $leaveTypePicker = $this->leaveTypePickerData($leaveTypes, $credits);
         $holidayDates = $this->holidayDates();
 
-        return view('leaves.create', compact('leaveTypes', 'credits', 'leaveTypePicker', 'holidayDates'));
+        $monetizationSalarySource = $employee ? app(\App\Services\SalaryScheduleService::class)->approvedSalary($employee) : null;
+        return view('leaves.create', compact('leaveTypes', 'credits', 'leaveTypePicker', 'holidayDates', 'monetizationSalarySource'));
     }
 
     /**
@@ -145,6 +165,8 @@ class MyLeaveController extends Controller
         if (! $employee) {
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
+
+        if ($request->boolean('monetization_requested')) return $this->saveMonetization($request, $employee);
 
         $leaveType = LeaveType::find($request->input('leave_type_id'));
         $validated = $request->validate([
@@ -165,8 +187,9 @@ class MyLeaveController extends Controller
         $this->validateLeaveEligibilityAndDates($request, $employee, $leaveType);
 
             if ($request->hasFile('attachment')) {
-                $path = $request->file('attachment')->store('leave-attachments', 'public');
+                $path = $request->file('attachment')->store('leave-attachments', 'documents');
                 $validated['attachment_path'] = $path;
+                $validated['attachment_original_name'] = $request->file('attachment')->getClientOriginalName();
             }
 
         // Calculate duration and reserved credits (pending)
@@ -273,10 +296,10 @@ class MyLeaveController extends Controller
         }
 
         $leaf->load(['leaveType', 'chief', 'hrstaff', 'regionalDirector']);
-        $employee->ensureLeaveCredits(Carbon::parse($leaf->start_date)->year);
+        $employee->ensureLeaveCredits(Carbon::parse($leaf->start_date ?? $leaf->date_filed)->year);
         $leaveCredit = $employee->leaveCredits()
             ->where('leave_type_id', $leaf->leave_type_id)
-            ->where('year', Carbon::parse($leaf->start_date)->year)
+            ->where('year', Carbon::parse($leaf->start_date ?? $leaf->date_filed)->year)
             ->first();
 
         return view('leaves.show', compact('leaf', 'leaveCredit'));
@@ -290,7 +313,7 @@ class MyLeaveController extends Controller
         }
 
         $leaf->load(['employee.user', 'employee.leaveCredits.leaveType', 'employee.pdsGovId', 'leaveType', 'chief', 'hrstaff', 'regionalDirector']);
-        $leaf->employee?->ensureLeaveCredits(Carbon::parse($leaf->start_date)->year);
+        $leaf->employee?->ensureLeaveCredits(Carbon::parse($leaf->start_date ?? $leaf->date_filed)->year);
 
         return view('leaves.print', ['leaveRequest' => $leaf]);
     }
@@ -313,16 +336,19 @@ class MyLeaveController extends Controller
         $leaveTypePicker = $this->leaveTypePickerData($leaveTypes, $credits);
         $holidayDates = $this->holidayDates();
 
-        return view('leaves.edit', compact('leaf', 'leaveTypes', 'credits', 'leaveTypePicker', 'holidayDates'));
+        $monetizationSalarySource = app(\App\Services\SalaryScheduleService::class)->approvedSalary($employee);
+        return view('leaves.edit', compact('leaf', 'leaveTypes', 'credits', 'leaveTypePicker', 'holidayDates', 'monetizationSalarySource'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, LeaveRequest $leaf): RedirectResponse
+    public function update(Request $request, LeaveRequest $leaf): RedirectResponse|Response
     {
         $employee = auth()->user()->employee;
         abort_unless($leaf->canBeEditedBy($employee), 403);
+
+        if ($request->boolean('monetization_requested')) return $this->saveMonetization($request, $employee, $leaf);
 
         $leaveType = LeaveType::find($request->input('leave_type_id'));
         $validated = $request->validate([
@@ -334,11 +360,14 @@ class MyLeaveController extends Controller
             'leave_detail' => $this->leaveDetailTextRules($leaveType),
             'monetization_requested' => $this->monetizationRules($leaveType),
             'commutation_requested' => 'required|boolean',
+            'attachment' => 'nullable|file|mimes:pdf|max:5120',
         ]);
 
         $leaveType = LeaveType::findOrFail($validated['leave_type_id']);
         $this->normalizeLeaveDetails($validated, $leaveType);
         $this->normalizeReason($validated, $leaveType);
+        $validated['is_monetization'] = false;
+        foreach (['monetization_basis', 'monetization_days', 'monetization_salary', 'monetization_salary_grade', 'monetization_salary_step', 'monetization_salary_year', 'monetization_amount', 'monetization_factor', 'monetization_justification', 'monetization_credit_before', 'monetization_credit_after'] as $field) $validated[$field] = null;
         $this->validateLeaveEligibilityAndDates($request, $employee, $leaveType);
         $duration = LeaveRequest::calculateBusinessDays($validated['start_date'], $validated['end_date']);
         $leaveYear = Carbon::parse($validated['start_date'])->year;
@@ -362,6 +391,12 @@ class MyLeaveController extends Controller
         $availableBalance = max(0, ($credit?->balance ?? 0) - $pendingDays);
         $typeAvailableBalance = $this->selectedTypeAvailableBalance($employee, $leaveType, $leaveYear, $duration, $leaf->id);
         $isPaid = (bool) $validated['is_paid'] && $availableBalance >= $duration && $typeAvailableBalance >= $duration;
+
+        if ($request->hasFile('attachment')) {
+            $validated['attachment_path'] = $request->file('attachment')->store('leave-attachments', 'documents');
+            $validated['attachment_original_name'] = $request->file('attachment')->getClientOriginalName();
+        }
+        unset($validated['attachment']);
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($leaf, $employee, $validated, $isPaid) {
             $current = LeaveRequest::query()->lockForUpdate()->findOrFail($leaf->id);
@@ -451,6 +486,64 @@ class MyLeaveController extends Controller
             || str_contains($name, 'women');
 
         return $needsDetails ? 'required|string|max:1000' : 'nullable|string|max:1000';
+    }
+
+    private function saveMonetization(Request $request, \App\Models\Employee $employee, ?LeaveRequest $existing = null): RedirectResponse|Response
+    {
+        $salary = app(\App\Services\SalaryScheduleService::class)->approvedSalary($employee);
+        if (!$salary) throw \Illuminate\Validation\ValidationException::withMessages(['monetization_salary' => 'No salary recorded in the PDS']);
+        // Resolve again on submission; never accept a salary supplied by the browser.
+        $request->merge(['monetization_salary' => $salary['amount']]);
+        $data = $request->validate([
+            'leave_type_id' => 'required|exists:leave_types,id',
+            'monetization_basis' => 'required|in:regular,exceptional',
+            'monetization_days' => 'required|numeric|decimal:0,3|min:0.001|max:9999',
+            'monetization_salary' => 'required|numeric|decimal:0,2|gt:0|max:10000000',
+
+            'attachment' => ($existing?->attachment_path ? 'nullable' : 'required_if:monetization_basis,exceptional').'|file|mimes:pdf|max:5120',
+        ]);
+        $data = [...$data, 'monetization_salary_grade' => $salary['grade'], 'monetization_salary_step' => $salary['step'], 'monetization_salary_year' => $salary['year']];
+        $type = LeaveType::findOrFail($data['leave_type_id']);
+        if (!$this->eligibleLeaveTypes($employee)->contains('id', $type->id)) throw \Illuminate\Validation\ValidationException::withMessages(['leave_type_id' => 'You are not eligible for this leave-credit type.']);
+        $leave = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $employee, $existing, $type, $data) {
+            $employee = \App\Models\Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
+            $current = $existing ? LeaveRequest::whereKey($existing->id)->lockForUpdate()->firstOrFail() : null;
+            if ($current) abort_unless($current->canBeEditedBy($employee), 403);
+            if (!$current) {
+                $duplicate = $employee->leaveRequests()->where('is_monetization', true)->where('status', 'pending')
+                    ->where('leave_type_id', $type->id)->where('monetization_basis', $data['monetization_basis'])
+                    ->where('monetization_days', $data['monetization_days'])->where('monetization_salary', $data['monetization_salary'])->first();
+                if ($duplicate) return $duplicate;
+            }
+            $service = app(\App\Services\LeaveMonetizationService::class);
+            $year = $current?->date_filed?->year ?? now()->year;
+            $available = $service->validateCredits($employee, $type, $data, $year, $current?->id);
+            $values = collect($data)->except('attachment')->all();
+            $values = [...$values, 'is_monetization' => true, 'start_date' => null, 'end_date' => null,
+                'leave_detail_type' => null, 'leave_detail' => null, 'reason' => 'Monetization of Leave Credits',
+                'is_paid' => true, 'commutation_requested' => true,
+                'monetization_factor' => \App\Services\LeaveMonetizationService::FACTOR, 'monetization_justification' => null,
+                'monetization_amount' => $service->amount((float) $data['monetization_salary'], (float) $data['monetization_days']),
+                'monetization_credit_before' => $available, 'monetization_credit_after' => round($available - (float) $data['monetization_days'], 3)];
+            if ($request->hasFile('attachment')) {
+                $values['attachment_path'] = $request->file('attachment')->store('leave-attachments', 'documents');
+                $values['attachment_original_name'] = $request->file('attachment')->getClientOriginalName();
+            }
+            if ($current) { $current->update($values); return $current; }
+            return $employee->leaveRequests()->create([...$values, 'date_filed' => now()]);
+        });
+        if (!$existing && $leave->wasRecentlyCreated) {
+            $hrUsers = User::whereHas('employee', fn ($query) => $query->whereIn('account_role', ['hrstaff', 'admin']))->get();
+            Notification::send($hrUsers, new LeaveRequestNotification($leave));
+        }
+        AuditLogListener::logActivity($existing ? 'Update Monetization Request' : 'Submit Monetization Request', 'Leaves', 'Monetization request #'.$leave->id.' for '.$leave->monetization_days.' '.$type->name.' days', auth()->user());
+        $message = 'Monetization request '.($existing ? 'updated' : 'submitted').'. Credits are deducted only after final approval.';
+        $url = route('leaves.index', ['tab' => 'monetization']);
+        if ($request->boolean('modal')) {
+            session()->flash('success', $message);
+            return response()->view('leaves.modal-success-redirect', ['url' => $url, 'message' => $message]);
+        }
+        return redirect($url)->with('success', $message);
     }
 
     private function monetizationRules(?LeaveType $leaveType): string

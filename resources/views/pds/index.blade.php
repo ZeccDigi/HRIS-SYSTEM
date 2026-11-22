@@ -1,13 +1,13 @@
 <x-app-layout>
     <x-slot name="title">{{ __('Personal Data Sheet (CS Form No. 212)') }}</x-slot>
 
-    <div class="py-8 bg-white min-h-screen">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+    <div class="min-h-screen bg-slate-50 px-1 py-3 sm:px-2 lg:px-3">
+        <div class="mx-auto w-full min-w-0">
             <!-- Main Content Area -->
-            <div class="bg-white border-2 border-gray-100 rounded-2xl overflow-hidden shadow-lg shadow-gray-200/40">
-                <div class="p-8">
+            <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <div class="p-4 sm:p-6">
                     <!-- Top Ribbon/Header -->
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-6 border-b-2 border-gray-50 gap-4">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-gray-100 gap-4">
                         <div>
                             <h3 class="text-xl font-black text-gray-900 tracking-tight">Employee PDS Record</h3>
                             <p class="text-sm text-gray-500 font-medium italic">Civil Service Records Management Dashboard.</p>
@@ -103,23 +103,28 @@
                                 'display' => 'VIII. Other Information',
                                 'tab' => 'otherinfo',
                                 'filled' => $employee->pdsOthers->count() > 0 || $employee->pdsReferences->count() >= 3 || $employee->pdsQuestionnaire || $employee->pdsGovId,
-                                'review_names' => ['Other Information', 'References', 'Questionnaire'],
+                                'review_names' => ['Other Information'],
+                            ],
+                            [
+                                'label' => 'References',
+                                'display' => 'IX. References and Declaration',
+                                'tab' => 'declaration',
+                                'filled' => $employee->pdsReferences->count() >= 3 && $employee->pdsQuestionnaire && $employee->pdsGovId,
+                                'review_names' => ['References', 'Questionnaire'],
                             ],
                         ];
                         $sectionReview = function ($section) use ($employee) {
                             $names = $section['review_names'] ?? [$section['label']];
 
-                            return $employee->pdsSectionReviews->first(function ($review) use ($names) {
-                                return in_array($review->section_name, $names, true);
-                            });
+                            $matching = $employee->pdsSectionReviews->whereIn('section_name', $names);
+                            return $matching->first(fn ($review) => $review->status !== 'approved') ?? $matching->first();
                         };
                         $completedCount = collect($sections)->where('filled', true)->count();
                         $totalSections = count($sections);
-                        $percentage = $totalSections > 0 ? round(($completedCount / $totalSections) * 100) : 0;
-                        $approvedCount = collect($sections)->filter(function ($section) use ($sectionReview) {
-                            return optional($sectionReview($section))->status === 'approved';
-                        })->count();
-                        $isAllApproved = $approvedCount === $totalSections;
+                        $completion = app(\App\Services\PdsCompletionService::class)->summary($employee->pdsSectionReviews);
+                        $percentage = $completion['percentage'];
+                        $approvedCount = $completion['approved'];
+                        $isAllApproved = $completion['status'] === 'approved';
                     @endphp
 
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -142,7 +147,7 @@
                                             @if($isAllApproved)
                                                 <span class="inline-flex items-center px-3 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-200">
                                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-                                                    HR Approved
+                                                    Complete — HR Approved
                                                 </span>
                                             @else
                                                 <span class="inline-flex items-center px-3 py-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest rounded-full border border-amber-200">
@@ -170,7 +175,7 @@
                                         </div>
                                         <div class="overflow-hidden">
                                             <p class="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-0.5">Primary Email</p>
-                                            <p class="text-sm font-bold text-gray-800 truncate tracking-tight">{{ $employee->pdsPersonal?->email_address ?? $employee->user->email }}</p>
+                                            <p class="text-sm font-bold text-gray-800 truncate tracking-tight">{{ $employee->notification_email ?: ($employee->pdsPersonal?->email_address ?: __('N/A')) }}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -183,9 +188,9 @@
                                 <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-2">
                                     <div>
                                         <h4 class="text-lg font-black text-gray-900">Completion Status</h4>
-                                        <p class="text-sm text-gray-500 font-medium italic">Official CS Form 212 sections saved in your PDS.</p>
+                                        <p class="text-sm text-gray-500 font-medium italic">Complete when every section is approved by HR.</p>
                                         <p class="mt-1 text-xs text-gray-400 font-semibold">
-                                            {{ $completedCount }} of {{ $totalSections }} sections saved. HR review status is shown separately on each section.
+                                            {{ $approvedCount }} of {{ $totalSections }} sections approved by HR.
                                         </p>
                                     </div>
                                     <div class="bg-blue-900 text-white px-5 py-2 rounded-xl shadow-md border-b-2 border-blue-900 leading-none">

@@ -50,15 +50,52 @@
                 @if($ctoRequest->canBeEditedBy(auth()->user()->employee))
                     <x-page-action href="{{ route('my-cto.edit', $ctoRequest) }}" kind="edit" class="ml-auto" />
                 @endif
-                <a href="{{ route('my-cto.print', $ctoRequest) }}" target="_blank" rel="noopener" data-no-transition class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700">
-                    {{ __('Print CTO') }}
-                </a>
+                @if($ctoRequest->type !== 'earn' || $ctoRequest->status === 'approved')
+                    <a href="{{ route('my-cto.print', $ctoRequest) }}" target="_blank" rel="noopener" data-no-transition class="inline-flex h-9 items-center justify-center rounded-xl bg-indigo-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700">
+                        {{ $ctoRequest->type === 'earn' ? __('Print COC Certificate') : __('Print CTO') }}
+                    </a>
+                @endif
             </div>
 
-            <x-approval-tracker :payload="$trackedCtoPayload" event="cto-selected" empty="No CTO request to track yet." compact />
+            @if($ctoRequest->credit_source !== 'hr_direct')
+                <x-approval-tracker :payload="$trackedCtoPayload" event="cto-selected" empty="No CTO request to track yet." compact />
+            @endif
+            @if($ctoRequest->type === 'earn')
+                <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <h2 class="text-base font-bold text-slate-900">{{ $ctoRequest->credit_source === 'hr_direct' ? __('HR COC Credit Addition') : __('COC Earning Record') }}</h2>
+                        <span class="rounded-full px-3 py-1 text-xs font-bold uppercase {{ $ctoRequest->status === 'approved' ? 'bg-emerald-50 text-emerald-700' : ($ctoRequest->status === 'rejected' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700') }}">{{ ucfirst($ctoRequest->status) }}</span>
+                    </div>
+                    <dl class="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-gray-200 bg-gray-200 text-sm sm:grid-cols-3">
+                        <div class="min-w-0 bg-white p-4"><dt class="text-xs font-semibold text-slate-500">{{ __('Reference') }}</dt><dd class="mt-1 font-semibold">{{ $ctoRequest->reference }}</dd></div>
+                        @php
+                            $filer = $ctoRequest->recordedBy?->employee ?? ($ctoRequest->credit_source !== 'hr_direct' ? $ctoRequest->employee : null);
+                            $filerName = $filer ? trim(collect([$filer->firstname, $filer->middlename, $filer->lastname, $filer->suffix])->filter()->implode(' ')) : ($ctoRequest->recordedBy?->name ?? '—');
+                        @endphp
+                        <div class="min-w-0 bg-white p-4"><dt class="text-xs font-semibold text-slate-500">{{ __('Filed By') }}</dt><dd class="mt-1 break-words">{{ $filerName }}@if($filer?->position)<span class="mt-0.5 block text-xs text-slate-500">{{ $filer->position }}</span>@endif</dd></div>
+                        <div class="min-w-0 bg-white p-4"><dt class="text-xs font-semibold text-slate-500">{{ __('Date Filed') }}</dt><dd class="mt-1">{{ $ctoRequest->created_at?->format('M d, Y') }}</dd></div>
+                        <div class="min-w-0 bg-white p-4"><dt class="text-xs font-semibold text-slate-500">{{ __('Authorized Overtime Date') }}</dt><dd class="mt-1">{{ $ctoRequest->date_start?->format('M d, Y') }}</dd></div>
+                        <div class="min-w-0 bg-white p-4"><dt class="text-xs font-semibold text-slate-500">{{ __('Hours Rendered') }}</dt><dd class="mt-1 font-semibold">{{ number_format((float) ($ctoRequest->rendered_hours ?? $ctoRequest->hours), 2) }} {{ __('hours') }}</dd></div>
+                        <div class="min-w-0 bg-white p-4"><dt class="text-xs font-semibold text-slate-500">{{ __('COC Credits') }}</dt><dd class="mt-1 font-semibold">{{ number_format((float) $ctoRequest->hours, 2) }} {{ __('hours') }}</dd></div>
+                    </dl>
+                </section>
+            @endif
 
             {{-- CTO form preview --}}
             <section class="mt-8 rounded-[2rem] border border-gray-100 bg-white p-3 shadow-sm sm:p-5">
+                @if($ctoRequest->type === 'earn')
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-2 px-2 text-sm">
+                        <h2 class="font-bold text-slate-900">{{ __('Certificate of COC Earned') }}</h2>
+                        <span class="text-xs text-slate-500">{{ $ctoRequest->status === 'approved' ? ($ctoRequest->issued_on && $ctoRequest->issued_on->isFuture() ? __('Monthly preview — scheduled for issue at month-end') : __('Issued')) : ($ctoRequest->status === 'rejected' ? __('Not issued — request rejected') : __('Preview — awaiting final approval')) }}</span>
+                    </div>
+                    @if($ctoRequest->status === 'approved')
+                        <dl class="mb-4 grid grid-cols-3 gap-3 px-2 text-xs text-slate-600">
+                            <div>{{ __('Date Issued') }}<dd class="mt-1 font-semibold">{{ $ctoRequest->issued_on?->format('M d, Y') ?? '—' }}</dd></div>
+                            <div>{{ __('Valid Until') }}<dd class="mt-1 font-semibold">{{ $ctoRequest->valid_until?->format('M d, Y') ?? '—' }}</dd></div>
+                            <div>{{ __('Monthly Certificate Remaining Hours') }}<dd class="mt-1 font-semibold">{{ $ctoRequest->grant_remaining !== null ? number_format(app(\App\Services\CocCertificateService::class)->data($ctoRequest)['remaining'], 2) : '—' }}</dd></div>
+                        </dl>
+                    @endif
+                @endif
                 <div class="mx-auto w-full max-w-[1100px] overflow-hidden rounded-2xl border border-gray-200 bg-white">
                     <iframe
                         id="ctoPreviewFrame"
@@ -74,47 +111,17 @@
                 </div>
             </section>
 
-            @if($ctoRequest->type === 'earn')
-                <section class="mt-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
-                    <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600">{{ __('Earn COC Request Details') }}</p>
-                    <dl class="mt-4 space-y-4">
-                        <div>
-                            <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('Description of Work Rendered') }}</dt>
-                            <dd class="mt-1 whitespace-pre-line text-sm leading-6 text-slate-800">{{ $ctoRequest->purpose }}</dd>
-                        </div>
-                        @if($ctoRequest->overtime_authority_reference)
-                            <div class="border-t border-slate-100 pt-4">
-                                <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('Overtime Memo / Authority Reference') }}</dt>
-                                <dd class="mt-1 text-sm text-slate-800">{{ $ctoRequest->overtime_authority_reference }}</dd>
-                            </div>
-                        @endif
-                    </dl>
+            {{-- Supporting attachment below the certificate preview. --}}
+            @if($ctoRequest->type === 'use' && filled($ctoRequest->purpose))
+                <section class="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <h2 class="text-sm font-semibold text-slate-900">{{ __('Purpose / Reason') }}</h2>
+                    <p class="mt-2 whitespace-pre-line break-words text-sm text-slate-600">{{ $ctoRequest->purpose }}</p>
                 </section>
             @endif
+            <x-supporting-document :path="$ctoRequest->attachment_path" :original-name="$ctoRequest->attachment_original_name" />
 
-            {{-- Attachment shown below the form and Earn COC request details. --}}
-            @if($ctoRequest->attachment_path)
-                <section class="mt-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                {{ __('Attached File') }}
-                            </span>
-                            <p class="mt-1 text-sm font-semibold text-gray-700">
-                                {{ __('Supporting document submitted with this CTO request.') }}
-                            </p>
-                        </div>
-                        <a
-                            href="{{ asset('storage/' . $ctoRequest->attachment_path) }}"
-                            target="_blank"
-                            rel="noopener"
-                            class="inline-flex shrink-0 items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white transition hover:bg-indigo-700"
-                        >
-                            <i class="fa-solid fa-paperclip mr-2"></i>
-                            {{ __('View Attachment') }}
-                        </a>
-                    </div>
-                </section>
+            @if($ctoRequest->type === 'earn' && !$ctoRequest->attachment_path)
+                <p class="mt-4 px-2 text-xs text-slate-500">{{ __('No supporting attachment provided.') }}</p>
             @endif
 
             {{-- Review action appears only to the current approver. --}}
@@ -300,31 +307,11 @@
             </section>
             @endif
 
-            @if($ctoRequest->hrstaff_remarks || $ctoRequest->chief_remarks || $ctoRequest->rd_remarks)
-                <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
-                    <div class="text-xs font-black text-indigo-500 uppercase tracking-widest mb-6 inline-block border-b-2 border-indigo-100 pb-1">Approver Remarks</div>
-                    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-                        @if($ctoRequest->hrstaff_remarks)
-                            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                                <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">HR Staff</span>
-                                <p class="mt-2 whitespace-pre-line break-words text-sm font-semibold italic leading-relaxed text-gray-700">"{{ $ctoRequest->hrstaff_remarks }}"</p>
-                            </div>
-                        @endif
-                        @if($ctoRequest->chief_remarks)
-                            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                                <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">Chief</span>
-                                <p class="mt-2 whitespace-pre-line break-words text-sm font-semibold italic leading-relaxed text-gray-700">"{{ $ctoRequest->chief_remarks }}"</p>
-                            </div>
-                        @endif
-                        @if($ctoRequest->rd_remarks)
-                            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                                <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">Regional Director</span>
-                                <p class="mt-2 whitespace-pre-line break-words text-sm font-semibold italic leading-relaxed text-gray-700">"{{ $ctoRequest->rd_remarks }}"</p>
-                            </div>
-                        @endif
-                    </div>
-                </section>
-            @endif
+            <x-approver-remarks :reviews="[
+                ['label' => __('HR Staff'), 'comment' => $ctoRequest->hrstaff_remarks],
+                ['label' => __('Chief'), 'comment' => $ctoRequest->chief_remarks],
+                ['label' => __('Regional Director'), 'comment' => $ctoRequest->rd_remarks],
+            ]" />
         </div>
     </div>
 
@@ -483,7 +470,11 @@
 
                 if (decisionDescription) {
                     decisionDescription.textContent = action === 'approved'
-                        ? 'Approving will move this request to the next step\nor mark it as fully approved.'
+                        ? (@js(strtolower(auth()->user()->role ?? '')) === 'chief'
+                            ? 'Approving will forward this request to the Regional Director for final approval.'
+                            : (@js(strtolower(auth()->user()->role ?? '')) === 'regionaldirector'
+                                ? 'Approving will mark this request as fully approved.'
+                                : 'Verifying will forward this request to the Chief for approval.'))
                         : 'Rejecting will mark this request as rejected.';
                 }
 

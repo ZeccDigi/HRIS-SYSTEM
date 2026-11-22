@@ -90,6 +90,19 @@
                                 </div>
                             </div>
 
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                    <div class="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><i class="fa-solid fa-cake-candles" aria-hidden="true"></i></div>
+                                    <span class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ __('Birthday') }}</span>
+                                    <span class="mt-0.5 block text-sm font-semibold text-slate-700">{{ filled($employee->pdsPersonal?->date_of_birth) ? \Carbon\Carbon::parse($employee->pdsPersonal->date_of_birth)->format('F j, Y') : '--' }}</span>
+                                </div>
+                                <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                    <div class="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i></div>
+                                    <span class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ __('Service Start Date') }}</span>
+                                    <span class="mt-0.5 block text-sm font-semibold text-slate-700">{{ $employee->service_start_date?->format('F j, Y') ?? '--' }}</span>
+                                </div>
+                            </div>
+
                             <!-- Email Row -->
                             <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 transition-all hover:border-slate-200">
                                 <div class="flex items-center gap-3.5 min-w-0">
@@ -101,7 +114,7 @@
                                     <div class="min-w-0">
                                         <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">{{ __('Primary Email') }}</span>
                                         <span class="text-sm font-semibold text-slate-700 block mt-0.5 truncate break-all">
-                                            {{ $employee->pdsPersonal?->email_address ?? ($employee->user?->email ?? __('N/A')) }}
+                                            {{ $employee->notification_email ?: ($employee->pdsPersonal?->email_address ?: __('N/A')) }}
                                         </span>
                                     </div>
                                 </div>

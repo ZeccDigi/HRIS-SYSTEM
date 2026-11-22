@@ -26,7 +26,7 @@ class SalnReviewNotification extends Notification
     {
         return [
             'type' => 'saln_review',
-            'title' => $this->title,
+            'title' => \App\Support\NotificationTitle::format($this->title),
             'message' => $this->message,
             'saln_id' => $this->saln->id,
             'employee_id' => $this->saln->employee_id,

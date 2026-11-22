@@ -13,17 +13,9 @@
         $statusColor = $statusColors[$requestStatus]
             ?? 'border-gray-100 bg-gray-50 text-gray-600';
 
-        $typeColors = [
-            'earn' => 'border-emerald-100 bg-emerald-50 text-emerald-600',
-            'use' => 'border-blue-100 bg-blue-50 text-blue-600',
-        ];
-
         $requestType = strtolower(
             (string) ($request->type ?? '')
         );
-
-        $typeColor = $typeColors[$requestType]
-            ?? 'border-gray-100 bg-gray-50 text-gray-600';
 
         $employeeName = trim(
             ($request->employee?->firstname ?? '') . ' ' .
@@ -125,23 +117,17 @@
             >
                 {{ $employeeName ?: __('N/A') }}
             </div>
+            @if($request->credit_source === 'hr_direct')
+                <span class="text-[10px] font-semibold text-indigo-700">{{ __('Filed by HR') }}</span>
+            @endif
         </td>
 
         {{-- Type --}}
         <td class="px-2 py-3 align-middle">
             <span
-                class="inline-flex max-w-full whitespace-normal break-words rounded-full border px-2 py-1 text-center text-[10px] font-black uppercase leading-4 tracking-wider {{ $typeColor }}"
+                class="whitespace-normal break-words text-sm font-medium leading-5 text-gray-900"
             >
                 {{ $request->type_label }}
-            </span>
-        </td>
-
-        {{-- Status --}}
-        <td class="px-2 py-3 text-center align-middle">
-            <span
-                class="inline-flex max-w-full whitespace-normal break-words rounded-full border px-2 py-1 text-center text-[10px] font-bold uppercase leading-4 {{ $statusColor }}"
-            >
-                {{ ucfirst($requestStatus) }}
             </span>
         </td>
 
@@ -184,9 +170,18 @@
             </div>
         </td>
 
-        {{-- Actions: 2 × 2 grid --}}
+        {{-- Status --}}
+        <td class="px-2 py-3 text-center align-middle">
+            <span
+                class="inline-flex max-w-full whitespace-normal break-words rounded-full border px-2 py-1 text-center text-[10px] font-bold uppercase leading-4 {{ $statusColor }}"
+            >
+                {{ ucfirst($requestStatus) }}
+            </span>
+        </td>
+
+        {{-- Actions --}}
         <td class="px-1 py-3 text-center align-middle">
-            <div class="mx-auto grid w-fit grid-cols-2 place-items-center gap-1">
+            <div class="mx-auto flex w-fit items-center justify-center gap-1">
 
                 {{-- View --}}
                 <a
@@ -210,6 +205,21 @@
                 >
                     <i class="fa-solid fa-print text-sm"></i>
                 </a>
+
+                @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true))
+                    <form action="{{ route('hr.cto.destroy', $request) }}" method="POST" class="inline-block" data-archive-question="{{ __('Archive this CTO request?') }}">
+                        @csrf
+                        @method('DELETE')
+                        <button
+                            type="submit"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-900"
+                            title="{{ __('Archive') }}"
+                            aria-label="{{ __('Archive CTO request') }}"
+                        >
+                            <i class="fa-solid fa-box-archive text-sm"></i>
+                        </button>
+                    </form>
+                @endif
 
             </div>
         </td>

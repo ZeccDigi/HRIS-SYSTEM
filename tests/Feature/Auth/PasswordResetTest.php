@@ -35,14 +35,14 @@ test('password can be reset with a valid recovery OTP', function () {
     $response = $this->post('/reset-password-otp', [
         'email' => $user->email,
         'otp' => '123456',
-        'password' => 'new-secure-password',
-        'password_confirmation' => 'new-secure-password',
+        'password' => 'New-Secure-Password9!',
+        'password_confirmation' => 'New-Secure-Password9!',
     ]);
 
     $response->assertRedirect(route('login'));
     $user->refresh();
 
-    expect(Hash::check('new-secure-password', $user->password))->toBeTrue()
+    expect(Hash::check('New-Secure-Password9!', $user->password))->toBeTrue()
         ->and($user->otp)->toBeNull()
         ->and($user->otp_expires_at)->toBeNull();
 });

@@ -12,11 +12,9 @@ class LeaveTypeController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): View
+    public function index(): RedirectResponse
     {
-        $leaveTypes = LeaveType::latest()->get();
-
-        return view('leaves.types.index', compact('leaveTypes'));
+        return redirect()->route('utilities.index', ['tab' => 'leave-types']);
     }
 
     /**
@@ -41,7 +39,7 @@ class LeaveTypeController extends Controller
 
         LeaveType::create($validated);
 
-        return redirect()->back()->with('success', 'Leave type created successfully.');
+        return redirect()->route('utilities.index', ['tab' => 'leave-types'])->with('success', 'Leave type created successfully.');
     }
 
     /**
@@ -75,7 +73,7 @@ class LeaveTypeController extends Controller
 
         $leaveType->update($validated);
 
-        return redirect()->back()->with('success', 'Leave type updated successfully.');
+        return redirect()->route('utilities.index', ['tab' => 'leave-types'])->with('success', 'Leave type updated successfully.');
     }
 
     /**
@@ -85,6 +83,6 @@ class LeaveTypeController extends Controller
     {
         $leaveType->delete();
 
-        return redirect()->back()->with('success', 'Leave type deleted successfully.');
+        return redirect()->route('utilities.index', ['tab' => 'leave-types'])->with('success', 'Leave type deleted successfully.');
     }
 }

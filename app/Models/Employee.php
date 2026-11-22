@@ -26,6 +26,7 @@ class Employee extends Model
         'account_role',
         'employment_status',
         'service_start_date',
+        'salary_grade', 'salary_step', 'salary_schedule_year', 'monthly_salary',
         'core_time_start_date',
         'core_time_end_date',
         'core_time_schedule',
@@ -40,15 +41,23 @@ class Employee extends Model
     {
         return [
             'service_start_date' => 'date',
+            'salary_schedule_year' => 'integer', 'monthly_salary' => 'decimal:2',
             'core_time_start_date' => 'date',
             'core_time_end_date' => 'date',
             'core_time_schedule' => 'array',
+            'pds_approved_data' => 'array',
+            'pds_record_year' => 'integer',
         ];
     }
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function coreTimeSchedules(): HasMany
+    {
+        return $this->hasMany(EmployeeCoreTimeSchedule::class);
     }
 
     // PDS Relationships

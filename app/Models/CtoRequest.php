@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CtoRequest extends Model
 {
+    use SoftDeletes;
     protected $fillable = [
         'employee_id',
         'type',
@@ -18,9 +20,11 @@ class CtoRequest extends Model
         'overtime_authority_reference',
         'exception_justification',
         'attachment_path',
+        'attachment_original_name',
         'applicant_signature_path',
         'cto_balance_before',
         'cto_balance_after',
+        'credits_posted_at',
         'status',
         'approved_by_chief',
         'chief_status',
@@ -32,6 +36,8 @@ class CtoRequest extends Model
         'approved_by_regionaldirector',
         'rd_status',
         'rd_remarks',
+        'credit_source', 'recorded_by', 'issued_on', 'valid_until', 'grant_remaining',
+        'rendered_hours', 'coc_rate', 'overtime_classification', 'coc_certificate_id',
     ];
 
     protected function casts(): array
@@ -44,6 +50,11 @@ class CtoRequest extends Model
             'hr_verified_at' => 'datetime',
             'cto_balance_before' => 'decimal:2',
             'cto_balance_after' => 'decimal:2',
+            'credits_posted_at' => 'datetime',
+            'issued_on' => 'date',
+            'valid_until' => 'date',
+            'grant_remaining' => 'decimal:2',
+            'rendered_hours' => 'decimal:2', 'coc_rate' => 'decimal:2',
         ];
     }
 
@@ -64,6 +75,11 @@ class CtoRequest extends Model
     public function chief(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'approved_by_chief');
+    }
+
+    public function recordedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
     }
 
     public function hrstaff(): BelongsTo

@@ -574,7 +574,9 @@
                     this.approveModalAction = isHR ? 'Verify' : 'Approve';
                     this.approveModalDescription = isHR
                         ? 'Verifying will forward this request\nto the next approval stage.'
-                        : 'Approving will move this request to the next step\nor mark it as fully approved.';
+                        : (@js(strtolower(auth()->user()->role ?? '')) === 'chief'
+                            ? 'Approving will forward this application to the Regional Director for final approval.'
+                            : 'Approving will mark this application as fully approved.');
                     this.approveModalOpen = true;
 
                     document.documentElement.classList.add('overflow-hidden');

@@ -4,23 +4,42 @@
     @php
         $role = strtolower(auth()->user()->role ?? '');
         $isApprover = in_array($role, ['admin', 'hrstaff', 'recordofficer', 'chief', 'regionaldirector'], true);
-        $reviewStage = $travelOrder->tar_review_status ?: ($travelOrder->tar_submitted_at ? 'pending_hr' : 'not_submitted');
+        $reviewStage = $travelOrder->tar_review_status ?: ($travelOrder->tar_submitted_at ? 'pending_chief' : 'not_submitted');
         $stageLabels = [
-            'pending_hr' => 'Pending HR Review',
-            'pending_chief' => 'Pending Division Chief Review',
+            'pending_chief' => 'Pending Chief Review',
             'pending_rd' => 'Pending Regional Director Review',
             'approved' => 'Fully Approved',
             'returned' => 'Returned for Correction',
             'not_submitted' => 'Not Submitted',
         ];
-        $canReview = ($reviewStage === 'pending_hr' && in_array($role, ['admin', 'hrstaff'], true))
-            || ($reviewStage === 'pending_chief' && $role === 'chief' && strcasecmp((string) auth()->user()->employee?->division, (string) $travelOrder->employee?->division) === 0)
+        $canReview = ($reviewStage === 'pending_chief' && $role === 'chief' && strcasecmp((string) auth()->user()->employee?->division, (string) $travelOrder->employee?->division) === 0)
             || ($reviewStage === 'pending_rd' && $role === 'regionaldirector');
         $workflowSteps = [
-            ['label' => 'HR', 'status' => $travelOrder->tar_hr_status ?: 'pending', 'stage' => 'pending_hr'],
-            ['label' => 'Division Chief', 'status' => $travelOrder->tar_chief_status ?: 'pending', 'stage' => 'pending_chief'],
+            ['label' => 'Chief', 'status' => $travelOrder->tar_chief_status ?: 'pending', 'stage' => 'pending_chief'],
             ['label' => 'Regional Director', 'status' => $travelOrder->tar_rd_status ?: 'pending', 'stage' => 'pending_rd'],
         ];
+        $returnedReviews = collect([
+            [
+                'stage' => __('Chief Review'),
+                'role' => __('Chief'),
+                'status' => $travelOrder->tar_chief_status,
+                'reviewer' => $travelOrder->tarChiefReviewer ? trim(($travelOrder->tarChiefReviewer->firstname ?? '') . ' ' . ($travelOrder->tarChiefReviewer->lastname ?? '')) : null,
+                'remarks' => $travelOrder->tar_chief_remarks,
+            ],
+            [
+                'stage' => __('Regional Director Review'),
+                'role' => __('Regional Director'),
+                'status' => $travelOrder->tar_rd_status,
+                'reviewer' => $travelOrder->tarRegionalDirectorReviewer ? trim(($travelOrder->tarRegionalDirectorReviewer->firstname ?? '') . ' ' . ($travelOrder->tarRegionalDirectorReviewer->lastname ?? '')) : null,
+                'remarks' => $travelOrder->tar_rd_remarks,
+            ],
+        ])->map(function ($item) {
+            $item['remarks'] = \App\Support\ApproverRemark::visible($item['remarks']);
+            return $item;
+        })->filter(function ($item) use ($travelOrder) {
+            return filled($item['remarks']) && ($item['status'] === 'returned'
+                || $travelOrder->tar_review_status === 'returned');
+        });
     @endphp
     <div class="bg-slate-100 py-6">
         <div class="mx-auto mb-4 flex max-w-[210mm] flex-wrap items-center justify-between gap-3 px-3 sm:px-0">
@@ -75,6 +94,41 @@
                     </section>
                 @endif
 
+                @if($returnedReviews->isNotEmpty())
+                    <section class="rounded-xl border border-red-200 bg-white p-5 shadow-sm">
+                        <div class="flex items-center justify-between border-b border-red-100 pb-3">
+                            <div class="flex items-center gap-2.5">
+                                <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                                    <i class="fa-solid fa-circle-exclamation text-sm"></i>
+                                </span>
+                                <div>
+                                    <h3 class="text-sm font-extrabold text-red-900">{{ __('Approver Return Remarks') }}</h3>
+                                    <p class="text-[11px] font-medium text-slate-500">{{ __('This report was returned with the following notes for correction.') }}</p>
+                                </div>
+                            </div>
+                            <span class="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-red-700">
+                                {{ __('Returned for Correction') }}
+                            </span>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            @foreach($returnedReviews as $review)
+                                <div class="rounded-lg border border-red-100 bg-red-50/50 p-4">
+                                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-red-100/80 pb-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex rounded bg-red-200/60 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-red-800">{{ $review['stage'] }}</span>
+                                            <span class="text-xs font-bold text-slate-800">{{ $review['reviewer'] ?: $review['role'] }}</span>
+                                            @if($review['reviewer'])<span class="text-xs text-slate-400">({{ $review['role'] }})</span>@endif
+                                        </div>
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-red-600">{{ __('Returned') }}</span>
+                                    </div>
+                                    <div class="mt-2.5 whitespace-pre-wrap text-xs font-semibold leading-relaxed text-slate-800">{{ $review['remarks'] ?: __('No specific remarks provided.') }}</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
                 @if($travelOrder->tar_submitted_at && $canReview)
                     <section class="border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
@@ -99,7 +153,7 @@
                                         <i class="fa-solid fa-xmark"></i>{{ __('Return TAR') }}
                                     </button>
                                     <button type="submit" name="action" value="approve" class="inline-flex min-h-11 min-w-48 items-center justify-center gap-2 rounded-xl bg-blue-800 px-5 text-xs font-black uppercase tracking-wider text-white transition hover:bg-blue-900">
-                                        <i class="fa-solid fa-check"></i>{{ in_array($role, ['admin', 'hrstaff'], true) ? __('Verify TAR') : __('Approve TAR') }}
+                                        <i class="fa-solid fa-check"></i>{{ __('Approve TAR') }}
                                     </button>
                                 </div>
                             </form>

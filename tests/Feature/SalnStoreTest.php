@@ -20,15 +20,15 @@ function createApprovedEmployeeUser(array $employeeOverrides = []): array
     return compact('user', 'employee');
 }
 
-test('saln create page loads for employee with prefilled declarant info', function () {
+test('saln create page uses NA when no PDS declarant fields exist for the year', function () {
     ['user' => $user] = createApprovedEmployeeUser();
 
     $this->actingAs($user)
         ->get(route('salns.create'))
         ->assertOk()
         ->assertSee('SALN Update')
-        ->assertSee('Reyes')
-        ->assertSee('Maria');
+        ->assertSee('name="declarant_info[family_name]" value="N/A"', false)
+        ->assertSee('name="declarant_info[first_name]" value="N/A"', false);
 });
 
 test('employee can submit a complete saln form', function () {
@@ -129,6 +129,7 @@ test('saln pdf download returns a pdf file', function () {
     ['user' => $user, 'employee' => $employee] = createApprovedEmployeeUser();
 
     $saln = Saln::create([
+        'review_status' => 'approved',
         'employee_id' => $employee->id,
         'type_of_filing' => 'annual_filing',
         'as_of_date' => '2026-12-31',

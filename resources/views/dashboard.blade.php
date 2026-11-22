@@ -230,16 +230,26 @@
 
                     @if($approvalCounts->isEmpty())
                         <div class="grid gap-2">
-                            <a href="{{ route('pds.index') }}" class="rounded-lg border border-blue-800 bg-blue-900 p-3 text-white shadow-md shadow-blue-100 transition hover:bg-blue-800">
+                            <a href="{{ route('pds.index') }}" class="flex items-center justify-between gap-4 rounded-lg border border-blue-800 bg-blue-900 p-3 text-white shadow-md shadow-blue-100 transition hover:bg-blue-800">
+                                <div>
                                 <span class="block text-sm font-bold tracking-tight">{{ __('View PDS') }}</span>
                                 <span class="mt-2 inline-flex items-center text-[10px] font-black bg-white text-blue-900 px-3 py-1.5 rounded-md uppercase tracking-widest">
                                     {{ __('Open PDS') }}
                                 </span>
+                                </div>
+                                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white" aria-hidden="true">
+                                    <i class="fa-solid fa-id-card text-sm"></i>
+                                </span>
                             </a>
-                            <a href="{{ route('salns.index') }}" class="rounded-lg border border-blue-800 bg-blue-900 p-3 text-white shadow-md shadow-blue-100 transition hover:bg-blue-800">
+                            <a href="{{ route('salns.index') }}" class="flex items-center justify-between gap-4 rounded-lg border border-blue-800 bg-blue-900 p-3 text-white shadow-md shadow-blue-100 transition hover:bg-blue-800">
+                                <div>
                                 <span class="block text-sm font-bold tracking-tight">{{ __('View SALN') }}</span>
                                 <span class="mt-2 inline-flex items-center text-[10px] font-black bg-white text-blue-900 px-3 py-1.5 rounded-md uppercase tracking-widest">
                                     {{ __('Open SALN') }}
+                                </span>
+                                </div>
+                                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white" aria-hidden="true">
+                                    <i class="fa-solid fa-file-invoice-dollar text-sm"></i>
                                 </span>
                             </a>
                         </div>

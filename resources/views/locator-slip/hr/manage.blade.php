@@ -3,6 +3,7 @@
 
     @php
         $currentYear = now()->year;
+        $canArchiveLocator = in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true);
     @endphp
 
     <div
@@ -154,15 +155,15 @@
         >
             <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
                 <div class="w-full overflow-x-auto">
-                    <table class="w-full table-fixed divide-y divide-slate-200">
+                    <table class="w-full table-fixed border-collapse text-left" style="min-width: 880px;">
                         <colgroup>
-                            <col style="width: 15%">
-                            <col style="width: 15%">
-                            <col style="width: 15%">
-                            <col style="width: 15%">
-                            <col style="width: 16%">
+                            <col style="width: {{ $canArchiveLocator ? 17 : 18 }}%">
                             <col style="width: 13%">
-                            <col style="width: 11%">
+                            <col style="width: 12%">
+                            <col style="width: {{ $canArchiveLocator ? 15 : 16 }}%">
+                            <col style="width: {{ $canArchiveLocator ? 14 : 17 }}%">
+                            <col style="width: 13%">
+                            <col style="width: {{ $canArchiveLocator ? 16 : 11 }}%">
                         </colgroup>
 
                         <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
@@ -417,6 +418,21 @@
                                                 <i class="fa-solid fa-print text-sm"></i>
                                             </a>
 
+                                            @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true))
+                                                <form action="{{ route('hr.locator-slips.destroy', $slip) }}" method="POST" class="inline-block" data-archive-question="{{ __('Archive this locator slip?') }}">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button
+                                                        type="submit"
+                                                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-900"
+                                                        title="{{ __('Archive') }}"
+                                                        aria-label="{{ __('Archive locator slip') }}"
+                                                    >
+                                                        <i class="fa-solid fa-box-archive text-sm"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
+
                                         </div>
                                     </td>
                                 </tr>
@@ -466,15 +482,15 @@
         >
             <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
                 <div class="w-full overflow-x-auto">
-                    <table class="w-full table-fixed divide-y divide-slate-200">
+                    <table class="w-full table-fixed border-collapse text-left" style="min-width: 880px;">
                         <colgroup>
-                            <col style="width: 15%">
-                            <col style="width: 15%">
-                            <col style="width: 15%">
-                            <col style="width: 15%">
-                            <col style="width: 16%">
+                            <col style="width: {{ $canArchiveLocator ? 17 : 18 }}%">
                             <col style="width: 13%">
-                            <col style="width: 11%">
+                            <col style="width: 12%">
+                            <col style="width: {{ $canArchiveLocator ? 15 : 16 }}%">
+                            <col style="width: {{ $canArchiveLocator ? 14 : 17 }}%">
+                            <col style="width: 13%">
+                            <col style="width: {{ $canArchiveLocator ? 16 : 11 }}%">
                         </colgroup>
 
                         <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
@@ -726,6 +742,21 @@
                                             >
                                                 <i class="fa-solid fa-print text-sm"></i>
                                             </a>
+
+                                            @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true))
+                                                <form action="{{ route('hr.locator-slips.destroy', $slip) }}" method="POST" class="inline-block" data-archive-question="{{ __('Archive this locator slip?') }}">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button
+                                                        type="submit"
+                                                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-900"
+                                                        title="{{ __('Archive') }}"
+                                                        aria-label="{{ __('Archive locator slip') }}"
+                                                    >
+                                                        <i class="fa-solid fa-box-archive text-sm"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>

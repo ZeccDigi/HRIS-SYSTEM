@@ -177,6 +177,7 @@ class LeaveApplicationController extends Controller
 
     private function applyFilters($query, string $search, mixed $leaveTypeId): void
     {
+        $query->where('is_monetization', request()->query('tab') === 'monetization');
         $query
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
@@ -228,7 +229,7 @@ class LeaveApplicationController extends Controller
             abort(403);
         }
 
-        $leaveYear = Carbon::parse($leaveApplication->start_date)->year;
+        $leaveYear = Carbon::parse($leaveApplication->start_date ?? $leaveApplication->date_filed)->year;
         $leaveApplication->employee?->ensureLeaveCredits($leaveYear);
 
         $creditLeaveType = $leaveApplication->leaveType;
@@ -253,7 +254,7 @@ class LeaveApplicationController extends Controller
             abort(403);
         }
 
-        $leaveApplication->employee?->ensureLeaveCredits(Carbon::parse($leaveApplication->start_date)->year);
+        $leaveApplication->employee?->ensureLeaveCredits(Carbon::parse($leaveApplication->start_date ?? $leaveApplication->date_filed)->year);
 
         return view('leaves.print', ['leaveRequest' => $leaveApplication]);
     }
@@ -272,6 +273,8 @@ class LeaveApplicationController extends Controller
             return redirect()->route('leave-applications.index')->with('error', __('You can only review leave applications from your division.'));
         }
 
+        abort_unless($leaveApplication->status === 'pending', 403, 'This application has already been completed.');
+
         $employeeId = auth()->user()->employee?->id;
         $isHR = $role === 'hrstaff';
 
@@ -288,7 +291,33 @@ class LeaveApplicationController extends Controller
 
         $remarks = $validated['remarks'] ?? null;
 
-        DB::transaction(function () use ($validated, $leaveApplication, $role, $employeeId, $isHR, $remarks) {
+        DB::transaction(function () use ($validated, $leaveApplication, $role, $employeeId, $isHR, $remarks, $request) {
+            $leaveApplication = LeaveRequest::whereKey($leaveApplication->id)->lockForUpdate()->firstOrFail();
+            $hrPending = in_array($leaveApplication->hrstaff_status, [null, 'pending'], true)
+                && $leaveApplication->approved_by_hrstaff === null;
+            $chiefPending = in_array($leaveApplication->chief_status, [null, 'pending'], true)
+                && $leaveApplication->approved_by_chief === null;
+            $rdPending = in_array($leaveApplication->rd_status, [null, 'pending'], true)
+                && $leaveApplication->approved_by_regionaldirector === null;
+            $stageReady = $leaveApplication->status === 'pending' && match ($role) {
+                'hrstaff' => $hrPending && $chiefPending && $rdPending,
+                'chief' => $leaveApplication->hrstaff_status === 'approved' && $chiefPending && $rdPending,
+                'regionaldirector' => $leaveApplication->hrstaff_status === 'approved'
+                    && $leaveApplication->chief_status === 'approved' && $rdPending,
+                default => false,
+            };
+            abort_unless($stageReady, 403, 'This application is not awaiting your decision or has already been completed.');
+            if ($leaveApplication->is_monetization) {
+                $employee = Employee::whereKey($leaveApplication->employee_id)->lockForUpdate()->firstOrFail();
+                if ($isHR) {
+                    $request->validate(['monetization_verified' => 'required|accepted']);
+                    if ($leaveApplication->monetization_basis === 'exceptional' && !$leaveApplication->attachment_path) throw \Illuminate\Validation\ValidationException::withMessages(['monetization' => 'A supporting letter is required for exceptional monetization.']);
+                    $available = app(\App\Services\LeaveMonetizationService::class)->validateCredits($employee, $leaveApplication->leaveType, $leaveApplication->toArray(), $leaveApplication->date_filed->year, $leaveApplication->id);
+                    $leaveApplication->monetization_credit_before = $available;
+                    $leaveApplication->monetization_credit_after = round($available - (float) $leaveApplication->monetization_days, 3);
+                    $leaveApplication->monetization_verified_at = now();
+                }
+            }
             if ($validated['status'] === 'rejected') {
                 $leaveApplication->status = 'rejected';
                 if ($role === 'chief') {
@@ -355,7 +384,7 @@ class LeaveApplicationController extends Controller
             auth()->user()
         );
 
-        return redirect()->route('leave-applications.index')->with('success', __('Leave application updated successfully.'));
+        return redirect()->route($leaveApplication->is_monetization ? 'leave-applications.all' : 'leave-applications.index', $leaveApplication->is_monetization ? ['tab' => 'monetization'] : [])->with('success', __('Leave application updated successfully.'));
     }
 
     private function scopeToChiefDivision($query): void
@@ -397,6 +426,22 @@ class LeaveApplicationController extends Controller
     private function currentChiefDivision(): string
     {
         return trim((string) auth()->user()?->employee?->division);
+    }
+
+    public function destroy(LeaveRequest $leaveApplication): RedirectResponse
+    {
+        abort_unless(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true), 403);
+
+        $leaveApplication->delete();
+
+        AuditLogListener::logActivity(
+            'Archive Leave Application',
+            'Leaves',
+            "Archived leave application (#{$leaveApplication->id}) for " . trim(($leaveApplication->employee?->firstname ?? '') . ' ' . ($leaveApplication->employee?->lastname ?? '')),
+            auth()->user()
+        );
+
+        return redirect()->back()->with('success', 'Leave application moved to Archive.');
     }
 
     private function perPage(Request $request): int

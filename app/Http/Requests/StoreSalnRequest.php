@@ -14,6 +14,26 @@ class StoreSalnRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        foreach (['real_properties' => ['assessed_value', 'fair_market_value', 'acquisition_cost'], 'personal_properties' => ['acquisition_cost'], 'liabilities' => ['outstanding_balance']] as $group => $fields) {
+            $rows = $this->input($group, []);
+            if (!is_array($rows)) continue;
+            foreach ($rows as &$row) {
+                if (!is_array($row)) continue;
+                foreach ($fields as $field) if (isset($row[$field]) && is_string($row[$field])) $row[$field] = str_replace(',', '', $row[$field]);
+            }
+            unset($row);
+            $this->merge([$group => $rows]);
+        }
+        $employee = $this->user()?->employee;
+        if ($employee && $this->filled('as_of_date')) {
+            try { $year = \Carbon\Carbon::parse($this->input('as_of_date'))->year; } catch (\Throwable) { $year = null; }
+            if ($year) {
+                $service = app(\App\Services\SalnPdsDefaultsService::class);
+                foreach ($service->defaults($employee, $year) as $key => $defaults) {
+                    if (is_array($this->input($key, []))) $this->merge([$key => $service->merge($this->input($key, []), $defaults)]);
+                }
+            }
+        }
         $this->merge([
             'has_business_interests' => $this->boolean('has_business_interests'),
             'has_relatives_in_gov' => $this->boolean('has_relatives_in_gov'),

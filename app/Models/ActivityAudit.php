@@ -35,7 +35,7 @@ class ActivityAudit extends Model
             return '-';
         }
 
-        return sprintf('%02d:%02d:%02d.00', intdiv($this->duration_seconds, 3600), intdiv($this->duration_seconds % 3600, 60), $this->duration_seconds % 60);
+        return sprintf('%02d.%02d.%02d', intdiv($this->duration_seconds, 3600), intdiv($this->duration_seconds % 3600, 60), $this->duration_seconds % 60);
     }
 
     public function user()

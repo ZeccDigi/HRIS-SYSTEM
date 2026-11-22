@@ -143,6 +143,36 @@
                         @csrf
                         @method('PUT')
 
+                        @if($isRecordsOfficer)
+                        {{-- TAR Required Toggle --}}
+                        <div class="mb-5 rounded-xl border border-slate-100 bg-slate-50 p-4"
+                             x-data="{ tarRequired: true }">
+                            <input type="hidden" name="is_tar_required" value="0">
+                            <div class="flex items-start gap-3">
+                                <input
+                                    type="checkbox"
+                                    id="is_tar_required"
+                                    name="is_tar_required"
+                                    value="1"
+                                    x-model="tarRequired"
+                                    checked
+                                    class="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                >
+                                <div class="min-w-0">
+                                    <label for="is_tar_required" class="block cursor-pointer text-xs font-black uppercase tracking-widest text-gray-700">
+                                        {{ __('TAR Submission Required') }}
+                                    </label>
+                                    <p class="mt-0.5 text-xs text-gray-400" x-show="tarRequired">
+                                        {{ __('Employee must submit a Travel Authority Report within 5 days after travel.') }}
+                                    </p>
+                                    <p class="mt-0.5 text-xs font-semibold text-amber-600" x-show="!tarRequired">
+                                        {{ __('TAR submission will NOT be required for this travel authority.') }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+
                         <div>
                             <label
                                 for="travel_order_remarks"
@@ -249,37 +279,12 @@
                 </div>
             @endif
 
-            @if($travelOrder->recordofficer_remarks || $travelOrder->chief_remarks || $travelOrder->hrstaff_remarks || $travelOrder->rd_remarks)
-                <section class="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
-                    <div class="text-xs font-black text-indigo-500 uppercase tracking-widest mb-6 inline-block border-b-2 border-indigo-100 pb-1">Approver Remarks</div>
-                    <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
-                        @if($travelOrder->recordofficer_remarks)
-                            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                                <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">Records Officer</span>
-                                <p class="mt-2 whitespace-pre-line break-words text-sm font-semibold italic leading-relaxed text-gray-700">"{{ $travelOrder->recordofficer_remarks }}"</p>
-                            </div>
-                        @endif
-                        @if($travelOrder->chief_remarks)
-                            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                                <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">Chief</span>
-                                <p class="mt-2 whitespace-pre-line break-words text-sm font-semibold italic leading-relaxed text-gray-700">"{{ $travelOrder->chief_remarks }}"</p>
-                            </div>
-                        @endif
-                        @if($travelOrder->hrstaff_remarks)
-                            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                                <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">HR Staff</span>
-                                <p class="mt-2 whitespace-pre-line break-words text-sm font-semibold italic leading-relaxed text-gray-700">"{{ $travelOrder->hrstaff_remarks }}"</p>
-                            </div>
-                        @endif
-                        @if($travelOrder->rd_remarks)
-                            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                                <span class="block text-[10px] font-black uppercase tracking-widest text-gray-400">Regional Director</span>
-                                <p class="mt-2 whitespace-pre-line break-words text-sm font-semibold italic leading-relaxed text-gray-700">"{{ $travelOrder->rd_remarks }}"</p>
-                            </div>
-                        @endif
-                    </div>
-                </section>
-            @endif
+            <x-approver-remarks :reviews="[
+                ['label' => __('Records Officer'), 'comment' => $travelOrder->recordofficer_remarks],
+                ['label' => __('Chief'), 'comment' => $travelOrder->chief_remarks],
+                ['label' => __('HR Staff'), 'comment' => $travelOrder->hrstaff_remarks],
+                ['label' => __('Regional Director'), 'comment' => $travelOrder->rd_remarks],
+            ]" />
         </div>
     </div>
 

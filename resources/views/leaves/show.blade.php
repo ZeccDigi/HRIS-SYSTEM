@@ -35,6 +35,7 @@
                 </button>
             </div>
 
+            @include('leaves._monetization-summary', ['leaveRequest' => $leaf])
             {{-- Approval tracker --}}
             @php
                 $leaveName = Str::of($leaf->leaveType?->name ?? 'Leave')
@@ -70,31 +71,11 @@
                 compact
             />
 
-            @if($leaf->hrstaff_remarks || $leaf->chief_remarks || $leaf->rd_remarks)
-                <div class="mb-6 bg-white overflow-hidden shadow-sm rounded-3xl border border-gray-100 p-6 md:p-8">
-                    <div class="text-xs font-black text-indigo-500 uppercase tracking-widest mb-6 inline-block border-b-2 border-indigo-100 pb-1">Approver Remarks</div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        @if($leaf->hrstaff_remarks)
-                            <div class="p-5 rounded-2xl bg-gray-50 border border-gray-100">
-                                <span class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">HR Staff</span>
-                                <p class="text-sm font-semibold text-gray-700 leading-relaxed italic">"{{ $leaf->hrstaff_remarks }}"</p>
-                            </div>
-                        @endif
-                        @if($leaf->chief_remarks)
-                            <div class="p-5 rounded-2xl bg-gray-50 border border-gray-100">
-                                <span class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Chief</span>
-                                <p class="text-sm font-semibold text-gray-700 leading-relaxed italic">"{{ $leaf->chief_remarks }}"</p>
-                            </div>
-                        @endif
-                        @if($leaf->rd_remarks)
-                            <div class="p-5 rounded-2xl bg-gray-50 border border-gray-100">
-                                <span class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Regional Director</span>
-                                <p class="text-sm font-semibold text-gray-700 leading-relaxed italic">"{{ $leaf->rd_remarks }}"</p>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            @endif
+            <x-approver-remarks :reviews="[
+                ['label' => __('HR Staff'), 'comment' => $leaf->hrstaff_remarks],
+                ['label' => __('Chief'), 'comment' => $leaf->chief_remarks],
+                ['label' => __('Regional Director'), 'comment' => $leaf->rd_remarks],
+            ]" />
 
             {{-- Full A4 leave form preview --}}
             <section

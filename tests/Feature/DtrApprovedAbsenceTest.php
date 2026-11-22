@@ -19,6 +19,44 @@ function approvedDtrEvents(Carbon $start, Carbon $end, array $employeeIds)
     return $method->invoke(new DtrController, $start, $end, $employeeIds);
 }
 
+test('approved monetization does not create an attendance event', function () {
+    $employee = Employee::create(['firstname' => 'Ana', 'lastname' => 'Garcia']);
+    $type = LeaveType::create(['name' => 'Vacation Leave', 'is_active' => true]);
+    LeaveRequest::create([
+        'employee_id' => $employee->id,
+        'leave_type_id' => $type->id,
+        'start_date' => '2026-11-05',
+        'end_date' => '2026-11-06',
+        'date_filed' => '2026-11-01',
+        'reason' => 'Monetization of Leave Credits',
+        'status' => 'approved',
+    ]);
+
+    expect(approvedDtrEvents(Carbon::parse('2026-11-01'), Carbon::parse('2026-11-30'), [$employee->id]))->toBeEmpty();
+});
+
+test('confirmed locator OUT without a return remains valid without inventing return slots', function () {
+    $employee = Employee::create(['firstname' => 'Ana', 'lastname' => 'Garcia']);
+    $slip = LocatorSlip::create([
+        'employee_id' => $employee->id,
+        'date_covered' => '2026-11-12',
+        'destination' => 'Digos',
+        'purpose' => 'Errand',
+        'type' => 'Pass Slip',
+        'time_from' => '10:00:00',
+        'out_scanned_at' => '2026-11-12 10:00:00',
+        'time_to' => null,
+        'status' => 'approved',
+    ]);
+    $event = approvedDtrEvents(Carbon::parse('2026-11-01'), Carbon::parse('2026-11-30'), [$employee->id])->get($employee->id.'|2026-11-12');
+    expect($event['remarks'])->toBe('Pass Slip')
+        ->and($event['slot_labels'])->toBe(['am_out' => 'Pass Slip'])
+        ->and($slip->fresh()->time_to)->toBeNull();
+
+    $slip->update(['out_scanned_at' => null]);
+    expect(approvedDtrEvents(Carbon::parse('2026-11-01'), Carbon::parse('2026-11-30'), [$employee->id]))->toBeEmpty();
+});
+
 test('approved leave appears on covered working days in the DTR', function () {
     $employee = Employee::create([
         'firstname' => 'Ana',
@@ -107,6 +145,10 @@ test('approved sick leave overrides a conflicting raw scan in HR and employee DT
         'core_time_start_date' => '2026-08-03',
         'core_time_end_date' => '2026-12-04',
         'core_time_schedule' => [
+            'tuesday' => [
+                'am_start' => '07:30', 'am_end' => '12:00',
+                'pm_start' => '13:00', 'pm_end' => '17:00',
+            ],
             'monday' => [
                 'am_start' => '07:30',
                 'am_end' => '12:00',

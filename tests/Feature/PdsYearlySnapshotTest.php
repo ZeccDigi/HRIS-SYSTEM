@@ -69,7 +69,7 @@ test('employee can select and view a historical yearly PDS snapshot', function (
         ->assertDontSee('Dec 31, 2026');
 });
 
-test('updating the PDS stores the current year snapshot', function () {
+test('updating the PDS retains only approved values in the current year snapshot', function () {
     Carbon::setTestNow('2026-11-03 09:00:00');
 
     $user = User::factory()->create(['must_change_password' => false]);
@@ -93,5 +93,5 @@ test('updating the PDS stores the current year snapshot', function () {
 
     $snapshot = PdsSnapshot::firstOrFail();
     expect($snapshot->year)->toBe(2026)
-        ->and(data_get($snapshot->data, 'relations.pdsPersonal.email_address'))->toBe('min@example.com');
+        ->and(data_get($snapshot->data, 'relations.pdsPersonal.email_address'))->toBeNull();
 });

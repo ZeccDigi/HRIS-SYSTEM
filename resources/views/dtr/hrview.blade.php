@@ -53,7 +53,7 @@
                             id="attendance_date_picker"
                             type="button"
                             @click.stop="toggleDatePicker()"
-                            class="flex h-11 w-full items-center justify-between rounded-xl border border-gray-100 bg-white px-4 text-left text-sm font-bold text-gray-900 shadow-sm transition hover:border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            class="flex h-9 w-full items-center justify-between rounded-lg border border-gray-100 bg-white px-3 text-left text-xs font-bold text-gray-900 shadow-sm transition hover:border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             :class="activePicker ? 'border-indigo-500 ring-2 ring-indigo-500' : 'hover:border-indigo-200'"
                         >
                             <span x-text="formatDate(date)"></span>
@@ -145,7 +145,7 @@
                         <select
                             x-model="division"
                             @change="applyFilters()"
-                            class="block h-9 rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-[#2b428f] focus:ring-[#2b428f] sm:w-48"
+                            class="block h-9 rounded-lg border-slate-300 bg-white py-1 text-xs shadow-sm focus:border-[#2b428f] focus:ring-[#2b428f] sm:w-48"
                         >
                             <option value="all">{{ __('Departments') }}</option>
                             @foreach($divisions as $divisionOption)
@@ -156,7 +156,7 @@
                         <select
                             x-model="employmentStatus"
                             @change="applyFilters()"
-                            class="block h-9 rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-[#2b428f] focus:ring-[#2b428f] sm:w-48"
+                            class="block h-9 rounded-lg border-slate-300 bg-white py-1 text-xs shadow-sm focus:border-[#2b428f] focus:ring-[#2b428f] sm:w-48"
                         >
                             <option value="all">{{ __('Status') }}</option>
                             @foreach($employmentStatuses as $employmentStatusOption)
@@ -262,11 +262,11 @@
                                             <div class="whitespace-normal break-words">{{ $employee->position ?: 'N/A' }}</div>
                                         </td>
                                         <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['time_in'] && isset($item['slot_labels']['time_in']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">
-                                            @if($item['time_in']){{ \Carbon\Carbon::parse($item['time_in'])->format('h:i A') }}@elseif(isset($item['slot_labels']['time_in']))<x-dtr-reference :value="$item['slot_labels']['time_in']" />@else N/A @endif
+                                            @if($item['time_in']){{ \Carbon\Carbon::parse($item['time_in'])->format('h:i A') }}@elseif(isset($item['slot_labels']['time_in']))<x-dtr-reference :value="$item['slot_labels']['time_in']" />@else{{ ($item['blank_day'] ?? false) ? '' : 'N/A' }}@endif
                                         </td>
-                                        <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['am_out'] && isset($item['slot_labels']['am_out']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">@if($item['am_out']){{ \Carbon\Carbon::parse($item['am_out'])->format('h:i A') }}@elseif(isset($item['slot_labels']['am_out']))<x-dtr-reference :value="$item['slot_labels']['am_out']" />@else N/A @endif</td>
-                                        <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['pm_in'] && isset($item['slot_labels']['pm_in']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">@if($item['pm_in']){{ \Carbon\Carbon::parse($item['pm_in'])->format('h:i A') }}@elseif(isset($item['slot_labels']['pm_in']))<x-dtr-reference :value="$item['slot_labels']['pm_in']" />@else N/A @endif</td>
-                                        <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['time_out'] && isset($item['slot_labels']['time_out']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">@if($item['time_out']){{ \Carbon\Carbon::parse($item['time_out'])->format('h:i A') }}@elseif(isset($item['slot_labels']['time_out']))<x-dtr-reference :value="$item['slot_labels']['time_out']" />@else N/A @endif</td>
+                                        <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['am_out'] && isset($item['slot_labels']['am_out']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">@if($item['am_out']){{ \Carbon\Carbon::parse($item['am_out'])->format('h:i A') }}@elseif(isset($item['slot_labels']['am_out']))<x-dtr-reference :value="$item['slot_labels']['am_out']" />@else{{ ($item['blank_day'] ?? false) ? '' : 'N/A' }}@endif</td>
+                                        <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['pm_in'] && isset($item['slot_labels']['pm_in']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">@if($item['pm_in']){{ \Carbon\Carbon::parse($item['pm_in'])->format('h:i A') }}@elseif(isset($item['slot_labels']['pm_in']))<x-dtr-reference :value="$item['slot_labels']['pm_in']" />@else{{ ($item['blank_day'] ?? false) ? '' : 'N/A' }}@endif</td>
+                                        <td class="px-3 py-2.5 align-top font-bold whitespace-normal break-all {{ ! $item['time_out'] && isset($item['slot_labels']['time_out']) ? 'text-[9px] leading-tight text-blue-700' : 'text-[11px] text-slate-900' }}">@if($item['time_out']){{ \Carbon\Carbon::parse($item['time_out'])->format('h:i A') }}@elseif(isset($item['slot_labels']['time_out']))<x-dtr-reference :value="$item['slot_labels']['time_out']" />@else{{ ($item['blank_day'] ?? false) ? '' : 'N/A' }}@endif</td>
                                         <td class="px-3 py-2.5 text-center align-top">
                                             <a
                                                 href="{{ route('dtr.employee', [

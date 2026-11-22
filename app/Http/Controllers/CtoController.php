@@ -23,7 +23,7 @@ class CtoController extends Controller
         $isChief = $role === 'chief';
         $isRegionalDirector = $role === 'regionaldirector';
         $search = trim((string) $request->query('search', ''));
-        $type = $request->query('type', '');
+        $status = $request->query('status', '');
         $sort = $request->query('sort', 'latest');
 
         $allCtoRequests = $this->sortCtoRequests($this->filterCtoRequests(
@@ -32,7 +32,7 @@ class CtoController extends Controller
                 fn ($query) => $isChief ? $this->scopeToChiefDivision($query) : null
             ),
             $search,
-            $type
+            $status
         ), $sort)
             ->get();
 
@@ -51,7 +51,7 @@ class CtoController extends Controller
                     ->where('chief_status', 'approved')
                     ->where('rd_status', 'pending')),
             $search,
-            $type
+            $status
         ), $sort)
             ->get();
 
@@ -60,12 +60,13 @@ class CtoController extends Controller
             $tab = 'pending';
         }
 
-        return view('my-cto.admin-index', compact('allCtoRequests', 'pendingCtoRequests', 'tab', 'sort', 'search', 'type', 'isAdmin'));
+        return view('my-cto.admin-index', compact('allCtoRequests', 'pendingCtoRequests', 'tab', 'sort', 'search', 'status', 'isAdmin'));
     }
 
-    private function filterCtoRequests($query, string $search, string $type)
+    private function filterCtoRequests($query, string $search, string $status)
     {
         return $query
+            ->where(fn ($query) => $query->whereNull('credit_source')->orWhere('credit_source', '!=', 'hr_direct'))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query
@@ -79,7 +80,7 @@ class CtoController extends Controller
                         });
                 });
             })
-            ->when(in_array($type, ['earn', 'use'], true), fn ($query) => $query->where('type', $type));
+            ->when(in_array($status, ['pending', 'approved', 'rejected'], true), fn ($query) => $query->where('status', $status));
     }
 
     private function sortCtoRequests($query, string $sort)
@@ -122,6 +123,16 @@ class CtoController extends Controller
         // DTR time-out verification is intentionally disabled for the current
         // manual Earn COC policy. HR approval proceeds using the filed hours.
         DB::transaction(function () use ($validated, $ctoRequest, $role, $employeeId, $isHR, $remarks, $wasFullyApproved) {
+            $current = CtoRequest::query()->lockForUpdate()->findOrFail($ctoRequest->id);
+            abort_unless($current->status === 'pending', 403);
+            $ctoRequest->setRawAttributes($current->getAttributes(), true);
+            if ($role === 'chief') {
+                abort_unless($ctoRequest->hrstaff_status === 'approved' && $ctoRequest->chief_status === 'pending', 403);
+            } elseif ($role === 'regionaldirector') {
+                abort_unless($ctoRequest->hrstaff_status === 'approved' && $ctoRequest->chief_status === 'approved' && $ctoRequest->rd_status === 'pending', 403);
+            } elseif ($isHR) {
+                abort_unless($ctoRequest->hrstaff_status === 'pending', 403);
+            }
             if ($validated['status'] === 'rejected') {
                 if ($isHR) {
                     $ctoRequest->hrstaff_status = 'rejected';
@@ -174,13 +185,15 @@ class CtoController extends Controller
                     $ctoRequest->status = 'approved';
 
                     if (! $wasFullyApproved && $ctoRequest->employee) {
-                        $currentBalance = (float) $ctoRequest->employee->cto_balance;
+                        $balanceOwner = $ctoRequest->employee()->lockForUpdate()->firstOrFail();
+                        $currentBalance = (float) $balanceOwner->cto_balance;
                         $hours = (float) $ctoRequest->hours;
+                        app(\App\Services\CocGrantService::class)->post($ctoRequest, $balanceOwner);
                         $newBalance = $ctoRequest->type === 'use'
                             ? max(0, $currentBalance - $hours)
                             : $currentBalance + $hours;
 
-                        $ctoRequest->employee->update(['cto_balance' => $newBalance]);
+                        $balanceOwner->forceFill(['cto_balance' => $newBalance])->save();
                         $ctoRequest->cto_balance_after = $newBalance;
                     }
 
@@ -239,6 +252,22 @@ class CtoController extends Controller
         $employeeDivision = trim((string) $employee?->division);
 
         return $chiefDivision !== '' && $employeeDivision !== '' && strcasecmp($chiefDivision, $employeeDivision) === 0;
+    }
+
+    public function destroy(CtoRequest $ctoRequest): RedirectResponse
+    {
+        abort_unless(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true), 403);
+
+        $ctoRequest->delete();
+
+        AuditLogListener::logActivity(
+            'Archive CTO Request',
+            'CTO',
+            "Archived CTO request (#{$ctoRequest->id}) for " . trim(($ctoRequest->employee?->firstname ?? '') . ' ' . ($ctoRequest->employee?->lastname ?? '')),
+            auth()->user()
+        );
+
+        return redirect()->back()->with('success', 'CTO request moved to Archive.');
     }
 
     private function currentChiefDivision(): string

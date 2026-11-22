@@ -14,6 +14,7 @@ class PdsUpdatedNotification extends Notification
         public Employee $employee,
         public string $title,
         public string $message,
+        public ?int $year = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -25,10 +26,10 @@ class PdsUpdatedNotification extends Notification
     {
         return [
             'type' => 'pds_updated',
-            'title' => $this->title,
+            'title' => \App\Support\NotificationTitle::format($this->title),
             'message' => $this->message,
             'employee_id' => $this->employee->id,
-            'action_url' => route('employees.pds.show', $this->employee->id),
+            'action_url' => route('employees.pds.show', ['employee' => $this->employee->id, 'year' => $this->year ?? (int) now()->year]),
             'icon' => 'pds',
         ];
     }

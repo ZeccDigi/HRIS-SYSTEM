@@ -23,8 +23,8 @@
         };
     @endphp
 
-    <div class="bg-slate-50 py-6 print:bg-white print:py-0">
-        <div class="mx-auto max-w-[900px] px-4 sm:px-6 lg:px-8 print:max-w-none print:mx-0 print:px-0">
+    <div class="min-h-screen bg-slate-50 px-1 py-3 sm:px-2 lg:px-3 print:bg-white print:p-0">
+        <div class="mx-auto w-full min-w-0 print:max-w-none print:mx-0 print:px-0">
             <div class="mb-6 space-y-4 font-sans print:hidden">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
@@ -37,10 +37,10 @@
                         @endif
                     </div>
                     @if($canManageSaln)
-                        <form method="GET" action="{{ route('salns.index') }}" class="flex items-center gap-3">
-                            <label for="saln_preview_year" class="text-[10px] font-black uppercase tracking-widest text-slate-400">Year</label>
-                            <select id="saln_preview_year" name="year" onchange="this.form.submit()" class="h-12 w-32 rounded-lg border-gray-100 bg-indigo-50/60 px-3 text-sm font-bold text-slate-700 shadow-sm outline-none focus:border-indigo-500 focus:ring-indigo-500">
-                                @foreach(range(now()->year + 1, now()->year - 5) as $year)
+                        <form method="GET" action="{{ route('salns.index') }}" class="flex items-center gap-2">
+                            <label for="saln_preview_year" class="text-sm font-semibold text-gray-700">{{ __('Year') }}</label>
+                            <select id="saln_preview_year" name="year" onchange="this.form.submit()" class="h-9 w-28 rounded-lg border-gray-300 bg-white pl-3 pr-8 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                @foreach($documentYears ?? app(\App\Services\PdsSnapshotService::class)->yearsFor($saln->employee) as $year)
                                     <option value="{{ $year }}" @selected((int) $selectedYear === (int) $year)>{{ $year }}</option>
                                 @endforeach
                             </select>
@@ -50,9 +50,9 @@
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         @if($backUrl ?? null)
-                            <a href="{{ $backUrl }}" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-200 bg-white px-5 text-[13px] font-extrabold uppercase leading-none tracking-[.12em] text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-[#0038a8]">Back</a>
+                            <a href="{{ $backUrl }}" class="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white px-5 text-xs font-extrabold uppercase leading-none tracking-[.12em] text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-[#0038a8]">Back</a>
                         @elseif($canManageSaln)
-                            <a href="{{ route('salns.index', ['year' => $selectedYear, 'edit' => 1]) }}" class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[#002f8f] bg-[#0038a8] px-5 text-[13px] font-extrabold uppercase leading-none tracking-[.12em] text-white shadow-[0_8px_18px_rgba(0,56,168,.18)] transition hover:bg-[#002f8f]">
+                            <a href="{{ route('salns.index', ['year' => $selectedYear, 'edit' => 1]) }}" class="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[#002f8f] bg-[#0038a8] px-5 text-xs font-extrabold uppercase leading-none tracking-[.12em] text-white shadow-[0_8px_18px_rgba(0,56,168,.18)] transition hover:bg-[#002f8f]">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M16.862 4.487l1.651-1.651a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
                                 </svg>
@@ -62,10 +62,10 @@
                     </div>
                     <div class="flex flex-wrap gap-3 sm:justify-end">
                         @if($canExportSaln ?? false)
-                            <a href="{{ route('salns.download', ['saln' => $saln, 'inline' => 1]) }}" target="_blank" rel="noopener noreferrer" data-no-transition class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#0038a8] bg-white px-5 text-[13px] font-extrabold uppercase leading-none tracking-[.12em] text-[#0038a8] shadow-sm transition hover:bg-blue-50">Print PDF</a>
+                            <a href="{{ route('salns.print-year', ['year' => $selectedYear]) }}" target="_blank" rel="noopener noreferrer" data-no-transition class="inline-flex h-9 items-center justify-center rounded-xl border border-[#0038a8] bg-white px-5 text-xs font-extrabold uppercase leading-none tracking-[.12em] text-[#0038a8] shadow-sm transition hover:bg-blue-50">Print PDF</a>
                         @endif
                         @if($canExportSaln ?? true)
-                            <a href="{{ route('salns.download', $saln) }}" data-no-transition class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-200 bg-white px-5 text-[13px] font-extrabold uppercase leading-none tracking-[.12em] text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-[#0038a8]">Download PDF</a>
+                            <a href="{{ route('salns.download', $saln) }}" data-no-transition class="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white px-5 text-xs font-extrabold uppercase leading-none tracking-[.12em] text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-[#0038a8]">Download PDF</a>
                         @endif
                     </div>
                 </div>

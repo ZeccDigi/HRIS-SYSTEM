@@ -8,6 +8,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -24,13 +26,13 @@ class PasswordController extends Controller
             ])->errorBag('updatePassword');
         }
 
+        $key = 'password-update-otp-cooldown:'.$user->id;
+        if (!Cache::add($key, now()->timestamp + 30, 30)) {
+            $wait = max(1, (int) Cache::get($key) - now()->timestamp);
+            $this->otpFailure($request, "Please wait {$wait} seconds before requesting another OTP.", $wait, 429);
+        }
         $otp = (string) random_int(100000, 999999);
-
-        $user->forceFill([
-            'otp' => $otp,
-            'otp_expires_at' => now()->addMinutes(10),
-        ])->save();
-
+        try {
         Mail::raw(
             "Your DMW-HRIS password update OTP is {$otp}.\n\nThis code expires in 10 minutes. If you did not request a password change, please contact HR immediately.",
             function ($message) use ($recoveryEmail) {
@@ -39,6 +41,21 @@ class PasswordController extends Controller
                     ->subject('DMW-HRIS Password Update OTP');
             }
         );
+        } catch (\Throwable $exception) {
+            Log::warning('Password update OTP email delivery failed.', ['user_id' => $user->id, 'exception' => $exception::class]);
+            $this->otpFailure($request, 'The OTP email could not be sent. Check the internet connection and mail settings, then try again.', 30, 503);
+        }
+        $user->forceFill(['otp' => $otp, 'otp_expires_at' => now()->addMinutes(10)])->save();
+    }
+
+    private function otpFailure(Request $request, string $message, int $wait, int $status): never
+    {
+        if ($request->expectsJson()) {
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+                'message' => $message, 'errors' => ['otp' => [$message]], 'retry_after' => $wait,
+            ], $status)->header('Retry-After', (string) $wait));
+        }
+        throw ValidationException::withMessages(['otp' => $message])->errorBag('updatePassword');
     }
 
     public function sendOtp(Request $request): RedirectResponse|JsonResponse
@@ -48,6 +65,7 @@ class PasswordController extends Controller
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'A password update OTP has been sent to your Recovery / OTP Email.',
+                'retry_after' => 30,
             ]);
         }
 
@@ -68,6 +86,7 @@ class PasswordController extends Controller
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'A password update OTP has been sent to your Recovery / OTP Email.',
+                'retry_after' => 30,
             ]);
         }
 

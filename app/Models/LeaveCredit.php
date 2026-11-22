@@ -11,6 +11,7 @@ class LeaveCredit extends Model
         'leave_type_id',
         'balance',
         'earned',
+        'carried_forward',
         'used',
         'adjusted',
         'year',
@@ -22,6 +23,7 @@ class LeaveCredit extends Model
         return [
             'balance' => 'decimal:3',
             'earned' => 'decimal:3',
+            'carried_forward' => 'decimal:3',
             'used' => 'decimal:3',
             'adjusted' => 'decimal:3',
             'accrued_as_of' => 'date',

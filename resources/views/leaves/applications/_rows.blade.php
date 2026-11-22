@@ -140,6 +140,7 @@
                 title="{{ $leaveTypeName }}"
             >
                 {{ $leaveTypeName ?: __('N/A') }}
+                @if($leaf->is_monetization)<span class="mt-1 block text-xs text-blue-800">{{ number_format((float) $leaf->monetization_days, 3) }} days · ₱{{ number_format((float) $leaf->monetization_amount, 2) }}</span>@endif
             </div>
         </td>
 
@@ -184,7 +185,7 @@
         </td>
         {{-- Actions --}}
        <td class="px-2 py-3 text-center align-middle">
-    <div class="mx-auto grid w-fit grid-cols-2 place-items-center gap-x-3 gap-y-2">
+    <div class="mx-auto flex w-fit items-center justify-center gap-1">
         {{-- View --}}
         <a
             href="{{ route('leave-applications.show', $leaf) }}"
@@ -208,6 +209,21 @@
             <i class="fa-solid fa-print text-sm"></i>
         </a>
 
+        @if(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true))
+            {{-- Archive --}}
+            <form action="{{ route('leave-applications.destroy', $leaf) }}" method="POST" class="inline-block" data-archive-question="{{ __('Archive this leave application?') }}">
+                @csrf
+                @method('DELETE')
+                <button
+                    type="submit"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
+                    title="{{ __('Archive') }}"
+                    aria-label="{{ __('Archive leave application') }}"
+                >
+                    <i class="fa-solid fa-box-archive text-sm"></i>
+                </button>
+            </form>
+        @endif
     </div>
 </td>
 

@@ -70,6 +70,7 @@
             <td class="report-heading">
                 <p class="report-type">{{ $reportTypeLabel }}</p>
                 <p class="sub-report">{{ $subReportLabel }}</p>
+                @if(!empty($report['sourceNote']))<p style="font-size:8pt; font-weight:normal;">{{ $report['sourceNote'] }}</p>@endif
             </td>
             <td class="report-period-cell">
                 <p class="report-period">
@@ -93,7 +94,7 @@
 
         @if(!empty($report['metrics']) || $summaryCharts->isNotEmpty())
             <section class="summary">
-                <h2 class="summary-heading">Report Summary and Visual Analysis</h2>
+                <h2 class="summary-heading">DMW Report Summary and Visual Analysis</h2>
                 @if(!empty($report['metrics']))
                     <table class="metric-grid"><tr>
                         @foreach(collect($report['metrics'])->take(8)->chunk(4) as $metricRow)

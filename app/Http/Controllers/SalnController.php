@@ -15,6 +15,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
+use App\Services\PdsSnapshotService;
+use Illuminate\Support\Facades\DB;
 
 class SalnController extends Controller
 {
@@ -28,13 +30,27 @@ class SalnController extends Controller
 
         UtilityOptionRegistry::ensureDefaults();
 
+        app(\App\Services\SalnPdsDefaultsService::class)->syncApprovedFamily($employee, (int) request('year', now()->year));
+
         $salns = $employee->salns()->orderBy('as_of_date', 'desc')->get();
         $selectedYear = (int) request('year', now()->year);
+        $documentYears = app(PdsSnapshotService::class)->yearsFor($employee)
+            ->merge($salns->map(fn ($record) => $record->as_of_date->year))->unique()->sortDesc()->values();
+        abort_unless($documentYears->containsStrict($selectedYear), 404);
         $selectedSaln = $salns->first(fn (Saln $saln) => (int) $saln->as_of_date->format('Y') === $selectedYear);
 
         if (! request()->boolean('edit')) {
+            // Employees should see the data they most recently saved, even while HR review is pending.
+            // Only the printable/exported form is restricted to the approved snapshot.
             $saln = $selectedSaln ?: $this->blankSalnForYear($employee->id, $selectedYear);
-            $canExportSaln = (bool) $selectedSaln;
+            if (!$selectedSaln || $selectedSaln->review_status !== 'approved') {
+                $saln = clone $saln;
+                $identity = app(\App\Services\SalnPdsDefaultsService::class);
+                $defaults = $identity->defaults($employee, $selectedYear);
+                $saln->declarant_info = $identity->merge($saln->declarant_info, $defaults['declarant_info']);
+                $saln->spouse_info = $identity->merge($saln->spouse_info, $defaults['spouse_info']);
+            }
+            $canExportSaln = $selectedSaln && ($selectedSaln->approved_data !== null || $selectedSaln->review_status === 'approved');
             $canManageSaln = true;
             $backUrl = null;
             $hasSavedSaln = (bool) $selectedSaln;
@@ -46,13 +62,14 @@ class SalnController extends Controller
                 'backUrl' => $backUrl,
                 'selectedYear' => $selectedYear,
                 'hasSavedSaln' => $hasSavedSaln,
+                'documentYears' => $documentYears,
             ]);
         }
 
         $isSalnIndex = true;
         $salnOptionSets = $this->optionSets($selectedSaln);
 
-        return view('saln.create', compact('employee', 'salns', 'selectedYear', 'selectedSaln', 'isSalnIndex', 'salnOptionSets'));
+        return view('saln.create', compact('employee', 'salns', 'selectedYear', 'selectedSaln', 'isSalnIndex', 'salnOptionSets', 'documentYears'));
     }
 
     public function create()
@@ -66,12 +83,15 @@ class SalnController extends Controller
         UtilityOptionRegistry::ensureDefaults();
 
         $salns = $employee->salns()->orderBy('as_of_date', 'desc')->get();
-        $selectedYear = (int) now()->year;
-        $selectedSaln = null;
+        $selectedYear = (int) request('year', now()->year);
+        $documentYears = app(PdsSnapshotService::class)->yearsFor($employee)
+            ->merge($salns->map(fn ($record) => $record->as_of_date->year))->unique()->sortDesc()->values();
+        abort_unless($documentYears->containsStrict($selectedYear), 404);
+        $selectedSaln = $salns->first(fn ($record) => $record->as_of_date->year === $selectedYear);
         $isSalnIndex = false;
-        $salnOptionSets = $this->optionSets(null);
+        $salnOptionSets = $this->optionSets($selectedSaln);
 
-        return view('saln.create', compact('employee', 'salns', 'selectedYear', 'selectedSaln', 'isSalnIndex', 'salnOptionSets'));
+        return view('saln.create', compact('employee', 'salns', 'selectedYear', 'selectedSaln', 'isSalnIndex', 'salnOptionSets', 'documentYears'));
     }
 
     public function store(StoreSalnRequest $request)
@@ -96,6 +116,10 @@ class SalnController extends Controller
         $net_worth = $total_assets - $total_liabilities;
 
         $employee = Auth::user()->employee;
+        $year = \Carbon\Carbon::parse($validated['as_of_date'])->year;
+        $years = app(PdsSnapshotService::class)->yearsFor($employee)
+            ->merge($employee->salns()->get()->map(fn ($record) => $record->as_of_date->year));
+        abort_unless($years->containsStrict($year), 422, 'Select a year within the employee service period.');
         $payload = array_merge($validated, [
             'employee_id' => $employee->id,
             'total_assets' => $total_assets,
@@ -108,19 +132,25 @@ class SalnController extends Controller
             'submitted_at' => now(),
         ]);
 
+        $saln = DB::transaction(function () use ($request, $employee, $payload, $validated, $year) {
+        \App\Models\Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
         if ($request->filled('saln_id')) {
             $saln = Saln::where('employee_id', $employee->id)
                 ->findOrFail($request->integer('saln_id'));
+            abort_unless($saln->as_of_date->year === $year, 422, 'A saved SALN cannot be moved to another year.');
+            $this->preserveApprovedSaln($saln);
             $saln->update($payload);
         } else {
-            $saln = Saln::updateOrCreate(
-                [
-                    'employee_id' => $employee->id,
-                    'as_of_date' => $validated['as_of_date'],
-                ],
+            $saln = Saln::where('employee_id', $employee->id)->whereYear('as_of_date', $year)->first();
+            if ($saln) {
+                $this->preserveApprovedSaln($saln);
+                $saln->update($payload);
+            } else $saln = Saln::create(
                 $payload
             );
         }
+        return $saln;
+        });
 
         AuditLogListener::logActivity(
             'Save SALN',
@@ -145,6 +175,9 @@ class SalnController extends Controller
         $canExportSaln = $this->isSalnOwner($saln);
         $canReviewSaln = $this->canReviewSaln($saln);
         $backUrl = $this->safeBackUrl((string) request('back', ''));
+        if ($this->isSalnOwner($saln) && !$canReviewSaln) {
+            $canExportSaln = $saln->approved_data !== null || $saln->review_status === 'approved';
+        }
 
         return view('saln.show', compact('saln', 'canExportSaln', 'canReviewSaln', 'backUrl'));
     }
@@ -160,12 +193,20 @@ class SalnController extends Controller
             return back()->withErrors(['review_remarks' => 'Remarks are required when returning a SALN.'])->withInput();
         }
 
+        DB::transaction(function () use ($saln, $validated) {
+        $locked = Saln::whereKey($saln->id)->lockForUpdate()->firstOrFail();
+        $saln->setRawAttributes($locked->getAttributes(), true);
+        abort_unless($saln->review_status === 'pending', 409, 'This SALN has no pending update to review.');
+        if ($validated['review_status'] === 'approved') {
+            $saln->forceFill(['approved_data' => $this->salnDocumentData($saln)])->save();
+        }
         $saln->update([
             'review_status' => $validated['review_status'],
             'review_remarks' => $validated['review_remarks'] ?? null,
             'reviewed_by_id' => Auth::id(),
             'reviewed_at' => now(),
         ]);
+        });
 
         $employeeName = trim(($saln->employee?->firstname ?? '') . ' ' . ($saln->employee?->lastname ?? '')) ?: 'Employee';
         $year = $saln->as_of_date?->format('Y');
@@ -198,12 +239,31 @@ class SalnController extends Controller
             abort(403);
         }
 
+        abort_unless($saln->approved_data !== null || $saln->review_status === 'approved', 403, 'No approved SALN is available for export.');
         try {
-            return $exporter->download($saln, request()->boolean('inline'));
+            return $exporter->download($this->officialSaln($saln), request()->boolean('inline'));
         } catch (\Throwable $e) {
             return redirect()
                 ->route('salns.show', $saln)
                 ->with('error', 'Could not generate PDF. '.$e->getMessage());
+        }
+    }
+
+    public function printYear(Request $request, SalnPdfExporter $exporter): Response|RedirectResponse
+    {
+        $employee = Auth::user()->employee;
+        abort_unless($employee, 403);
+        $year = (int) $request->query('year', now()->year);
+        $years = app(PdsSnapshotService::class)->yearsFor($employee)
+            ->merge($employee->salns()->get()->map(fn ($record) => $record->as_of_date->year));
+        abort_unless($years->containsStrict($year), 404);
+        $record = $employee->salns()->whereYear('as_of_date', $year)->orderByDesc('as_of_date')->first();
+        abort_unless($record && ($record->approved_data !== null || $record->review_status === 'approved'), 403, 'The SALN can be printed after HR approval.');
+        $saln = $this->officialSaln($record);
+        try {
+            return $exporter->download($saln, true);
+        } catch (\Throwable $e) {
+            return redirect()->route('salns.index', ['year' => $year])->with('error', 'Could not generate the SALN PDF.');
         }
     }
 
@@ -215,6 +275,44 @@ class SalnController extends Controller
             'relationships' => UtilityOption::listFor('relationships')->values(),
             'government_id_types' => UtilityOption::listFor('government_id_types')->values(),
         ];
+    }
+
+    public function destroy(Saln $saln): RedirectResponse
+    {
+        abort_unless(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'hrstaff', 'hr staff'], true), 403);
+        $employeeId = $saln->employee_id;
+        $year = $saln->as_of_date->year;
+        $saln->delete();
+        AuditLogListener::logActivity('Archive SALN', 'Employees', "Archived {$year} SALN #{$saln->id} for employee #{$employeeId}.", auth()->user());
+        return redirect()->route('employees.show', ['employee' => $employeeId, 'tab' => 'saln', 'saln_year' => $year])
+            ->with('success', 'SALN moved to Archive.');
+    }
+
+    private function salnDocumentData(Saln $saln): array
+    {
+        return collect($saln->getAttributes())->except(['id', 'employee_id', 'approved_data', 'review_status', 'review_remarks', 'reviewed_by_id', 'reviewed_at', 'submitted_at', 'created_at', 'updated_at'])->all();
+    }
+
+    private function preserveApprovedSaln(Saln $saln): void
+    {
+        if ($saln->approved_data === null && $saln->review_status === 'approved') {
+            $saln->forceFill(['approved_data' => $this->salnDocumentData($saln)])->save();
+        }
+    }
+
+    private function officialSaln(Saln $saln): Saln
+    {
+        if ($saln->exists) {
+            app(\App\Services\SalnPdsDefaultsService::class)->syncApprovedFamily($saln->employee, $saln->as_of_date->year);
+            $saln->refresh();
+        }
+        if ($saln->approved_data !== null) {
+            return (new Saln)->newFromBuilder(array_merge($saln->getAttributes(), $saln->approved_data));
+        }
+        if ($saln->review_status === 'approved') return $saln;
+        $blank = $this->blankSalnForYear($saln->employee_id, $saln->as_of_date->year);
+        $attributes = array_merge($saln->getAttributes(), $blank->getAttributes());
+        return (new Saln)->newFromBuilder($attributes);
     }
 
     private function isSalnOwner(Saln $saln): bool

@@ -401,7 +401,7 @@
 
         @if(!empty($report['metrics']) || $printCharts->isNotEmpty())
             <section class="visual-summary" aria-label="Visual report summary">
-                <h2 class="visual-summary-title">Report Summary</h2>
+                <h2 class="visual-summary-title">DMW Report Summary</h2>
 
                 @if(!empty($report['metrics']))
                     <div class="metric-grid">

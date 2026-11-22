@@ -199,8 +199,8 @@
     .pds-preview-page.is-embedded .pds-document { border-radius: 10px; box-shadow: none; }
     .pds-toolbar { display: flex; gap: 12px; justify-content: space-between; align-items: center; max-width: 900px; margin: 0 auto 1rem; padding: 0; font-family: Manrope, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     .pds-toolbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
-    .pds-year-picker { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; color: #94a3b8; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-    .pds-year-picker select { height: 44px; min-width: 112px; border: 1px solid #f1f5f9; border-radius: 8px; background: #eef2ff; padding: 0 30px 0 12px; color: #334155; font-size: 13px; font-weight: 800; }
+    .pds-year-picker { display: inline-flex; min-height: 40px; align-items: center; gap: 8px; color: #374151; font-size: 14px; font-weight: 600; text-transform: none; letter-spacing: normal; }
+    .pds-year-picker select { height: 40px; min-width: 112px; border: 1px solid #d1d5db; border-radius: 8px; background: #ffffff; padding: 0 36px 0 16px; color: #1f2937; font-size: 14px; font-weight: 500; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
     .pds-toolbar button, .pds-toolbar a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 12px; padding: 0 20px; font-family: inherit; font-size: 13px; font-weight: 800; line-height: 1; text-decoration: none; cursor: pointer; transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; }
     .pds-toolbar svg { width: 16px; height: 16px; flex: 0 0 auto; }
     .pds-back { border: 1px solid #e5e7eb; background: #fff; color: #4b5563; box-shadow: 0 1px 4px rgba(15, 23, 42, .08); }
@@ -412,8 +412,8 @@ html, body { width: 215.9mm; margin: 0; background: #fff; }
     }
 </style>
 
-<div class="pds-preview-page {{ $isEmbeddedPreview ? 'is-embedded' : 'min-h-screen py-8' }}">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+<div class="pds-preview-page {{ $isEmbeddedPreview ? 'is-embedded' : 'min-h-screen bg-slate-50 px-1 py-3 sm:px-2 lg:px-3' }}">
+    <div class="mx-auto w-full min-w-0">
         <div class="pds-toolbar">
             <a href="{{ $backUrl }}" class="pds-back">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">

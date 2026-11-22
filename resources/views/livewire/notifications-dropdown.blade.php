@@ -123,7 +123,7 @@
                             @endif
                         </div>
                         <div class="flex-1 min-w-0">
-                            <p class="text-sm font-semibold text-gray-900 leading-tight">{{ $data['title'] ?? 'Notification' }}</p>
+                            <p class="text-sm font-semibold text-gray-900 leading-tight">{{ \App\Support\NotificationTitle::format($data['title'] ?? 'Notification') }}</p>
                             <p class="text-xs text-gray-500 mt-1 line-clamp-2">{{ $data['message'] ?? '' }}</p>
                             <p class="text-[10px] text-gray-400 mt-2 flex items-center font-medium uppercase tracking-tight">
                                 <svg class="w-3 h-3 mr-1 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">

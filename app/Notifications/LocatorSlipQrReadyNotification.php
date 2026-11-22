@@ -60,7 +60,7 @@ class LocatorSlipQrReadyNotification extends Notification
     {
         return [
             'locator_slip_id' => $this->locatorSlip->id,
-            'title' => 'Locator Slip QR Ready',
+            'title' => 'Locator slip QR ready',
             'message' => 'Your approved locator slip QR code has been sent to your email.',
         ];
     }

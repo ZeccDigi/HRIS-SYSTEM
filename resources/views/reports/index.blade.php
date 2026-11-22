@@ -67,7 +67,7 @@
     <div class="min-h-screen bg-slate-50 py-2" x-data="reportsDashboard()" x-init="initCharts()">
         <div class="mx-auto w-full px-0 sm:px-1">
             <div class="mb-2">
-                <h1 class="text-2xl font-black tracking-tight text-slate-900">{{ __('Report Summary') }}</h1>
+                <h1 class="text-2xl font-black tracking-tight text-slate-900">{{ __('DMW Report Summary') }}</h1>
             </div>
 
             <div class="rounded-xl border border-blue-100 bg-white p-3 shadow-sm">
@@ -99,12 +99,12 @@
 
                     <label x-show="visibleFilters().includes('dateRange')" x-cloak>
                         <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('From') }}</span>
-                        <input type="date" x-model="filters.from" @change="applyFilters()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
+                        <input type="date" max="{{ now()->endOfYear()->toDateString() }}" x-model="filters.from" @change="applyFilters()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
                     </label>
 
                     <label x-show="visibleFilters().includes('dateRange')" x-cloak>
                         <span class="text-[11px] font-black uppercase tracking-wider text-slate-600">{{ __('To') }}</span>
-                        <input type="date" x-model="filters.to" @change="applyFilters()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
+                        <input type="date" max="{{ now()->endOfYear()->toDateString() }}" x-model="filters.to" @change="applyFilters()" class="mt-2 h-11 w-full rounded-lg border-blue-100 bg-white text-sm font-semibold text-slate-700 focus:border-[#0038a8] focus:ring-[#0038a8]">
                     </label>
 
                     <label x-show="visibleFilters().includes('year')" x-cloak>
@@ -128,6 +128,7 @@
                     <div class="flex items-start">
                         <div>
                             <h2 class="text-lg font-black text-slate-900" x-text="active.title"></h2>
+                            <p x-show="active.sourceNote" x-text="active.sourceNote" class="mt-1 text-xs text-slate-500"></p>
                             <p class="mt-1 text-xs font-semibold text-slate-500">
                                 <span>From </span>
                                 <span x-text="filters.from"></span>
@@ -681,7 +682,7 @@
                 employmentStatuses: serverReportData.employmentStatuses,
                 search: '',
                 filters: serverReportData.filters,
-                yearOptions: Array.from({ length: new Date().getFullYear() - 1999 }, (_, index) => new Date().getFullYear() - index),
+                yearOptions: @js(range((int) now()->year, 2000)),
                 page: 1,
                 perPage: 10,
                 charts: {
@@ -741,6 +742,7 @@
                         division: this.filters.division,
                         employment_status: this.filters.employmentStatus,
                         cto_tab: this.ctoTab,
+                        year: this.filters.year,
                     });
 
                     window.open(`{{ route('reports.print') }}?${params.toString()}`, '_blank', 'noopener');

@@ -37,11 +37,16 @@ class EmployeeController extends Controller
         $divisionOptions = $this->divisionOptions();
         $search = trim((string) $request->query('search', ''));
         $division = (string) $request->query('division', '');
+        $employmentStatus = (string) $request->query('employment_status', '');
         $sort = $request->query('sort', 'name_asc');
+        $employeeYears = $this->employeeYears();
+        $defaultEmployeeYear = 0;
+        $year = $request->integer('year', $defaultEmployeeYear);
+        $year = $employeeYears->containsStrict($year) ? $year : $defaultEmployeeYear;
         $perPage = $this->perPage($request, 'per_page');
         $archivePerPage = $this->perPage($request, 'archive_per_page');
 
-        $employees = $this->employeeIndexQuery($search, $division, $sort, $divisionOptions)
+        $employees = $this->employeeIndexQuery($search, $division, $employmentStatus, $year, $sort, $divisionOptions)
             ->paginate($perPage, ['*'], 'employees_page')
             ->withQueryString();
         $archivedEmployees = Employee::onlyTrashed()
@@ -50,16 +55,21 @@ class EmployeeController extends Controller
             ->paginate($archivePerPage, ['*'], 'archive_page')
             ->withQueryString();
 
-        return view('employees.index', compact('employees', 'archivedEmployees', 'divisionOptions', 'search', 'division', 'sort', 'perPage', 'archivePerPage'));
+        return view('employees.index', compact('employees', 'archivedEmployees', 'divisionOptions', 'search', 'division', 'employmentStatus', 'employeeYears', 'defaultEmployeeYear', 'year', 'sort', 'perPage', 'archivePerPage'));
     }
 
     public function filter(Request $request)
     {
         $search = trim((string) $request->query('search', ''));
         $division = (string) $request->query('division', '');
+        $employmentStatus = (string) $request->query('employment_status', '');
         $sort = $request->query('sort', 'name_asc');
+        $employeeYears = $this->employeeYears();
+        $defaultEmployeeYear = 0;
+        $year = $request->integer('year', $defaultEmployeeYear);
+        $year = $employeeYears->containsStrict($year) ? $year : $defaultEmployeeYear;
         $perPage = $this->perPage($request, 'per_page');
-        $employees = $this->employeeIndexQuery($search, $division, $sort, $this->divisionOptions())
+        $employees = $this->employeeIndexQuery($search, $division, $employmentStatus, $year, $sort, $this->divisionOptions())
             ->paginate($perPage, ['*'], 'employees_page')
             ->withPath(route('employees.index'))
             ->withQueryString();
@@ -77,7 +87,7 @@ class EmployeeController extends Controller
         ]);
     }
 
-    private function employeeIndexQuery(string $search, string $division, string $sort, array $divisionOptions)
+    private function employeeIndexQuery(string $search, string $division, string $employmentStatus, int $year, string $sort, array $divisionOptions)
     {
         $query = Employee::with('user')
             ->when($search !== '', function ($query) use ($search) {
@@ -90,7 +100,15 @@ class EmployeeController extends Controller
                         ->orWhere('division', 'like', "%{$search}%");
                 });
             })
-            ->when(in_array($division, $divisionOptions, true), fn ($query) => $query->where('division', $division));
+            ->when(in_array($division, $divisionOptions, true), fn ($query) => $query->where('division', $division))
+            ->when(in_array($employmentStatus, ['Regular', 'Contract of Service', 'Job Order'], true), fn ($query) => $query->where('employment_status', $employmentStatus))
+            // Match the service-start year exactly; creation year is the legacy fallback.
+            ->when($year > 0, fn ($query) => $query->where(function ($query) use ($year) {
+                $query->whereYear('service_start_date', $year)
+                    ->orWhere(function ($query) use ($year) {
+                        $query->whereNull('service_start_date')->whereYear('created_at', $year);
+                    });
+            }));
 
         return match ($sort) {
             'name_desc' => $query->orderByDesc('lastname')->orderByDesc('firstname'),
@@ -98,6 +116,16 @@ class EmployeeController extends Controller
             'newest' => $query->latest(),
             default => $query->orderBy('lastname')->orderBy('firstname'),
         };
+    }
+
+    private function employeeYears(): \Illuminate\Support\Collection
+    {
+        $currentYear = (int) now()->year;
+        $years = Employee::query()->get(['service_start_date', 'created_at'])
+            ->map(fn (Employee $employee) => (int) ($employee->service_start_date?->year ?? $employee->created_at?->year ?? $currentYear))
+            ->filter(fn ($year) => $year >= 2000 && $year <= $currentYear)
+            ->unique()->sortDesc()->values();
+        return $years->isEmpty() ? collect([$currentYear]) : $years;
     }
 
     /**
@@ -126,7 +154,7 @@ class EmployeeController extends Controller
             'lastname' => 'required|string|max:255',
             'firstname' => 'required|string|max:255',
             'middlename' => 'nullable|string|max:255',
-            'contact_number' => 'required|string|max:20',
+            'contact_number' => 'required|string|digits:11',
             'notification_email' => ['required', 'email', 'max:255', Rule::unique('employees', 'notification_email')],
             'division' => ['required', 'string', Rule::in($this->divisionOptions())],
             'position' => 'required|string|max:255',
@@ -143,6 +171,7 @@ class EmployeeController extends Controller
             'rfid_number.unique' => 'This RFID Number is already assigned to another employee.',
         ]);
 
+        $validated = [...$validated, ...app(\App\Services\EmployeeSalaryService::class)->values($request)];
         $loginUsername = $validated['hris_username'].'@dmw.gov.ph';
 
         if (User::where('email', $loginUsername)->exists()) {
@@ -156,7 +185,7 @@ class EmployeeController extends Controller
         $notificationEmail = null;
 
         DB::transaction(function () use (&$validated, &$createdAccount, &$temporaryPassword, &$notificationEmail, $loginUsername) {
-            $temporaryPassword = Str::password(12, true, true, false, false);
+            $temporaryPassword = Str::password(12, true, true, true, false);
             $notificationEmail = $validated['notification_email'];
             $user = User::create([
                 'name' => trim($validated['firstname'].' '.$validated['lastname']),
@@ -173,7 +202,9 @@ class EmployeeController extends Controller
             $createdAccount = $user;
 
             unset($validated['hris_username']);
-            Employee::create($validated);
+            $newEmployee = Employee::create($validated);
+            app(\App\Services\EmployeeSalaryService::class)->syncPds($newEmployee);
+            $newEmployee->ensureLeaveCredits((int) now()->year);
         });
 
         if ($createdAccount && $temporaryPassword) {
@@ -225,7 +256,7 @@ class EmployeeController extends Controller
             'pdsPersonal', 'pdsFamily', 'pdsChildren', 'pdsEducation', 
             'pdsEligibilities', 'pdsWorkExperiences', 'pdsVoluntaryWorks', 
             'pdsTrainings', 'pdsOthers', 'pdsQuestionnaire', 'pdsReferences', 'pdsGovId',
-            'pdsSectionReviews', 'salns', 'leaveCredits.leaveType', 'ctoRequests'
+            'pdsSectionReviews', 'salns', 'leaveCredits' => fn ($query) => $query->where('year', now()->year)->with('leaveType'), 'ctoRequests'
         ]);
 
         $pdsReviewChangedFields = $this->pdsReviewChangedFields($employee);
@@ -234,9 +265,19 @@ class EmployeeController extends Controller
         $pdsYears = $snapshots->yearsFor($employee);
         $pdsYear = $request->integer('pds_year', $currentYear);
         $pdsYear = $pdsYears->containsStrict($pdsYear) ? $pdsYear : $currentYear;
+        $pdsDraft = $snapshots->draftForYear($employee, $pdsYear);
+        $employee->setRelation('pdsSectionReviews', $pdsDraft->pdsSectionReviews);
+        $pdsReviewChangedFields = $this->pdsReviewChangedFields($pdsDraft);
+        $pdsStatus = $request->query('pds_status', 'all');
+        abort_unless(in_array($pdsStatus, ['all', 'pending', 'approved', 'rejected'], true), 422);
+        $pdsSnapshot = $employee->pdsSnapshots()->where('year', $pdsYear)->first();
+        $pdsHasRecord = !$snapshots->isArchivedForYear($employee, $pdsYear) && ($pdsSnapshot !== null
+            || ($pdsYear === (int) ($employee->pds_record_year ?? now()->year) && $employee->pdsPersonal !== null));
+        $pdsReviewStatus = app(\App\Services\PdsCompletionService::class)->summary($pdsDraft->pdsSectionReviews)['status'];
+        $pdsDateFiled = $pdsSnapshot?->submitted_at ?? $pdsSnapshot?->created_at ?? $employee->pdsPersonal?->created_at;
 
         $salnYears = $employee->salns->pluck('as_of_date')->filter()
-            ->map(fn ($date) => $date->year)->unique()->sortDesc()->values();
+            ->map(fn ($date) => $date->year)->merge($snapshots->yearsFor($employee))->unique()->sortDesc()->values();
         if ($salnYears->isEmpty()) {
             $salnYears->push($currentYear);
         }
@@ -244,11 +285,67 @@ class EmployeeController extends Controller
         $salnYear = $salnYears->containsStrict($salnYear) ? $salnYear : $salnYears->first();
         $salnRecords = $employee->salns->filter(fn ($saln) => $saln->as_of_date?->year === $salnYear)
             ->sortByDesc('as_of_date');
-        $salnBackUrl = route('employees.show', ['employee' => $employee, 'tab' => 'saln', 'saln_year' => $salnYear, 'pds_year' => $pdsYear]);
+        $salnStatus = $request->query('saln_status', 'all');
+        abort_unless(in_array($salnStatus, ['all', 'pending', 'approved', 'returned'], true), 422);
+        if ($salnStatus !== 'all') $salnRecords = $salnRecords->filter(fn ($saln) => ($saln->review_status ?? 'pending') === $salnStatus);
+        $salnBackUrl = route('employees.show', ['employee' => $employee, 'tab' => 'saln', 'saln_year' => $salnYear, 'pds_year' => $pdsYear, 'saln_status' => $salnStatus]);
 
         return view('employees.show', compact(
-            'employee', 'pdsReviewChangedFields', 'pdsYears', 'pdsYear', 'salnYears', 'salnYear', 'salnRecords', 'salnBackUrl'
+            'employee', 'pdsReviewChangedFields', 'pdsYears', 'pdsYear', 'salnYears', 'salnYear', 'salnRecords', 'salnBackUrl', 'salnStatus',
+            'pdsStatus', 'pdsHasRecord', 'pdsReviewStatus', 'pdsDateFiled'
         ));
+    }
+
+    public function storeCtoCredit(Request $request, Employee $employee): RedirectResponse
+    {
+        $validated = $request->validateWithBag('ctoCredit', [
+            'hours' => ['required', 'numeric', 'decimal:0,2', 'min:2', 'max:999999.99'],
+            'overtime_date' => ['required', 'date', 'before_or_equal:today'],
+        ]);
+
+        DB::transaction(function () use ($employee, $validated, $request) {
+            $current = Employee::query()->lockForUpdate()->findOrFail($employee->id);
+            $calculation = app(\App\Services\CocEntitlementService::class)->calculate($current, $validated['overtime_date'], (float) $validated['hours']);
+            $hours = $calculation['hours'];
+            $balance = round((float) $current->cto_balance + $hours, 2);
+
+            if ($balance > 999999.99) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'hours' => 'The new balance exceeds the supported limit.',
+                ])->errorBag('ctoCredit');
+            }
+
+            $creditRequest = \App\Models\CtoRequest::create([
+                'employee_id' => $current->id, 'type' => 'earn',
+                'date_start' => $validated['overtime_date'], 'date_end' => $validated['overtime_date'],
+                'hours' => $hours, 'purpose' => '',
+                'rendered_hours' => $calculation['rendered_hours'], 'coc_rate' => $calculation['coc_rate'],
+                'overtime_classification' => $calculation['overtime_classification'],
+                'status' => 'approved', 'hrstaff_status' => 'approved',
+                'chief_status' => 'not_applicable', 'rd_status' => 'not_applicable',
+                'approved_by_hrstaff' => $request->user()->employee?->id,
+                'credit_source' => 'hr_direct', 'recorded_by' => $request->user()->id,
+                'cto_balance_before' => $current->cto_balance,
+            ]);
+            app(\App\Services\CocGrantService::class)->post($creditRequest, $current);
+            $creditRequest->cto_balance_after = $balance;
+            $creditRequest->save();
+            $current->forceFill(['cto_balance' => $balance])->save();
+            $filer = $request->user()->name ?: 'HR';
+            $current->user?->notify(new \App\Notifications\CtoRequestNotification(
+                $creditRequest, 'COC Credits Added by HR',
+                "{$filer} added {$hours} COC hours to your balance. Your new balance is {$balance} hours."
+            ));
+            AuditLogListener::logActivity(
+                'Add CTO Credits',
+                'CTO',
+                "HR added {$hours} COC hours directly to employee #{$current->id}. Balance after: {$balance}.",
+                $request->user()
+            );
+        });
+
+        return redirect()->route('employees.show', ['employee' => $employee, 'tab' => 'cto-credits'])
+            ->with('cto_credit_success', 'COC credits added. The employee has been notified and the ledger updated.');
     }
 
     public function storeLeaveCreditAdjustment(Request $request, Employee $employee): RedirectResponse
@@ -270,36 +367,38 @@ class EmployeeController extends Controller
 
         $validated = $validator->validated();
 
-        $leaveCredit = $employee->leaveCredits()
-            ->whereKey($validated['leave_credit_id'])
-            ->firstOrFail();
-
-        $amount = round((float) $validated['amount'], 3);
-        $delta = $validated['operation'] === 'deduct' ? -$amount : $amount;
-        $previousAdjusted = (float) $leaveCredit->adjusted;
-        $adjusted = round($previousAdjusted + $delta, 3);
-
-        $leaveCredit->adjusted = $adjusted;
-        $leaveCredit->balance = round(max(0, (float) $leaveCredit->earned + $adjusted - (float) $leaveCredit->used), 3);
-        $leaveCredit->save();
-
-        LeaveCreditTransaction::create([
-            'employee_id' => $employee->id,
-            'leave_type_id' => $leaveCredit->leave_type_id,
-            'type' => 'adjustment',
-            'amount' => $delta,
-            'balance_after' => $leaveCredit->balance,
-            'effective_date' => now()->toDateString(),
-            'description' => $validated['remarks'] ?: 'HR leave credit adjustment',
-            'metadata' => [
-                'operation' => $validated['operation'],
-                'previous_adjusted' => $previousAdjusted,
-                'new_adjusted' => $adjusted,
-                'year' => $leaveCredit->year,
-                'updated_by' => auth()->id(),
-            ],
-        ]);
-
+        $leaveCredit = DB::transaction(function () use ($employee, $validated) {
+            Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
+            $credit = $employee->leaveCredits()->whereKey($validated['leave_credit_id'])->lockForUpdate()->firstOrFail();
+            $amount = round((float) $validated['amount'], 3);
+            if ($validated['operation'] === 'deduct' && $amount > (float) $credit->balance) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'amount' => (float) $credit->balance <= 0
+                        ? 'No available credits. The balance is 0; a deduction cannot be made.'
+                        : 'The deduction exceeds the available balance of '.number_format((float) $credit->balance, 3).' days.',
+                ]);
+            }
+            $delta = $validated['operation'] === 'deduct' ? -$amount : $amount;
+            $previousAdjusted = (float) $credit->adjusted;
+            $credit->adjusted = round($previousAdjusted + $delta, 3);
+            $credit->balance = round((float) $credit->balance + $delta, 3);
+            $credit->save();
+            LeaveCreditTransaction::create([
+                'employee_id' => $employee->id, 'leave_type_id' => $credit->leave_type_id,
+                'type' => 'adjustment', 'credit_year' => $credit->year, 'amount' => $delta,
+                'balance_after' => $credit->balance, 'effective_date' => now()->toDateString(),
+                'description' => ($validated['remarks'] ?? null) ?: 'HR leave credit adjustment',
+                'metadata' => ['operation' => $validated['operation'], 'previous_adjusted' => $previousAdjusted,
+                    'new_adjusted' => $credit->adjusted, 'year' => $credit->year, 'updated_by' => auth()->id()],
+            ]);
+            DB::afterCommit(function () use ($employee, $validated, $amount, $credit) {
+                $employee->user?->notify(new \App\Notifications\LeaveCreditAdjustedNotification(
+                    $credit->leaveType?->name ?? 'Leave', $validated['operation'], $amount,
+                    (float) $credit->balance, (int) $credit->year, $validated['remarks'] ?? null,
+                ));
+            });
+            return $credit;
+        });
         return redirect()
             ->route('employees.show', $employee)
             ->withFragment('leave-credits')
@@ -326,7 +425,7 @@ class EmployeeController extends Controller
             ->filter()
             ->all();
 
-        $employee->update([
+        app(\App\Services\CoreTimeHistoryService::class)->assign($employee, [
             'core_time_start_date' => $validated['core_time_start_date'] ?? null,
             'core_time_end_date' => $validated['core_time_end_date'] ?? null,
             'core_time_schedule' => $schedule !== [] ? $schedule : null,
@@ -437,7 +536,7 @@ class EmployeeController extends Controller
             'firstname' => 'required|string|max:255',
             'lastname' => 'required|string|max:255',
             'middlename' => 'nullable|string|max:255',
-            'contact_number' => 'nullable|string|max:20',
+            'contact_number' => 'nullable|string|digits:11',
         ]);
 
         // Update employee name and contact number
@@ -495,7 +594,7 @@ class EmployeeController extends Controller
             'lastname' => 'required|string|max:255',
             'firstname' => 'required|string|max:255',
             'middlename' => 'nullable|string|max:255',
-            'contact_number' => 'nullable|string|max:20',
+            'contact_number' => 'nullable|string|digits:11',
             'notification_email' => ['required', 'email', 'max:255', Rule::unique('employees', 'notification_email')->ignore($employee->id)],
             'division' => ['required', 'string', Rule::in($this->divisionOptions())],
             'position' => 'required|string|max:255',
@@ -510,7 +609,11 @@ class EmployeeController extends Controller
             'rfid_number.unique' => 'This RFID Number is already assigned to another employee.',
         ]);
 
-        $employee->update($validated);
+        $salary = app(\App\Services\EmployeeSalaryService::class)->values($request);
+        DB::transaction(function () use ($employee, $validated, $salary) {
+            $employee->update([...$validated, ...$salary]);
+            app(\App\Services\EmployeeSalaryService::class)->syncPds($employee, array_keys($employee->getChanges()));
+        });
 
         AuditLogListener::logActivity(
             'Update Employee',

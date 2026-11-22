@@ -34,7 +34,7 @@ test('leave application form removes general reason and offers monetization as a
         ->assertSee('Monetization of Leave Credits');
 });
 
-test('vacation leave monetization is stored for reports and the official form', function () {
+test('legacy date-based monetization requires the new financial fields', function () {
     Notification::fake();
     [$user, $employee] = purposeTestEmployee();
     $vacation = LeaveType::create(['name' => 'Vacation Leave', 'days_per_year' => 15, 'is_active' => true]);
@@ -49,16 +49,8 @@ test('vacation leave monetization is stored for reports and the official form', 
         'leave_detail' => 'Davao City',
         'monetization_requested' => 1,
         'commutation_requested' => 0,
-    ])->assertRedirect(route('leaves.index'));
-
-    $leave = $employee->leaveRequests()->firstOrFail();
-    expect($leave->reason)->toBe('Monetization of Leave Credits')
-        ->and($leave->leave_detail)->toBe('Davao City');
-
-    $this->actingAs($user)
-        ->get(route('leaves.print', $leave))
-        ->assertOk()
-        ->assertSee('Monetization of Leave Credits');
+    ])->assertSessionHasErrors(['monetization_basis', 'monetization_days', 'monetization_salary']);
+    expect($employee->leaveRequests()->count())->toBe(0);
 });
 
 test('ordinary sick leave derives its internal reason from the structured detail', function () {
@@ -80,7 +72,7 @@ test('ordinary sick leave derives its internal reason from the structured detail
     expect($employee->leaveRequests()->firstOrFail()->reason)->toBe('Flu');
 });
 
-test('sick leave can also be filed for monetization', function () {
+test('sick leave monetization cannot be submitted as an ordinary dated absence', function () {
     Notification::fake();
     [$user, $employee] = purposeTestEmployee();
     $sick = LeaveType::create(['name' => 'Sick Leave', 'days_per_year' => 15, 'is_active' => true]);
@@ -95,8 +87,7 @@ test('sick leave can also be filed for monetization', function () {
         'leave_detail' => 'Medical consultation',
         'monetization_requested' => 1,
         'commutation_requested' => 0,
-    ])->assertRedirect(route('leaves.index'));
-
-    expect($employee->leaveRequests()->firstOrFail()->reason)->toBe('Monetization of Leave Credits');
+    ])->assertSessionHasErrors(['monetization_basis', 'monetization_days', 'monetization_salary']);
+    expect($employee->leaveRequests()->count())->toBe(0);
 });
 

@@ -8,26 +8,26 @@
         $parentOptions = $parentGroup ? $optionsByGroup->get($parentGroup, collect()) : collect();
     @endphp
 
-    <div class="p-4 sm:p-6 lg:p-8" x-data="{ createLeaveTypeModalOpen: false }">
-        <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white/80 shadow-lg backdrop-blur-xl">
-            <div class="border-b border-gray-100 px-6 py-5">
-                <h2 class="text-2xl font-bold text-gray-800">Utilities</h2>
-                <p class="mt-1 text-sm text-gray-500">Manage fixed dropdown values used across leave, PDS, and SALN.</p>
+    <div class="px-1 py-3 sm:px-2 lg:px-3" x-data="{ createLeaveTypeModalOpen: false }">
+        <div class="mx-auto w-full min-w-0 space-y-4">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800 sm:text-2xl">Utilities</h2>
+                <p class="mt-0.5 text-xs text-gray-500 sm:text-sm">Manage fixed dropdown values used across leave, PDS, and SALN.</p>
             </div>
 
             @if(session('success'))
-                <div class="border-b border-emerald-100 bg-emerald-50 px-6 py-3 text-sm font-semibold text-emerald-700">
+                <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-700 sm:text-sm">
                     {{ session('success') }}
                 </div>
             @endif
 
-            <div class="border-b border-gray-100 px-6 py-4">
+            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
                 <div class="overflow-x-auto">
-                    <div class="flex w-max min-w-full items-center gap-2">
+                    <div class="flex w-max min-w-full items-center gap-1">
                         @foreach($tabs as $tabKey => $tabLabel)
                             <a
                                 href="{{ route('utilities.index', ['tab' => $tabKey]) }}"
-                                class="shrink-0 whitespace-nowrap rounded-[6px] px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition
+                                class="shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] transition
                                     {{ $tab === $tabKey
                                         ? 'bg-blue-50 text-[#0038a8]'
                                         : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700' }}"
@@ -38,9 +38,9 @@
                     </div>
                 </div>
             </div>
-
-            <div class="space-y-8 p-6">
-                @if($tab === 'leave-types')
+                @if($tab === 'salary-schedule')
+                    @include('utilities.salary-schedule')
+                @elseif($tab === 'leave-types')
                     <div
                         x-data="{ leaveTypeSearch: '' }"
                         class="space-y-5"
@@ -61,8 +61,8 @@
                                     class="h-11 w-full rounded-xl border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-700 shadow-sm transition placeholder:text-slate-400 focus:border-[#0038a8] focus:ring-[#0038a8]"
                                 >
                             </div>
-                            <button type="button" @click="createLeaveTypeModalOpen = true" class="inline-flex h-11 items-center justify-center rounded-lg bg-[#0038a8] px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-[#002f8f]">
-                                Add Leave Type
+                            <button type="button" @click="createLeaveTypeModalOpen = true" class="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg bg-[#0038a8] px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-[#002f8f]">
+                                <span>+ {{ __('Add Leave Type') }}</span>
                             </button>
                         </div>
                     </div>
@@ -94,7 +94,12 @@
                                         <td class="px-4 py-3 font-semibold text-slate-700">{{ $leaveType->name }}</td>
                                         <td class="px-4 py-3 text-slate-600">{{ ($leaveType->is_active ?? true) ? 'Active' : 'Inactive' }}</td>
                                         <td class="px-4 py-3 text-slate-600">{{ optional($leaveType->created_at)->format('M d, Y') }}</td>
-                                        <td class="px-4 py-3"><a href="{{ route('leave-types.edit', $leaveType) }}" class="text-xs font-black uppercase tracking-widest text-[#0038a8] hover:text-[#002f8f]">Edit</a></td>
+                                        <td class="px-4 py-3">
+                                            <a href="{{ route('leave-types.edit', $leaveType) }}" class="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-[#0038a8] hover:text-[#002f8f]">
+                                                <i class="fa-solid fa-pen text-xs" aria-hidden="true"></i>
+                                                <span>{{ __('Edit') }}</span>
+                                            </a>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-500">No leave types found.</td></tr>
@@ -152,7 +157,9 @@
                                     </div>
                                 @endif
                                 <div class="flex items-end justify-end">
-                                    <button type="submit" class="inline-flex items-center rounded-lg bg-[#0038a8] px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-[#002f8f]">Add Option</button>
+                                    <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-[#0038a8] px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-[#002f8f]">
+                                        <span>+ {{ __('Add Option') }}</span>
+                                    </button>
                                 </div>
                             </form>
 
@@ -204,7 +211,6 @@
                         </div>
                     </section>
                 @endif
-            </div>
         </div>
 
         <!-- Add Leave Type Modal Overlay -->

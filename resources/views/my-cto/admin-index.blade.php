@@ -8,7 +8,7 @@
 
     <div
         class="px-1 py-3 sm:px-2 lg:px-3"
-        x-data='manageCtoRequests(@json($tab), @json($currentYear))'
+        x-data='manageCtoRequests(@json($tab), @json($currentYear), @json($status))'
         x-init="init()"
     >
         <div class="mx-auto w-full min-w-0">
@@ -58,7 +58,7 @@
             <div class="mb-4 border-b border-gray-200">
                 <nav
                     class="-mb-px flex gap-6 overflow-x-auto"
-                    aria-label="{{ __('CTO tabs') }}"
+                    aria-label="{{ __('CTO Tabs') }}"
                 >
                     <button
                         type="button"
@@ -68,7 +68,7 @@
                             ? 'border-indigo-600 text-indigo-700'
                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
                     >
-                        {{ __('Pending CTO') }}
+                        {{ __('Pending CTO Requests') }}
                     </button>
 
                     <button
@@ -79,7 +79,7 @@
                             ? 'border-indigo-600 text-indigo-700'
                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
                     >
-                        {{ __('All CTO') }}
+                        {{ __('All CTO Requests') }}
                     </button>
                 </nav>
             </div>
@@ -122,13 +122,14 @@
                     />
                 </div>
 
-                {{-- CTO type filter --}}
+                {{-- CTO status filter --}}
                 <div class="sm:w-44 sm:shrink-0">
-                    <label for="ctoType" class="sr-only">{{ __('CTO Type') }}</label>
-                    <select id="ctoType" x-model="type" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="">{{ __('Types') }}</option>
-                        <option value="earn">{{ __('Earn COC') }}</option>
-                        <option value="use">{{ __('Use CTO') }}</option>
+                    <label for="ctoStatus" class="sr-only">{{ __('Status') }}</label>
+                    <select id="ctoStatus" x-model="status" @change="applyFilters()" class="block h-9 w-full rounded-lg border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">{{ __('Status') }}</option>
+                        <option value="pending">{{ __('Pending') }}</option>
+                        <option value="approved">{{ __('Approved') }}</option>
+                        <option value="rejected">{{ __('Rejected') }}</option>
                     </select>
                 </div>
 
@@ -161,16 +162,16 @@
             >
                 <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
                     <div class="w-full overflow-x-auto">
-                        <table class="w-full table-fixed divide-y divide-slate-200">
+                        <table class="min-w-full table-fixed border-collapse text-left" style="min-width: 880px;">
                             <colgroup>
                                 <col class="w-[11%]">
-                                <col class="w-[19%]">
-                                <col class="w-[11%]">
-                                <col class="w-[11%]">
+                                <col class="w-[17%]">
+                                <col class="w-[10%]">
+                                <col class="w-[10%]">
                                 <col class="w-[13%]">
+                                <col class="w-[12%]">
                                 <col class="w-[13%]">
-                                <col class="w-[13%]">
-                                <col class="w-[9%]">
+                                <col class="w-[14%]">
                             </colgroup>
 
                             <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
@@ -196,12 +197,7 @@
                                         {{ __('Type') }}
                                     </th>
 
-                                    <th
-                                        scope="col"
-                                        class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
-                                    >
-                                        {{ __('Status') }}
-                                    </th>
+                                    
 
                                     <th
                                         scope="col"
@@ -222,6 +218,12 @@
                                         class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                     >
                                         {{ __('Regional Director') }}
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    >
+                                        {{ __('Status') }}
                                     </th>
 
                                     <th
@@ -273,16 +275,16 @@
             >
                 <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
                     <div class="w-full overflow-x-auto">
-                        <table class="w-full table-fixed divide-y divide-slate-200">
+                        <table class="min-w-full table-fixed border-collapse text-left" style="min-width: 880px;">
                             <colgroup>
                                 <col class="w-[11%]">
-                                <col class="w-[19%]">
-                                <col class="w-[11%]">
-                                <col class="w-[11%]">
+                                <col class="w-[17%]">
+                                <col class="w-[10%]">
+                                <col class="w-[10%]">
                                 <col class="w-[13%]">
+                                <col class="w-[12%]">
                                 <col class="w-[13%]">
-                                <col class="w-[13%]">
-                                <col class="w-[9%]">
+                                <col class="w-[14%]">
                             </colgroup>
 
                             <thead class="border-b border-slate-300 bg-slate-50 [&_th]:bg-slate-50">
@@ -308,12 +310,7 @@
                                         {{ __('Type') }}
                                     </th>
 
-                                    <th
-                                        scope="col"
-                                        class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
-                                    >
-                                        {{ __('Status') }}
-                                    </th>
+                                    
 
                                     <th
                                         scope="col"
@@ -334,6 +331,12 @@
                                         class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
                                     >
                                         {{ __('Regional Director') }}
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        class="break-words whitespace-normal px-2 py-3 text-center text-[10px] font-black uppercase leading-4 tracking-wider text-gray-500"
+                                    >
+                                        {{ __('Status') }}
                                     </th>
 
                                     <th
@@ -618,14 +621,14 @@
     </div>
 
     <script>
-        function manageCtoRequests(initialTab, currentYear) {
+        function manageCtoRequests(initialTab, currentYear, initialStatus) {
             const approvalRole = @js($approvalRole);
 
             return {
                 tab: initialTab || 'pending',
 
                 search: '',
-                type: '',
+                status: initialStatus || '',
                 year: String(currentYear),
                 month: '',
                 perPage: 5,
@@ -755,17 +758,17 @@
                             row.dataset.search || ''
                         ).toLowerCase();
 
-                        const rowType = (
-                            row.dataset.type || ''
+                        const rowStatus = (
+                            row.dataset.status || ''
                         ).toLowerCase();
 
                         const matchesSearch =
                             !searchValue ||
                             rowSearch.includes(searchValue);
 
-                        const matchesType =
-                            !this.type ||
-                            rowType === String(this.type).toLowerCase();
+                        const matchesStatus =
+                            !this.status ||
+                            rowStatus === String(this.status).toLowerCase();
 
                         const matchesYear =
                             !this.year ||
@@ -776,7 +779,7 @@
 
                         const visible =
                             matchesSearch &&
-                            matchesType &&
+                            matchesStatus &&
                             matchesYear &&
                             matchesMonth;
 
@@ -860,7 +863,7 @@
 
                 reset() {
                     this.search = '';
-                    this.type = '';
+                    this.status = '';
                     this.year = String(currentYear);
                     this.month = '';
                     this.resetPages();
@@ -917,7 +920,7 @@
                         ? 'Verifying will forward this request\nto the next approval stage.'
                         : (approvalRole === 'regionaldirector'
                             ? 'Approving will mark this as\nfully approved.'
-                            : 'Approving will move this request to the next step\nor mark it as fully approved.');
+                            : 'Approving will forward this request to the Regional Director for final approval.');
                     this.approveModalOpen = true;
 
                     document.documentElement.classList.add('overflow-hidden');

@@ -13,42 +13,42 @@
         $formatRole = fn ($role) => $roleLabels[strtolower((string) $role)] ?? 'Unassigned';
     @endphp
 
-    <div class="overflow-x-hidden py-6" x-data="{ tab: 'employees', archiveConfirmOpen: false, archiveAction: '', archiveEmployeeName: '' }">
-        <div class="mx-auto w-full min-w-0 px-3 sm:px-4 lg:px-5">
+    <div class="px-1 py-3 sm:px-2 lg:px-3" x-data="{ tab: 'employees', archiveConfirmOpen: false, archiveAction: '', archiveEmployeeName: '', sortMenuOpen: false }">
+        <div class="mx-auto w-full min-w-0">
             @if(session('success'))
-                <div class="mb-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700">
+                <div role="status" class="mb-2 rounded-lg border-l-4 border-green-500 bg-green-50 px-3 py-2 text-sm leading-snug text-green-800">
                     {{ session('success') }}
                 </div>
             @endif
             @if(session('error'))
-                <div class="mb-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
+                <div role="alert" class="mb-2 rounded-lg border-l-4 border-red-500 bg-red-50 px-3 py-2 text-sm leading-snug text-red-700">
                     {{ session('error') }}
                 </div>
             @endif
             @if(session('account_credentials'))
                 @php($credentials = session('account_credentials'))
-                <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                    <div class="font-black uppercase tracking-wider text-amber-800">{{ __('Temporary Account Details') }}</div>
-                    <p class="mt-1 text-amber-700">{{ __('Give these details to the employee only if the email was not received. This message appears once after account creation.') }}</p>
-                    <div class="mt-3 grid gap-2 sm:grid-cols-3">
+                <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    <div class="text-xs font-bold uppercase tracking-wide text-amber-800">{{ __('Temporary Account Details') }}</div>
+                    <p class="mt-1 text-xs leading-snug text-amber-700">{{ __('Share only with the employee if the email was not received. Shown once after account creation.') }}</p>
+                    <div class="mt-2 grid gap-2 sm:grid-cols-3">
                         <div>
-                            <span class="block text-[10px] font-black uppercase tracking-widest text-amber-700">{{ __('HRIS Username') }}</span>
-                            <span class="font-bold">{{ $credentials['hris_username'] ?? '' }}</span>
+                            <span class="block text-[11px] font-black uppercase tracking-widest text-amber-700">{{ __('HRIS Username') }}</span>
+                            <span class="break-all font-semibold">{{ $credentials['hris_username'] ?? '' }}</span>
                         </div>
                         <div>
-                            <span class="block text-[10px] font-black uppercase tracking-widest text-amber-700">{{ __('Recovery / OTP Email') }}</span>
-                            <span class="font-bold">{{ $credentials['recovery_email'] ?? '' }}</span>
+                            <span class="block text-[11px] font-black uppercase tracking-widest text-amber-700">{{ __('Recovery / OTP Email') }}</span>
+                            <span class="break-all font-semibold">{{ $credentials['recovery_email'] ?? '' }}</span>
                         </div>
                         <div>
-                            <span class="block text-[10px] font-black uppercase tracking-widest text-amber-700">{{ __('Temporary Password') }}</span>
-                            <span class="font-mono font-black">{{ $credentials['temporary_password'] ?? '' }}</span>
+                            <span class="block text-[11px] font-black uppercase tracking-widest text-amber-700">{{ __('Temporary Password') }}</span>
+                            <span class="break-all font-mono font-semibold">{{ $credentials['temporary_password'] ?? '' }}</span>
                         </div>
                     </div>
                 </div>
             @endif
 
             <!-- Header Actions -->
-            <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div class="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="max-w-full overflow-x-auto">
                 <div class="inline-flex rounded-xl bg-white border border-gray-100 shadow-sm p-1">
                     <button type="button"
@@ -66,13 +66,23 @@
                 </div>
                 </div>
 
-                <a href="{{ route('employees.create') }}"
-                   class="inline-flex shrink-0 items-center justify-center rounded-xl bg-indigo-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                    <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    {{ __('Add Employee') }}
-                </a>
+                <div class="flex shrink-0 items-center gap-2">
+                    <div class="relative">
+                        <select id="employee_year" form="employeeFilterForm" name="year" aria-label="Year" class="block h-9 w-28 rounded-lg border-slate-300 bg-white pl-3 pr-8 py-1 text-sm font-normal text-slate-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="0" @selected($year === 0)>{{ __('Years') }}</option>
+                            @foreach($employeeYears as $yearOption)
+                                <option value="{{ $yearOption }}" @selected($year === $yearOption)>{{ $yearOption }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <a href="{{ route('employees.create') }}"
+                       class="inline-flex h-9 items-center justify-center rounded-xl bg-indigo-600 px-4 text-xs font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                        <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        {{ __('Add Employee') }}
+                    </a>
+                </div>
             </div>
 
             <form id="employeeFilterForm" method="GET" action="{{ route('employees.index') }}" data-filter-url="{{ route('employees.filter') }}" class="mb-4 flex min-w-0 flex-col gap-2 rounded-xl border border-gray-100 bg-gray-50/70 p-2 sm:flex-row sm:items-center" x-show="tab === 'employees'" x-cloak>
@@ -96,13 +106,24 @@
                             </select>
                         </div>
                         <div class="sm:w-44 sm:shrink-0">
-                            <label for="sort" class="sr-only">{{ __('Sort') }}</label>
-                            <select id="sort" name="sort" class="block h-9 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="name_asc" {{ $sort === 'name_asc' ? 'selected' : '' }}>{{ __('Name A-Z') }}</option>
-                                <option value="name_desc" {{ $sort === 'name_desc' ? 'selected' : '' }}>{{ __('Name Z-A') }}</option>
-                                <option value="division_asc" {{ $sort === 'division_asc' ? 'selected' : '' }}>{{ __('Division') }}</option>
-                                <option value="newest" {{ $sort === 'newest' ? 'selected' : '' }}>{{ __('Newest') }}</option>
+                            <label for="employment_status" class="sr-only">{{ __('Employment status') }}</label>
+                            <select id="employment_status" name="employment_status" class="block h-9 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">{{ __('All Statuses') }}</option>
+                                @foreach(['Regular', 'Contract of Service', 'Job Order'] as $statusOption)
+                                    <option value="{{ $statusOption }}" @selected($employmentStatus === $statusOption)>{{ $statusOption }}</option>
+                                @endforeach
                             </select>
+                        </div>
+                        <input id="sort" name="sort" type="hidden" value="{{ $sort }}">
+                        <div class="relative shrink-0" @click.outside="sortMenuOpen = false">
+                            <button type="button" @click="sortMenuOpen = !sortMenuOpen" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-slate-600 transition hover:bg-slate-100" title="{{ __('Sort employees') }}" aria-label="{{ __('Sort employees') }}">
+                                <i class="fa-solid fa-arrow-down-a-z text-sm" aria-hidden="true"></i>
+                            </button>
+                            <div x-show="sortMenuOpen" x-cloak class="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-xs shadow-lg">
+                                @foreach(['name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A', 'division_asc' => 'Division', 'newest' => 'Newest'] as $sortValue => $sortLabel)
+                                    <button type="button" data-employee-sort="{{ $sortValue }}" @click="sortMenuOpen = false" class="block w-full px-3 py-2 text-left {{ $sort === $sortValue ? 'bg-indigo-50 font-bold text-indigo-700' : 'text-slate-600 hover:bg-slate-50' }}">{{ __($sortLabel) }}</button>
+                                @endforeach
+                            </div>
                         </div>
                         <div class="flex items-center gap-2 sm:shrink-0">
                             <button type="button" id="employeeFilterReset" class="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-xs font-bold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50">
@@ -117,11 +138,13 @@
                         <table class="min-w-full w-full table-fixed divide-y divide-gray-200">
                             <thead>
                                 <tr class="bg-gray-50">
-                                    <th class="w-[22%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Employees Name') }}</th>
-                                    <th class="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('RFID Number') }}</th>
-                                    <th class="w-[34%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Division') }}</th>
-                                    <th class="w-[18%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Role') }}</th>
-                                    <th class="w-[14%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ __('Actions') }}</th>
+                                    <th class="w-[19%] px-2 py-2.5 text-left text-[11px] font-black uppercase tracking-wider text-gray-500">{{ __('Employee') }}</th>
+                                    <th class="w-[11%] px-2 py-2.5 text-left text-[11px] font-black uppercase tracking-wider text-gray-500">{{ __('RFID') }}</th>
+                                    <th class="w-[23%] px-2 py-2.5 text-left text-[11px] font-black uppercase tracking-wider text-gray-500">{{ __('Division') }}</th>
+                                    <th class="w-[13%] px-2 py-2.5 text-left text-[11px] font-black uppercase tracking-wider text-gray-500">{{ __('Role') }}</th>
+                                    <th class="w-[15%] px-2 py-2.5 text-left text-[11px] font-black uppercase tracking-wider text-gray-500">{{ __('Status') }}</th>
+                                    <th class="w-[8%] px-2 py-2.5 text-left text-[11px] font-black uppercase tracking-wider text-gray-500">{{ __('Year') }}</th>
+                                    <th class="w-[11%] px-2 py-2.5 text-center text-[11px] font-black uppercase tracking-wider text-gray-500">{{ __('Actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="employeeTableBody" class="bg-white divide-y divide-gray-200">
@@ -306,6 +329,8 @@
         const employeeFilterForm = document.getElementById('employeeFilterForm');
         const employeeSearchInput = document.querySelector('[data-autofilter]');
         const employeeDivisionSelect = document.getElementById('division');
+        const employeeStatusSelect = document.getElementById('employment_status');
+        const employeeYearSelect = document.getElementById('employee_year');
         const employeeSortSelect = document.getElementById('sort');
         const employeeTableBody = document.getElementById('employeeTableBody');
         const employeeTablePagination = document.getElementById('employeeTablePagination');
@@ -369,14 +394,32 @@
             employeeDivisionSelect.addEventListener('change', filterEmployees);
         }
 
+        if (employeeStatusSelect) {
+            employeeStatusSelect.addEventListener('change', filterEmployees);
+        }
+
+        if (employeeYearSelect) {
+            employeeYearSelect.addEventListener('change', filterEmployees);
+        }
+
         if (employeeSortSelect) {
             employeeSortSelect.addEventListener('change', filterEmployees);
         }
+
+        document.querySelectorAll('[data-employee-sort]').forEach((button) => {
+            button.addEventListener('click', () => {
+                if (!employeeSortSelect) return;
+                employeeSortSelect.value = button.dataset.employeeSort;
+                filterEmployees();
+            });
+        });
 
         if (employeeFilterReset) {
             employeeFilterReset.addEventListener('click', () => {
                 employeeSearchInput.value = '';
                 employeeDivisionSelect.value = '';
+                employeeStatusSelect.value = '';
+                employeeYearSelect.value = '{{ $defaultEmployeeYear }}';
                 employeeSortSelect.value = 'name_asc';
                 filterEmployees();
             });

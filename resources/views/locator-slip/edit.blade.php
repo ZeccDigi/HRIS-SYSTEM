@@ -1,4 +1,4 @@
-﻿<x-app-layout>
+<x-app-layout>
     <x-slot name="title">{{ __('Edit Locator Slip') }}</x-slot>
 
     <div class="p-4 sm:p-6 lg:p-8">
@@ -88,7 +88,7 @@
                 isDisabled(value) {
                     const date = new Date(value + 'T00:00:00');
                     const today = new Date(this.minDate + 'T00:00:00');
-                    return date < today || date.getDay() === 0 || date.getDay() === 6;
+                    return date < today || (!@js((bool) config('locator_slips.allow_weekends')) && (date.getDay() === 0 || date.getDay() === 6));
                 },
                 calendarDays() {
                     const year = this.currentMonth.getFullYear();

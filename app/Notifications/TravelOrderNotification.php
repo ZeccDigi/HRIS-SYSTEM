@@ -38,7 +38,7 @@ class TravelOrderNotification extends Notification
     {
         return [
             'type' => 'travel_order',
-            'title' => $this->title,
+            'title' => \App\Support\NotificationTitle::format($this->title),
             'message' => $this->message,
             'travel_order_id' => $this->travelOrder->id,
             'action_url' => str_contains(strtolower($this->title), 'acknowledgement') || str_starts_with(strtolower($this->title), 'tar')

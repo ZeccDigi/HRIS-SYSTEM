@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="title">{{ __('My Leave Requests') }}</x-slot>
+    <x-slot name="title">{{ $monetizationTab ? __('My Monetization') : __('My Leave Requests') }}</x-slot>
 
     <div class="px-1 py-3 sm:px-2 lg:px-3">
         <div class="w-full" x-data="myLeaveApplicationTable()" x-init="init()">
@@ -32,21 +32,22 @@
                         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                         </svg>
-                        {{ __('Apply New Leave') }}
+                        {{ __('Apply Leave') }}
                     </button>
                 </div>
             </div>
 
             <section class="rounded-2xl border border-slate-100 bg-white p-2 shadow-sm sm:p-3">
-            <div x-data="{ tab: 'applications' }">
+            <div>
                 <!-- Tabs Navigation -->
                 <div class="mb-4 border-b border-gray-200">
                     <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                        <button @click="tab = 'applications'"
+                        <a href="{{ route('leaves.index') }}"
                                 :class="tab === 'applications' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
                                 class="whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm uppercase tracking-widest transition-colors duration-200">
                             My Leave Applications
-                        </button>
+                        </a>
+                        <a href="{{ route('leaves.index', ['tab' => 'monetization']) }}" :class="tab === 'monetization' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'" class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-bold uppercase tracking-widest">My Monetization</a>
                         <button @click="tab = 'credits'"
                                 :class="tab === 'credits' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
                                 class="whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm uppercase tracking-widest transition-colors duration-200">
@@ -58,18 +59,20 @@
                 <!-- Credits Summary Tab -->
                 <div x-show="tab === 'credits'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        @foreach($credits->filter(function ($credit) {
-                            $leaveName = Str::lower(trim($credit->leaveType?->name ?? ''));
-
-                            return in_array($leaveName, [
-                                'special privilege leave',
-                                'sick leave',
-                                'vacation leave',
-                                'mandatory/force leave',
-                                
-                            ], true);
-                        }) as $credit)
-                            <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+                        @foreach($creditCards as $credit)
+                            @php
+                                $hasCreditHistory = in_array(strtolower(trim($credit->leaveType->name)), ['vacation leave', 'sick leave'], true);
+                                $total = (float) ($credit->leaveType->days_per_year ?? 15);
+                                $percentage = $total > 0 ? max(0, min(100, ((float) $credit->balance / $total) * 100)) : 0;
+                                $color = $percentage > 50 ? 'bg-blue-900' : ($percentage > 20 ? 'bg-yellow-500' : 'bg-red-500');
+                            @endphp
+                            <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md {{ $hasCreditHistory ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500' : '' }}"
+                                @if($hasCreditHistory)
+                                    data-credit-history-trigger role="button" tabindex="0" aria-label="{{ __('View :type credit history', ['type' => $credit->leaveType->name]) }}"
+                                    @click="$dispatch('open-credit-history', { id: {{ $credit->leave_type_id }}, name: @js($credit->leaveType->name) })"
+                                    @keydown.enter.prevent="$dispatch('open-credit-history', { id: {{ $credit->leave_type_id }}, name: @js($credit->leaveType->name) })"
+                                    @keydown.space.prevent="$dispatch('open-credit-history', { id: {{ $credit->leave_type_id }}, name: @js($credit->leaveType->name) })"
+                                @endif>
                                 <div class="min-h-[2.5rem] text-[10px] font-black uppercase text-blue-900 tracking-widest">
                                     {{ $credit->leaveType->name }}
                                 </div>
@@ -79,32 +82,18 @@
                                         <div class="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-400">{{ __('Days Left') }}</div>
                                     </div>
                                 </div>
-                                <div class="mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-gray-100 bg-gray-50/70">
-                                    <div class="border-r border-gray-100 px-3 py-2.5">
-                                        <div class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ __('Earned') }}</div>
-                                        <div class="mt-1 text-sm font-black text-gray-900">{{ number_format((float) $credit->earned, 3) }}</div>
-                                    </div>
-                                    <div class="px-3 py-2.5">
-                                        <div class="text-[10px] font-black uppercase tracking-widest text-gray-400">{{ __('Used') }}</div>
-                                        <div class="mt-1 text-sm font-black text-gray-900">{{ number_format((float) $credit->used, 3) }}</div>
-                                    </div>
-                                </div>
                                 <div class="mt-4 w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                                    @php
-                                        $total = $credit->leaveType->days_per_year ?? 15;
-                                        $percentage = $total > 0 ? ($credit->balance / $total) * 100 : 0;
-                                        $color = $percentage > 50 ? 'bg-blue-900' : ($percentage > 20 ? 'bg-yellow-500' : 'bg-red-500');
-                                    @endphp
                                     <div class="{{ $color }} h-full transition-all duration-1000" style="width: {{ $percentage }}%">
                                     </div>
                                 </div>
                             </div>
                         @endforeach
                     </div>
+                    <x-leave-credit-history />
                 </div>
 
                 <!-- Leave Applications Tab -->
-                <div x-show="tab === 'applications'" style="display: none;" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+                <div x-show="tab === 'applications' || tab === 'monetization'" style="display: none;" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
                     <!-- Search and Filters -->
                     <div class="mb-4 flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
                         <div class="relative min-w-[260px] flex-1">
@@ -249,6 +238,7 @@
                                             <td class="px-2 py-3 text-center align-middle">
                                                 <div class="w-full min-w-0 text-center text-sm font-normal text-gray-900 break-normal whitespace-normal">
                                                     <span class="block break-normal whitespace-normal">{{ $leaveTypeName }}</span>
+                                                    @if($leaf->is_monetization)<span class="mt-1 block text-xs text-blue-800">{{ number_format((float) $leaf->monetization_days, 3) }} days · ₱{{ number_format((float) $leaf->monetization_amount, 2) }}</span>@endif
                                                 </div>
                                             </td>
                                             <td class="px-1 py-3 text-center align-middle">
@@ -341,6 +331,7 @@
                 </div>
             </div>
             </section>
+
 
             <template x-teleport="body">
                 <div
@@ -546,6 +537,7 @@
                 selectedId: initialSelectedId ? String(initialSelectedId) : '',
                 search: @js($search),
                 year: @js((string) $year),
+                tab: @js(request('tab') === 'credits' ? 'credits' : ($monetizationTab ? 'monetization' : 'applications')),
                 month: @js($month),
                 status: @js($status),
                 rows: [],
@@ -571,6 +563,7 @@
                 },
                 applyFilters() {
                     const url = new URL(@js(route('leaves.index')));
+                    if (this.tab !== 'applications') url.searchParams.set('tab', this.tab);
 
                     if (this.search.trim()) {
                         url.searchParams.set('search', this.search.trim());
@@ -591,7 +584,7 @@
                     window.location.href = url.toString();
                 },
                 reset() {
-                    window.location.href = @js(route('leaves.index'));
+                    window.location.href = @js(route('leaves.index', $monetizationTab ? ['tab' => 'monetization'] : []));
                 },
                 openCreateModal(url, title) {
                     this.createModalUrl = url;

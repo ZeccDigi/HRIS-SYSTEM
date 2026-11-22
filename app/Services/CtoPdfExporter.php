@@ -16,7 +16,7 @@ class CtoPdfExporter
             ? public_path('storage/'.$ctoRequest->applicant_signature_path)
             : $ctoRequest->employee?->e_signature_absolute_path;
 
-        $pdf = Pdf::loadView('my-cto.print-availment-new', [
+        $pdf = Pdf::loadView($ctoRequest->type === 'earn' ? 'my-cto.print-coc-certificate' : 'my-cto.print-availment-new', [
             'ctoRequest' => $ctoRequest,
             'isPrintDocument' => true,
             'dmwLogoPath' => public_path('images/official DMW.png'),

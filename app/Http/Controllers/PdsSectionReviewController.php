@@ -6,6 +6,8 @@ use App\Listeners\AuditLogListener;
 use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Services\PdsSnapshotService;
+use Illuminate\Support\Facades\DB;
 
 class PdsSectionReviewController extends Controller
 {
@@ -25,8 +27,8 @@ class PdsSectionReviewController extends Controller
     public function store(Request $request, Employee $employee)
     {
         $validated = $request->validate([
-            'section_name' => 'required|string',
-            'status' => 'required|in:pending,approved,rejected',
+            'section_name' => ['required', 'string', Rule::in(self::SECTION_NAMES)],
+            'status' => 'required|in:approved,rejected',
             'remarks' => [
                 Rule::requiredIf($request->input('status') === 'rejected'),
                 'nullable',
@@ -34,6 +36,17 @@ class PdsSectionReviewController extends Controller
             ],
         ]);
 
+        $year = $this->reviewYear($employee);
+        if ($year !== (int) now()->year || $year !== (int) ($employee->pds_record_year ?? now()->year)) {
+            app(PdsSnapshotService::class)->reviewHistorical($employee, $year, $validated['section_name'], $validated['status'], $validated['remarks'] ?? null);
+            AuditLogListener::logActivity('Review PDS Section', 'Employees', "Reviewed {$year} {$validated['section_name']} for employee #{$employee->id}: {$validated['status']}.", auth()->user());
+            return back()->with('success', "{$year} PDS section review saved.");
+        }
+
+        DB::transaction(function () use ($employee, $validated) {
+        $employee->newQuery()->whereKey($employee->id)->lockForUpdate()->firstOrFail();
+        $review = $employee->pdsSectionReviews()->where('section_name', $validated['section_name'])->lockForUpdate()->first();
+        abort_unless($review && $review->status === 'pending', 409, 'This section has no pending update to review.');
         $review = $employee->pdsSectionReviews()->firstOrNew([
             'section_name' => $validated['section_name'],
         ]);
@@ -48,7 +61,12 @@ class PdsSectionReviewController extends Controller
             $review->changed_fields = [];
         }
 
-        $review->save();
+            $review->save();
+            if ($validated['status'] === 'approved') {
+                app(PdsSnapshotService::class)->publishSections($employee, [$validated['section_name']]);
+            }
+            app(PdsSnapshotService::class)->syncLiveDraft($employee);
+        });
 
         AuditLogListener::logActivity(
             'Review PDS Section',
@@ -66,7 +84,18 @@ class PdsSectionReviewController extends Controller
             'remarks' => ['nullable', 'string'],
         ])['remarks'] ?? null;
 
-        foreach (self::SECTION_NAMES as $sectionName) {
+        $year = $this->reviewYear($employee);
+        if ($year !== (int) now()->year || $year !== (int) ($employee->pds_record_year ?? now()->year)) {
+            app(PdsSnapshotService::class)->reviewHistorical($employee, $year, null, 'approved', $remarks);
+            AuditLogListener::logActivity('Approve All PDS Sections', 'Employees', "Approved pending {$year} PDS sections for employee #{$employee->id}.", auth()->user());
+            return back()->with('success', "Pending {$year} PDS sections approved.");
+        }
+
+        DB::transaction(function () use ($employee, $remarks) {
+        $employee->newQuery()->whereKey($employee->id)->lockForUpdate()->firstOrFail();
+        $sections = $employee->pdsSectionReviews()->where('status', 'pending')->lockForUpdate()->pluck('section_name')->all();
+        abort_if(empty($sections), 409, 'There are no pending PDS updates to approve.');
+        foreach ($sections as $sectionName) {
             $employee->pdsSectionReviews()->updateOrCreate(
                 ['section_name' => $sectionName],
                 [
@@ -78,6 +107,10 @@ class PdsSectionReviewController extends Controller
             );
         }
 
+        app(PdsSnapshotService::class)->publishSections($employee, $sections);
+        app(PdsSnapshotService::class)->syncLiveDraft($employee);
+        });
+
         AuditLogListener::logActivity(
             'Approve All PDS Sections',
             'Employees',
@@ -85,7 +118,7 @@ class PdsSectionReviewController extends Controller
             auth()->user()
         );
 
-        return back()->with('success', 'All PDS sections have been approved successfully.');
+        return back()->with('success', 'All pending PDS sections have been approved successfully.');
     }
 
     public function rejectAll(Request $request, Employee $employee)
@@ -94,7 +127,18 @@ class PdsSectionReviewController extends Controller
             'remarks' => ['required', 'string'],
         ]);
 
-        foreach (self::SECTION_NAMES as $sectionName) {
+        $year = $this->reviewYear($employee);
+        if ($year !== (int) now()->year || $year !== (int) ($employee->pds_record_year ?? now()->year)) {
+            app(PdsSnapshotService::class)->reviewHistorical($employee, $year, null, 'rejected', $validated['remarks']);
+            AuditLogListener::logActivity('Reject All PDS Sections', 'Employees', "Rejected pending {$year} PDS sections for employee #{$employee->id}.", auth()->user());
+            return back()->with('success', "Pending {$year} PDS sections rejected.");
+        }
+
+        DB::transaction(function () use ($employee, $validated) {
+        $employee->newQuery()->whereKey($employee->id)->lockForUpdate()->firstOrFail();
+        $sections = $employee->pdsSectionReviews()->where('status', 'pending')->lockForUpdate()->pluck('section_name')->all();
+        abort_if(empty($sections), 409, 'There are no pending PDS updates to reject.');
+        foreach ($sections as $sectionName) {
             $employee->pdsSectionReviews()->updateOrCreate(
                 ['section_name' => $sectionName],
                 [
@@ -104,6 +148,8 @@ class PdsSectionReviewController extends Controller
                 ]
             );
         }
+        app(PdsSnapshotService::class)->syncLiveDraft($employee);
+        });
 
         AuditLogListener::logActivity(
             'Reject All PDS Sections',
@@ -113,5 +159,14 @@ class PdsSectionReviewController extends Controller
         );
 
         return back()->with('success', 'PDS sections have been rejected successfully.');
+    }
+
+    private function reviewYear(Employee $employee): int
+    {
+        request()->validate(['year' => ['nullable', 'integer']]);
+        $year = (int) request('year', now()->year);
+        abort_unless(app(PdsSnapshotService::class)->hasYear($employee, $year), 422);
+        abort_if(app(PdsSnapshotService::class)->isArchivedForYear($employee, $year), 409, 'Restore this PDS year before reviewing it.');
+        return $year;
     }
 }
