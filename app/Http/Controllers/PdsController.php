@@ -340,6 +340,7 @@ class PdsController extends Controller
 
         $request->merge(['work_experience' => collect($request->input('work_experience', []))->map(function ($row) {
             if (isset($row['monthly_salary']) && is_string($row['monthly_salary'])) $row['monthly_salary'] = str_replace(',', '', $row['monthly_salary']);
+            $row['is_gov_service'] = $row['is_gov_service'] ?? 0;
             return $row;
         })->all()]);
         $request->validate([
@@ -404,6 +405,7 @@ class PdsController extends Controller
             'work_experience.*.company' => 'nullable|string',
             'work_experience.*.date_to' => 'nullable|date|after_or_equal:work_experience.*.date_from',
             'work_experience.*.hr_salary_assignment' => 'nullable|boolean',
+            'work_experience.*.is_gov_service' => 'nullable|boolean',
             'work_experience' => 'nullable|array',
             'work_experience.*.salary_step' => 'nullable|string|max:50',
             'work_experience.*.salary_schedule_year' => 'nullable|integer|min:2000|max:2100',

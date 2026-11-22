@@ -659,8 +659,9 @@
                                     <button type="button" @click="children.push({fullname: '', date_of_birth: ''})" class="text-[9px] font-black uppercase tracking-[0.1em] bg-white border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition">+ Add Child</button>
                                 </div>
                                 <div class="overflow-x-auto border-b border-slate-100">
-                                    <table class="w-full">
-                                        <thead>
+                                    <table class="pds-repeat-table pds-children-table w-full table-fixed text-xs" style="min-width: 620px">
+                                    <colgroup><col><col style="width:160px"><col style="width:28px"></colgroup>
+                                    <thead>
                                             <tr class="text-left text-[9px] font-black uppercase text-gray-400 bg-gray-50">
                                                 <th class="px-4 py-2">Full Name</th>
                                                 <th class="px-4 py-2">Date of Birth</th>
@@ -699,7 +700,8 @@
                                 </div>
                             </div>
                             <div class="overflow-x-auto border-b border-slate-100">
-                                <table class="w-full text-xs">
+                                <table class="pds-repeat-table pds-education-table w-full table-fixed text-xs" style="min-width: 1100px">
+                                    <colgroup><col style="width:145px"><col><col style="width:190px"><col style="width:90px"><col style="width:90px"><col style="width:110px"><col style="width:160px"><col style="width:28px"></colgroup>
                                     <thead>
                                         <tr class="text-left text-[9px] font-black uppercase text-gray-400 bg-gray-50">
                                             <th class="px-2 py-3 border-r border-gray-50">Level <span class="text-red-500 font-bold ml-0.5">*</span></th>
@@ -748,7 +750,8 @@
                                 </div>
                             </div>
                             <div class="overflow-x-auto border-b border-slate-100">
-                                <table class="w-full text-xs">
+                                <table class="pds-repeat-table pds-eligibility-table w-full table-fixed text-xs" style="min-width: 600px">
+                                    <colgroup><col><col style="width:130px"><col style="width:160px"><col style="width:28px"></colgroup>
                                     <thead>
                                         <tr class="text-left text-[9px] font-black uppercase text-gray-400 bg-gray-50">
                                             <th class="px-4 py-3">Eligibility Title <span class="text-red-500 font-bold ml-0.5">*</span></th>
@@ -789,10 +792,8 @@
                                 </div>
                             </div>
                             <div class="overflow-x-auto border-b border-slate-100">
-                                <table class="pds-work-table w-full table-fixed text-xs" style="min-width: 1350px">
-                                    <colgroup>
-                                        <col style="width:10%"><col style="width:10%"><col style="width:12%"><col style="width:13%"><col style="width:10%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:12%"><col style="width:7%"><col style="width:3%">
-                                    </colgroup>
+                                <table class="pds-repeat-table pds-work-table w-full table-fixed text-xs" style="min-width: 1600px">
+                                    <colgroup><col style="width:145px"><col style="width:145px"><col><col style="width:220px"><col style="width:130px"><col style="width:100px"><col style="width:95px"><col style="width:110px"><col style="width:155px"><col style="width:100px"><col style="width:28px"></colgroup>
                                     <thead>
                                         <tr class="text-left text-[9px] font-black uppercase text-gray-400 bg-gray-50">
                                             <th class="px-4 py-3">From <span class="text-red-500 font-bold ml-0.5">*</span></th>
@@ -820,7 +821,7 @@
                                                 <td class="p-1"><select class="w-full text-[10px] border-transparent px-2" x-model="w.salary_step" @change="applySalaryRate(w)" :name="`work_experience[${index}][salary_step]`"><option value="">Step</option>@foreach($utilityOptionSets['step_increments'] as $option)<option value="{{ $option->value }}">{{ $option->label }}</option>@endforeach</select></td>
                                                 <td class="p-1"><select class="w-full text-[10px] border-transparent px-2" x-model="w.salary_schedule_year" @change="applySalaryRate(w)" :name="`work_experience[${index}][salary_schedule_year]`"><option value="">Select year</option>@foreach($salaryScheduleYears as $salaryYear)<option value="{{ $salaryYear }}">{{ $salaryYear }}</option>@endforeach</select><span x-show="w.salary_grade && w.salary_step && w.salary_schedule_year && !salaryRateFor(w)" class="block text-[9px] text-red-600">No salary rate in Utilities</span></td>
                                                 <td class="p-1"><select class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.appointment_status" :name="`work_experience[${index}][appointment_status]`"><option value="">Status</option>@foreach($utilityOptionSets['appointment_statuses'] as $option)<option value="{{ $option->value }}">{{ $option->label }}</option>@endforeach</select></td>
-                                                <td class="p-1"><select class="w-full text-[10px] font-bold border-transparent px-3" x-model="w.is_gov_service" :name="`work_experience[${index}][is_gov_service]`"><option value="">Select</option><option value="1">Yes</option><option value="0">No</option></select></td>
+                                                <td class="p-1"><select class="w-full text-[10px] font-bold border-transparent px-3" x-model.number="w.is_gov_service" :name="`work_experience[${index}][is_gov_service]`"><option value="">Select</option><option value="1">Yes</option><option value="0">No</option></select></td>
                                                 <td class="p-1 text-center"><button type="button" @click="work.splice(index, 1)" class="text-red-400 hover:text-red-600">&times;</button></td>
                                             </tr>
                                         </template>
@@ -840,7 +841,8 @@
                                 <button type="button" @click="voluntary.push({organization_name: '', date_from: '', date_to: '', number_of_hours: '', position: ''})" class="text-[9px] font-black uppercase tracking-[0.1em] bg-indigo-700 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-800 transition">+ Add Voluntary Work</button>
                             </div>
                             <div class="overflow-x-auto border-b border-slate-100">
-                                <table class="w-full text-xs">
+                                <table class="pds-repeat-table pds-voluntary-table w-full table-fixed text-xs" style="min-width: 950px">
+                                    <colgroup><col><col style="width:145px"><col style="width:145px"><col style="width:90px"><col style="width:220px"><col style="width:28px"></colgroup>
                                     <thead>
                                         <tr class="text-left text-[9px] font-black uppercase text-gray-400 bg-gray-50">
                                             <th class="px-4 py-3">Organization <span class="text-red-500 font-bold ml-0.5">*</span></th>
@@ -885,7 +887,8 @@
                                 </div>
                             </div>
                             <div class="overflow-x-auto border-b border-slate-100">
-                                <table class="w-full text-xs">
+                                <table class="pds-repeat-table pds-training-table w-full table-fixed text-xs" style="min-width: 900px">
+                                    <colgroup><col><col style="width:145px"><col style="width:145px"><col style="width:230px"><col style="width:28px"></colgroup>
                                     <thead>
                                         <tr class="text-left text-[9px] font-black uppercase text-gray-400 bg-gray-50">
                                             <th class="px-4 py-3">Title of Program <span class="text-red-500 font-bold ml-0.5">*</span></th>
@@ -930,7 +933,8 @@
                                 <button type="button" @click="others.push({type: 'Skill', description: ''})" class="text-[9px] font-black uppercase tracking-[0.1em] bg-indigo-700 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-800 transition">+ Add Info</button>
                             </div>
                             <div class="overflow-x-auto border-b border-slate-100">
-                                <table class="w-full text-xs">
+                                <table class="pds-repeat-table pds-other-table w-full table-fixed text-xs" style="min-width: 680px">
+                                    <colgroup><col style="width:240px"><col><col style="width:28px"></colgroup>
                                     <thead>
                                         <tr class="text-left text-[9px] font-black uppercase text-gray-400 bg-gray-50">
                                             <th class="px-4 py-3">Type</th>
@@ -1305,8 +1309,8 @@
             width: 100% !important;
         }
         .pds-line-page .pds-form-body select {
-            appearance: auto !important;
-            -webkit-appearance: menulist !important;
+            appearance: none !important;
+            -webkit-appearance: none !important;
             padding-right: 2rem !important;
             cursor: pointer;
         }
@@ -1323,6 +1327,19 @@
             border: 1px solid #dc2626 !important;
         }
         @endforeach
+        #pds-data-fields .pds-repeat-table th:last-child,
+        #pds-data-fields .pds-repeat-table td:last-child {
+            width: 28px !important;
+            padding: 0.25rem !important;
+            text-align: center;
+        }
+        #pds-data-fields .pds-repeat-table select {
+            padding-right: 1.5rem !important;
+            background-position: right 0.25rem center !important;
+        }
+        #pds-data-fields .pds-repeat-table td {
+            vertical-align: top;
+        }
         .pds-line-page .pds-form-body table {
             border-collapse: collapse;
         }
