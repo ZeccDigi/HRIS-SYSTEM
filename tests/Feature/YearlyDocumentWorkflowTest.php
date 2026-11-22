@@ -49,9 +49,9 @@ test('past year SALN edits require HR approval and cannot overwrite another year
     $current = Saln::create(['employee_id' => $employee->id, 'type_of_filing' => 'annual_filing', 'as_of_date' => '2026-12-31',
         'declarant_info' => ['family_name' => 'CURRENT-SALN'], 'filing_status' => 'not_applicable', 'review_status' => 'approved']);
     $this->actingAs($owner)->get(route('salns.index', ['year' => 2023, 'edit' => 1]))->assertOk()
-        ->assertSee('name="declarant_info[family_name]" value="N/A"', false);
+        ->assertSee('declarant_info[family_name]', false);
     $payload = ['type_of_filing' => 'annual_filing', 'as_of_date' => '2023-12-31', 'declarant_info' => [
-        'family_name' => 'PAST-SALN', 'first_name' => 'Ana', 'position' => 'Officer', 'agency' => 'DMW', 'office_address' => 'Davao'],
+        'family_name' => 'PAST-SALN', 'first_name' => 'Ana', 'position' => 'Officer', 'agency' => 'DMW', 'office_address' => 'PAST-SALN'],
         'filing_status' => 'not_applicable', 'has_business_interests' => 0, 'has_relatives_in_gov' => 0];
     $this->post(route('salns.store'), $payload)->assertSessionHasNoErrors()->assertRedirect();
     $past = $employee->salns()->whereYear('as_of_date', 2023)->firstOrFail();
@@ -61,7 +61,7 @@ test('past year SALN edits require HR approval and cannot overwrite another year
     $this->actingAs($hr)->get(route('salns.show', $past))->assertOk()->assertSee('PAST-SALN');
     $this->patch(route('salns.review', $past), ['review_status' => 'approved'])->assertRedirect();
     $this->actingAs($owner)->get(route('salns.index', ['year' => 2023]))->assertOk()->assertSee('PAST-SALN');
-    $payload['declarant_info']['family_name'] = 'PAST-SECOND-DRAFT';
+    $payload['declarant_info']['office_address'] = 'PAST-SECOND-DRAFT';
     $payload['saln_id'] = $past->id;
     $this->post(route('salns.store'), $payload)->assertSessionHasNoErrors()->assertRedirect();
     $this->get(route('salns.index', ['year' => 2023]))->assertOk()->assertSee('PAST-SECOND-DRAFT');

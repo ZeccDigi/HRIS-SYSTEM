@@ -38,6 +38,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $hidden = [
+        'otp', 'otp_expires_at',
         'password',
         'remember_token',
     ];

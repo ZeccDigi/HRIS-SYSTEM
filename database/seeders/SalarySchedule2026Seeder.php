@@ -20,7 +20,7 @@ class SalarySchedule2026Seeder extends Seeder
             foreach ($schedule['grades'] as $grade) {
                 foreach ($grade['steps'] as $index => $amount) {
                     $key = ['year' => $schedule['year'], 'salary_grade' => 'SG '.$grade['grade'], 'salary_step' => 'Step '.($index + 1)];
-                    $rate = SalaryRate::firstOrCreate($key, ['monthly_salary' => $amount, 'is_active' => true]);
+                    $rate = SalaryRate::withTrashed()->firstOrCreate($key, ['monthly_salary' => $amount, 'is_active' => true]);
                     if ($rate->wasRecentlyCreated) $created++;
                     else {
                         $existing++;

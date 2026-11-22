@@ -8,7 +8,7 @@
         $parentOptions = $parentGroup ? $optionsByGroup->get($parentGroup, collect()) : collect();
     @endphp
 
-    <div class="px-1 py-3 sm:px-2 lg:px-3" x-data="{ createLeaveTypeModalOpen: false }">
+    <div class="px-1 py-2 sm:px-2 lg:px-3" x-data="{ createLeaveTypeModalOpen: false, tabSearch: '' }">
         <div class="mx-auto w-full min-w-0 space-y-4">
             <div>
                 <h2 class="text-xl font-bold text-gray-800 sm:text-2xl">Utilities</h2>
@@ -21,12 +21,13 @@
                 </div>
             @endif
 
+            <input type="search" x-model="tabSearch" placeholder="Search utilities tabs…" aria-label="Search utilities tabs" class="h-9 w-full max-w-sm rounded-lg border-slate-300 text-sm">
             <div class="overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
                 <div class="overflow-x-auto">
                     <div class="flex w-max min-w-full items-center gap-1">
                         @foreach($tabs as $tabKey => $tabLabel)
                             <a
-                                href="{{ route('utilities.index', ['tab' => $tabKey]) }}"
+                                data-label="{{ strtolower($tabLabel) }}" x-show="$el.dataset.label.includes(tabSearch.toLowerCase())" href="{{ route('utilities.index', ['tab' => $tabKey]) }}"
                                 class="shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] transition
                                     {{ $tab === $tabKey
                                         ? 'bg-blue-50 text-[#0038a8]'
@@ -58,10 +59,10 @@
                                     type="search"
                                     x-model.debounce.150ms="leaveTypeSearch"
                                     placeholder="Search leave types..."
-                                    class="h-11 w-full rounded-xl border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-700 shadow-sm transition placeholder:text-slate-400 focus:border-[#0038a8] focus:ring-[#0038a8]"
+                                    class="h-9 w-full rounded-xl border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-700 shadow-sm transition placeholder:text-slate-400 focus:border-[#0038a8] focus:ring-[#0038a8]"
                                 >
                             </div>
-                            <button type="button" @click="createLeaveTypeModalOpen = true" class="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg bg-[#0038a8] px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-[#002f8f]">
+                            <button type="button" @click="createLeaveTypeModalOpen = true" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#0038a8] px-4 text-xs font-black uppercase tracking-widest text-white hover:bg-[#002f8f]">
                                 <span>+ {{ __('Add Leave Type') }}</span>
                             </button>
                         </div>
@@ -71,10 +72,10 @@
                         <table class="w-full text-left text-sm">
                             <thead class="bg-slate-50 text-xs font-black uppercase tracking-widest text-slate-500">
                                 <tr>
-                                    <th class="px-4 py-3">Leave Type</th>
-                                    <th class="px-4 py-3">Status</th>
-                                    <th class="px-4 py-3">Created</th>
-                                    <th class="px-4 py-3">Action</th>
+                                    <th class="px-4 py-2">Leave Type</th>
+                                    <th class="px-4 py-2">Status</th>
+                                    <th class="px-4 py-2">Created</th>
+                                    <th class="px-4 py-2">Action</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 bg-white">
@@ -91,14 +92,15 @@
                                         data-search="{{ $leaveTypeSearchText }}"
                                         x-show="$el.dataset.search.includes(leaveTypeSearch.toLowerCase())"
                                     >
-                                        <td class="px-4 py-3 font-semibold text-slate-700">{{ $leaveType->name }}</td>
-                                        <td class="px-4 py-3 text-slate-600">{{ ($leaveType->is_active ?? true) ? 'Active' : 'Inactive' }}</td>
-                                        <td class="px-4 py-3 text-slate-600">{{ optional($leaveType->created_at)->format('M d, Y') }}</td>
-                                        <td class="px-4 py-3">
+                                        <td class="px-4 py-2 font-semibold text-slate-700">{{ $leaveType->name }}</td>
+                                        <td class="px-4 py-2 text-slate-600">{{ ($leaveType->is_active ?? true) ? 'Active' : 'Inactive' }}</td>
+                                        <td class="px-4 py-2 text-slate-600">{{ optional($leaveType->created_at)->format('M d, Y') }}</td>
+                                        <td class="px-4 py-2">
                                             <a href="{{ route('leave-types.edit', $leaveType) }}" class="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-[#0038a8] hover:text-[#002f8f]">
                                                 <i class="fa-solid fa-pen text-xs" aria-hidden="true"></i>
                                                 <span>{{ __('Edit') }}</span>
                                             </a>
+                                            <form class="inline-flex ml-3" method="POST" action="{{ route('leave-types.destroy', $leaveType) }}" data-archive-question="Archive this leave type? Existing records will be retained.">@csrf @method('DELETE')<button class="text-xs font-semibold text-red-600">Archive</button></form>
                                         </td>
                                     </tr>
                                 @empty
@@ -122,7 +124,7 @@
                             <h3 class="text-sm font-black uppercase tracking-[0.14em] text-slate-700">{{ $currentMeta['label'] ?? $tabs[$tab] }}</h3>
                         </div>
 
-                        <div class="space-y-5 p-5">
+                        <div class="space-y-3 p-3">
                             <form method="POST" action="{{ route('utilities.options.store') }}" class="grid gap-3 md:grid-cols-3">
                                 @csrf
                                 <input type="hidden" name="group_key" value="{{ $tab }}">
@@ -165,11 +167,11 @@
 
                             <div class="space-y-3">
                                 @forelse($groupOptions->take(200) as $option)
-                                    <div class="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between">
+                                    <div class="flex flex-col gap-3 rounded-xl border border-slate-200 p-2 lg:flex-row lg:items-center lg:justify-between">
                                         <form method="POST" action="{{ route('utilities.options.update', $option) }}" class="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
                                             @csrf
                                             @method('PUT')
-                                            <input type="text" name="label" value="{{ $option->label }}" class="w-full rounded-lg border-slate-200 text-sm font-semibold md:w-[30rem]">
+                                            <input type="text" name="label" value="{{ $option->label }}" class="w-full rounded-lg border-slate-200 text-sm font-semibold md:w-72">
                                             <input type="hidden" name="value" value="{{ $option->label }}">
                                             @if($parentGroup)
                                                 @if($parentOptions->count() > 100)
@@ -198,10 +200,10 @@
                                             </div>
                                         </form>
 
-                                        <form method="POST" action="{{ route('utilities.options.destroy', $option) }}" onsubmit="return confirm('Remove this option?')" class="lg:ml-1">
+                                        <form method="POST" action="{{ route('utilities.options.destroy', $option) }}" data-archive-question="Archive this option?" class="lg:ml-1">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="rounded-lg bg-red-50 px-4 py-2 text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-100">Delete</button>
+                                            <button type="submit" class="rounded-lg bg-red-50 px-4 py-2 text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-100">Archive</button>
                                         </form>
                                     </div>
                                 @empty

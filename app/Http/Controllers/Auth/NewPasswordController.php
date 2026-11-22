@@ -70,6 +70,12 @@ class NewPasswordController extends Controller
 
     public function storeOtp(Request $request): RedirectResponse
     {
+        $attemptKey = 'otp-reset-verify:'.hash('sha256', strtolower((string)$request->input('email')));
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($attemptKey, 5)) {
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['message'=>'Too many OTP attempts. Please wait before trying again.'], 429)->header('Retry-After', (string)\Illuminate\Support\Facades\RateLimiter::availableIn($attemptKey)));
+        }
+        \Illuminate\Support\Facades\RateLimiter::hit($attemptKey, 600);
+
         $validated = $request->validate([
             'email' => ['required', 'email'],
             'otp' => ['required', 'digits:6'],
@@ -100,6 +106,7 @@ class NewPasswordController extends Controller
             'must_change_password' => false,
         ])->save();
 
+        \Illuminate\Support\Facades\RateLimiter::clear($attemptKey);
         event(new PasswordReset($user));
 
         return redirect()

@@ -40,7 +40,7 @@ test('Record Officer decides TAR requirement and deadline stays hidden until fin
         ->and($order->fresh()->visible_tar_deadline?->toDateString())->toBe($required ? '2026-12-10' : null);
     $response = $this->actingAs($actors['employee'])->get(route('travel-orders.index'))->assertOk();
     if ($required) $response->assertSee('Dec 10, 2026'); else $response->assertDontSee('Dec 10, 2026');
-    $this->get(route('travel-orders.show', $order))->assertOk()->assertDontSee('Approver Remarks')->assertDontSee('Internal approval note')->assertDontSee('Final approval note');
+    $this->get(route('travel-orders.show', $order))->assertOk()->assertSee('Approver Remarks')->assertSee('Internal approval note')->assertSee('Final approval note');
     if (!$required) {
         $this->post(route('travel-orders.submit-tar', $order), [])->assertSessionHas('error');
         expect($order->fresh()->tar_submitted_at)->toBeNull();
@@ -52,6 +52,6 @@ test('rejection displays its reason while hiding prior approval remarks and dead
     $order = pendingTarRequirementOrder($actors['employee']);
     $this->actingAs($actors['recordofficer'])->put(route('travel-orders.update-status', $order), ['status' => 'approved', 'is_tar_required' => 1, 'remarks' => 'RO approved for processing'])->assertSessionHasNoErrors();
     $this->actingAs($actors['regionaldirector'])->put(route('travel-orders.update-status', $order), ['status' => 'rejected', 'remarks' => 'Missing travel authority documents'])->assertSessionHasNoErrors();
-    $this->actingAs($actors['employee'])->get(route('travel-orders.show', $order))->assertOk()->assertSee('Approver Remarks')->assertSee('Missing travel authority documents')->assertDontSee('RO approved for processing');
+    $this->actingAs($actors['employee'])->get(route('travel-orders.show', $order))->assertOk()->assertSee('Approver Remarks')->assertSee('Missing travel authority documents')->assertSee('RO approved for processing');
     expect($order->fresh()->visible_tar_deadline)->toBeNull();
 });

@@ -36,7 +36,7 @@ class ImportPsgcUtilityOptions extends Command
         $reader->setReadDataOnly(true);
         $reader->setLoadSheetsOnly(['PSGC']);
         $reader->setReadFilter(new class implements IReadFilter {
-            public function readCell($columnAddress, $row, $worksheetName = ''): bool
+            public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
             {
                 return $row === 1 || in_array($columnAddress, ['A', 'B', 'D'], true);
             }

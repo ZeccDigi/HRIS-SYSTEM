@@ -82,6 +82,7 @@ Route::middleware(['auth', 'account.active', 'approved', 'password.changed'])->g
     Route::resource('holidays', HolidayController::class)->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
 
     Route::get('/utilities', [UtilityController::class, 'index'])->name('utilities.index')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');
+    Route::delete('/utilities/salary-rates/{salaryRate}', [UtilityController::class, 'destroySalaryRate'])->name('utilities.salary-rates.destroy')->middleware('role:ADMIN,HRSTAFF');
     Route::post('/utilities/salary-rates', [UtilityController::class, 'saveSalaryRate'])->name('utilities.salary-rates.store')->middleware('role:ADMIN,HRSTAFF');
     Route::put('/utilities/salary-rates/{salaryRate}', [UtilityController::class, 'saveSalaryRate'])->name('utilities.salary-rates.update')->middleware('role:ADMIN,HRSTAFF');
     Route::post('/utilities/options', [UtilityController::class, 'storeOption'])->name('utilities.options.store')->middleware('role:ADMIN,HRSTAFF,REGIONALDIRECTOR');

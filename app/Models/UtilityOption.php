@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 
 class UtilityOption extends Model
 {
+    use \Illuminate\Database\Eloquent\SoftDeletes;
     use HasFactory;
 
     protected $fillable = [

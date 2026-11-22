@@ -20,7 +20,7 @@ class UtilityOptionRegistry
             'highest_levels' => 'Educational Attainment',
             'eligibility_titles' => 'Eligibility Title',
             'salary_grades' => 'Salary Grade',
-            'salary-schedule' => 'Salary Schedule',
+            'salary-schedule' => 'Salary Rate',
             'step_increments' => 'Step Increment',
             'appointment_statuses' => 'Appointment Status',
             'government_service_options' => 'Government Service',
@@ -67,7 +67,7 @@ class UtilityOptionRegistry
     {
         foreach (self::defaultOptions() as $groupKey => $options) {
             foreach ($options as $index => $option) {
-                UtilityOption::firstOrCreate(
+                UtilityOption::withTrashed()->firstOrCreate(
                     [
                         'group_key' => $groupKey,
                         'value' => $option['value'],
@@ -143,7 +143,7 @@ class UtilityOptionRegistry
                     ->pluck($column)
                     ->filter()
                     ->each(function ($value) use ($groupKey) {
-                        UtilityOption::firstOrCreate(
+                        UtilityOption::withTrashed()->firstOrCreate(
                             [
                                 'group_key' => $groupKey,
                                 'value' => $value,

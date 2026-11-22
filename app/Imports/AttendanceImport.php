@@ -3,15 +3,29 @@
 namespace App\Imports;
 
 use App\Models\DtrRecord;
-use Maatwebsite\Excel\Concerns\ToModel;
-use Maatwebsite\Excel\Concerns\WithStartRow;
+
+
 use Carbon\Carbon;
 
-class AttendanceImport implements ToModel, WithStartRow
+class AttendanceImport
 {
     /**
      * Skip the header row (Start at row 2)
      */
+    public function import(string $path): void
+    {
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+        $workbook = $reader->load($path);
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($workbook) {
+                foreach ($workbook->getActiveSheet()->toArray(null, false, false, false) as $index => $row) {
+                    if ($index + 1 >= $this->startRow()) $this->model($row);
+                }
+            });
+        } finally { $workbook->disconnectWorksheets(); }
+    }
+
     public function startRow(): int
     {
         return 2;
@@ -30,7 +44,7 @@ class AttendanceImport implements ToModel, WithStartRow
 
         $date    = $this->transformDate($row[2]);
         $timeIn  = $this->transformTime($row[3]);
-        $timeOut = $this->transformTime($row[4]);
+        $timeOut = $this->transformTime($row[4] ?? null);
 
         // 2. Extra safety: If parsing failed and resulted in null for a required field
         if (!$date || !$timeIn) {

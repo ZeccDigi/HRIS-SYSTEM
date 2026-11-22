@@ -18,7 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
-use Maatwebsite\Excel\Facades\Excel;
+
 
 class DtrController extends Controller
 {
@@ -654,11 +654,11 @@ class DtrController extends Controller
         }
 
         try {
-            Excel::import(new AttendanceImport, $absPath);
+            (new AttendanceImport)->import($absPath);
 
             return back()->with('success', 'Attendance records synced successfully from biometric file.');
         } catch (\Throwable $exception) {
-            return back()->with('error', 'Error syncing file: ' . $exception->getMessage());
+            return back()->with('error', 'The attendance file could not be imported. Please check its format or contact HR.');
         }
     }
 }

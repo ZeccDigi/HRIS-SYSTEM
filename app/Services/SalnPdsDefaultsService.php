@@ -46,6 +46,37 @@ class SalnPdsDefaultsService
         return $saved;
     }
 
+    public function mergeLocked(?array $saved, array $defaults, string $group): array
+    {
+        $result = $this->merge($saved, $defaults);
+        foreach (self::FIELDS as $field) {
+            if ($group === 'declarant_info' && $field === 'office_address') continue;
+            $result[$field] = $defaults[$field];
+        }
+        return $result;
+    }
+
+    public function children(Employee $employee, int $year, string $asOfDate, array $saved = []): array
+    {
+        $date = Carbon::parse($asOfDate)->startOfDay();
+        $pds = app(PdsSnapshotService::class)->employeeForYear($employee, $year);
+        $rows = [];
+        foreach ($pds->pdsChildren as $child) {
+            if (!$child->date_of_birth || blank($child->fullname)) continue;
+            $birth = Carbon::parse($child->date_of_birth)->startOfDay();
+            $age = (int) $birth->diffInYears($date, false);
+            if ($birth->gt($date) || $age < 0 || $age >= 18) continue;
+            $rows[] = ['pds_child_id' => $child->id, 'name' => $child->fullname, 'date_of_birth' => $birth->toDateString(), 'age' => $age];
+        }
+        $names = collect($rows)->pluck('name')->map(fn ($name) => mb_strtolower(trim($name)));
+        foreach ($saved as $row) {
+            if (!is_array($row) || !empty($row['pds_child_id'])) continue;
+            if ($names->contains(mb_strtolower(trim((string) ($row['name'] ?? ''))))) continue;
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
     public function syncApprovedFamily(Employee $employee, int $year): void
     {
         $snapshotService = app(PdsSnapshotService::class);

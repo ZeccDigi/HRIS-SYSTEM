@@ -29,11 +29,15 @@ class ArchiveController extends Controller
             'saln' => Saln::class,
             'pds' => PdsSnapshot::class,
             'logs' => ActivityAudit::class,
-            default => abort(404),
+            'utility-leave-types' => \App\Models\LeaveType::class,
+            'utility-salary-rates' => \App\Models\SalaryRate::class,
+            default => $this->utilityGroup($category) ? \App\Models\UtilityOption::class : abort(404),
         };
 
         DB::transaction(function () use ($model, $category, $record) {
-            $archived = $model::onlyTrashed()->lockForUpdate()->findOrFail($record);
+            $query = $model::onlyTrashed()->lockForUpdate();
+            if ($group = $this->utilityGroup($category)) $query->where('group_key', $group);
+            $archived = $query->findOrFail($record);
             $archived->restore();
             AuditLogListener::logActivity('Restore Archived Record', 'Archive',
                 "Restored {$category} record #{$archived->id}.", auth()->user());
@@ -41,6 +45,12 @@ class ArchiveController extends Controller
 
         return redirect()->route('archive.index', ['tab' => $category])
             ->with('success', 'Record restored successfully.');
+    }
+
+    private function utilityGroup(string $category): ?string
+    {
+        $key = str_starts_with($category, 'utility-') ? substr($category, 8) : '';
+        return isset(\App\Support\UtilityOptionRegistry::groups()[$key]) ? $key : null;
     }
 
     public function index(Request $request): View
@@ -56,6 +66,9 @@ class ArchiveController extends Controller
             'logs' => 'Logs Audit',
         ];
 
+        $tabs['utility-leave-types'] = 'Leave Types';
+        $tabs['utility-salary-rates'] = 'Salary Rate';
+        foreach (\App\Support\UtilityOptionRegistry::groups() as $key => $meta) $tabs['utility-'.$key] = $meta['label'];
         $tab = $request->query('tab', array_key_first($tabs));
         abort_unless(is_string($tab) && isset($tabs[$tab]), 404);
 
@@ -68,6 +81,9 @@ class ArchiveController extends Controller
             'saln' => Saln::onlyTrashed()->with(['employee' => fn ($query) => $query->withTrashed()]),
             'pds' => PdsSnapshot::onlyTrashed()->with(['employee' => fn ($query) => $query->withTrashed()]),
             'logs' => ActivityAudit::onlyTrashed(),
+            'utility-leave-types' => \App\Models\LeaveType::onlyTrashed(),
+            'utility-salary-rates' => \App\Models\SalaryRate::onlyTrashed(),
+            default => \App\Models\UtilityOption::onlyTrashed()->where('group_key', $this->utilityGroup($tab)),
         };
         $records = $query->latest('deleted_at')->orderByDesc('id')->paginate(20)->withQueryString();
 

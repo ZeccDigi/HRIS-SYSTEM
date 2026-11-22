@@ -17,7 +17,7 @@ function dtrScreenCells(string $html, int $day): array
     return array_map(fn ($cell) => trim($cell->textContent), iterator_to_array($cells));
 }
 
-test('holidays and rest days hide attendance values in view and PDF data without deleting scans', function () {
+test('holidays hide attendance values while weekend punches remain visible without deleting scans', function () {
     $user = User::factory()->create(['must_change_password' => false]);
     $employee = Employee::create(['user_id' => $user->id, 'account_role' => 'employee', 'firstname' => 'Ana', 'lastname' => 'Test',
         'core_time_schedule' => ['wednesday' => ['am_start' => '08:00', 'am_end' => '12:00', 'pm_start' => '13:00', 'pm_end' => '17:00']]]);
@@ -33,9 +33,11 @@ test('holidays and rest days hide attendance values in view and PDF data without
     $expectedHolidayCells[7] = '8.00';
     expect($holidayCells)->toBe($expectedHolidayCells);
     expect(array_slice(dtrScreenCells($response->getContent(), 19), 2))->toBe(array_fill(0, 12, ''));
-    expect(array_slice(dtrScreenCells($response->getContent(), 21), 2, 11))->toBe(array_fill(0, 11, ''))
+    $expectedWeekend = array_fill(0, 11, '');
+    $expectedWeekend[0] = '07:03 AM';
+    expect(array_slice(dtrScreenCells($response->getContent(), 21), 2, 11))->toBe($expectedWeekend)
         ->and(dtrScreenCells($response->getContent(), 21)[13])->toBe('Weekend');
-    expect($response->viewData('dtrRecords'))->toBeEmpty();
+    expect($response->viewData('dtrRecords')->pluck('date')->all())->toBe(['2026-11-21']);
     $this->get(route('my-dtr.print', ['month' => 11, 'year' => 2026]))->assertOk()->assertHeader('content-type', 'application/pdf');
     $this->assertDatabaseCount('dtr_records', 3);
 });
@@ -53,3 +55,4 @@ test('overlapping approved applications hide references keep actual punches and 
     $cells = dtrScreenCells($response->getContent(), 20);
     expect($cells[2])->toBe('08:31 AM')->and(array_slice($cells, 3, 3))->toBe(['', '', ''])->and($cells[9])->toBe('8.00');
 });
+

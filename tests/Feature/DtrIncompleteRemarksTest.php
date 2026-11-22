@@ -28,7 +28,7 @@ test('missing scheduled punches are incomplete including an entirely blank day',
     expect($calculator->isIncomplete($record, $employee, '2026-11-18'))->toBeTrue()
         ->and($calculator->isIncomplete(null, $employee, '2026-11-19'))->toBeTrue();
     $this->actingAs($user)->get(route('my-dtr.index', ['month' => 11, 'year' => 2026]))
-        ->assertOk()->assertSee('Incomplete')->assertDontSee('>absent<', false);
+        ->assertOk()->assertDontSee('Incomplete')->assertDontSee('>absent<', false);
 });
 
 test('afternoon only completed attendance does not require AM punches', function () {

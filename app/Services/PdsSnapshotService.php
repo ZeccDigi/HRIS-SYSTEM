@@ -192,7 +192,7 @@ class PdsSnapshotService
             }
             if ($request->hasFile('pds_photo')) $data['employee']['profile_picture'] = $request->file('pds_photo')->store('profile_pictures', 'public_uploads');
             if ($request->hasFile('pds_signature')) {
-                $path = $request->file('pds_signature')->store('employee-signatures', 'public');
+                $path = $request->file('pds_signature')->store('employee-signatures', 'signatures');
                 $data['relations']['pdsGovId']['signature_path'] = $path;
                 $data['employee']['e_signature_path'] = $path;
             }

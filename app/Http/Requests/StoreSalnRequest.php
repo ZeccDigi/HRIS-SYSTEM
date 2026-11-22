@@ -30,8 +30,9 @@ class StoreSalnRequest extends FormRequest
             if ($year) {
                 $service = app(\App\Services\SalnPdsDefaultsService::class);
                 foreach ($service->defaults($employee, $year) as $key => $defaults) {
-                    if (is_array($this->input($key, []))) $this->merge([$key => $service->merge($this->input($key, []), $defaults)]);
+                    if (is_array($this->input($key, []))) $this->merge([$key => $service->mergeLocked($this->input($key, []), $defaults, $key)]);
                 }
+                if (is_array($this->input('children', []))) $this->merge(['children' => $service->children($employee, $year, $this->input('as_of_date'), $this->input('children', []))]);
             }
         }
         $this->merge([
@@ -91,6 +92,8 @@ class StoreSalnRequest extends FormRequest
             'children' => 'nullable|array',
             'children.*.name' => 'nullable|string|max:255',
             'children.*.age' => 'nullable|integer|min:0|max:17',
+            'children.*.pds_child_id' => 'nullable|integer',
+            'children.*.date_of_birth' => 'nullable|date',
             'real_properties' => 'nullable|array',
             'real_properties.*.description' => 'required_with:real_properties.*.kind|nullable|string|max:255',
             'real_properties.*.kind' => 'nullable|string|max:255',

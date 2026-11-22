@@ -8,8 +8,8 @@
         $isSalnIndex = $isSalnIndex ?? false;
         $pdsDefaultsService = app(\App\Services\SalnPdsDefaultsService::class);
         $pdsDefaults = $pdsDefaultsService->defaults($employee, (int) $selectedYear);
-        $declarantDefaults = $pdsDefaultsService->merge($selectedSaln?->declarant_info, $pdsDefaults['declarant_info']);
-        $spouseDefaults = $pdsDefaultsService->merge($selectedSaln?->spouse_info, $pdsDefaults['spouse_info']);
+        $declarantDefaults = $pdsDefaultsService->mergeLocked($selectedSaln?->declarant_info, $pdsDefaults['declarant_info'], 'declarant_info');
+        $spouseDefaults = $pdsDefaultsService->mergeLocked($selectedSaln?->spouse_info, $pdsDefaults['spouse_info'], 'spouse_info');
 
         $oldFilingType = old('type_of_filing', $selectedSaln?->type_of_filing ?? 'annual_filing');
         $oldAsOfDate = old('as_of_date', $selectedSaln?->as_of_date?->format('Y-m-d'));
@@ -268,7 +268,7 @@
     <div
         class="saln-entry-page pds-line-page min-h-screen bg-slate-50 px-2 py-3 font-sans"
         x-data="salnForm(@js([
-            'children' => old('children', $selectedSaln?->children ?? []),
+            'children' => $pdsDefaultsService->children($employee, (int) $selectedYear, $oldAsOfDate ?: $selectedYear.'-12-31', old('children', $selectedSaln?->children ?? [])),
             'real_properties' => old('real_properties', $selectedSaln?->real_properties ?? []),
             'personal_properties' => old('personal_properties', $selectedSaln?->personal_properties ?? []),
             'liabilities' => old('liabilities', $selectedSaln?->liabilities ?? []),
@@ -465,9 +465,9 @@
                                     <tbody class="divide-y divide-slate-100">
                                         <template x-for="(row, index) in children" :key="row._id">
                                             <tr>
-                                                <td class="px-4 py-4"><input :name="'children['+index+'][name]'" x-model="row.name" class="w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm font-bold text-slate-600 outline-none focus:border-indigo-700 focus:ring-0"></td>
-                                                <td class="px-4 py-4"><input type="number" min="0" max="17" :name="'children['+index+'][age]'" x-model="row.age" class="w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm font-bold text-slate-600 outline-none focus:border-indigo-700 focus:ring-0"></td>
-                                                <td class="px-4 py-4 text-right"><button type="button" @click="removeChild(index)" class="text-xs font-black uppercase tracking-wider text-red-500">Remove</button></td>
+                                                <td class="px-4 py-4"><input type="hidden" :name="'children['+index+'][pds_child_id]'" :value="row.pds_child_id || ''"><input :readonly="!!row.pds_child_id" :name="'children['+index+'][name]'" x-model="row.name" class="w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm font-bold text-slate-600 outline-none focus:border-indigo-700 focus:ring-0"></td>
+                                                <td class="px-4 py-4"><input :readonly="!!row.pds_child_id" type="number" min="0" max="17" :name="'children['+index+'][age]'" x-model="row.age" class="w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-0 py-1 text-sm font-bold text-slate-600 outline-none focus:border-indigo-700 focus:ring-0"></td>
+                                                <td class="px-4 py-4 text-right"><button x-show="!row.pds_child_id" type="button" @click="removeChild(index)" class="text-xs font-black uppercase tracking-wider text-red-500">Remove</button></td>
                                             </tr>
                                         </template>
                                     </tbody>
@@ -714,6 +714,28 @@
 
             return {
                 activeTab: 'compliance',
+                init() {
+                    const pdsIdentity = @js(['declarant_info' => $declarantDefaults, 'spouse_info' => $spouseDefaults]);
+                    for (const group of ['declarant_info', 'spouse_info']) {
+                        for (const field of ['family_name', 'first_name', 'middle_initial', 'position', 'agency', 'office_address']) {
+                            if (group === 'declarant_info' && field === 'office_address') continue;
+                            this.$root.querySelectorAll(`[name="${group}[${field}]"]`).forEach(element => {
+                                element.readOnly = true;
+                                element.value = pdsIdentity[group][field] ?? 'N/A';
+                            });
+                        }
+                    }
+                    this.$watch('asOfDate', value => {
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return;
+                        const [year, month, day] = value.split('-').map(Number);
+                        this.children = this.children.filter(row => {
+                            if (!row.pds_child_id || !row.date_of_birth) return true;
+                            const [by, bm, bd] = row.date_of_birth.split('-').map(Number);
+                            row.age = year - by - ((month < bm || (month === bm && day < bd)) ? 1 : 0);
+                            return row.age >= 0 && row.age < 18;
+                        });
+                    });
+                },
                 children: withIds(initial.children, { name: '', age: '' }),
                 realProperties: withIds(initial.real_properties, { description: '', kind: '', location: '', assessed_value: '', fair_market_value: '', acquisition_year: '', acquisition_mode: '', acquisition_cost: 0 }),
                 personalProperties: withIds(initial.personal_properties, { description: '', acquisition_year: '', acquisition_cost: 0 }),

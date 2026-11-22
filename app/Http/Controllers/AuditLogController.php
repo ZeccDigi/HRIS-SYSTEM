@@ -86,6 +86,9 @@ class AuditLogController extends Controller
             ->paginate(15, ['*'], 'activity_page')
             ->withQueryString();
 
+        $activityAudits->setPath(route('audit-logs.activity'));
+        $audits->setPath(route('audit-logs.login'));
+
         $roleOptions = [
             'employee' => 'Employee',
             'hrstaff' => 'HR Admin',

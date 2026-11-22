@@ -716,7 +716,7 @@
     $chiefName = $formatName($leaveRequest->chief) ?: 'LOUIE JAY C. LOSARIA';
     $hrName = $formatName($leaveRequest->hrstaff) ?: 'MANILYN JOY P. VELITA';
     $directorName = $formatName($leaveRequest->regionalDirector) ?: 'MARIA CAROLINA B. AGDAMAG';
-    $signatureUrl = $employee?->effective_signature_url ?? ($employee?->pdsGovId?->signature_path ? Storage::disk('public')->url($employee->pdsGovId->signature_path) : null);
+    $signatureUrl = $employee?->effective_signature_url ?? ($employee?->pdsGovId?->signature_path ? \App\Services\SignatureStorage::image($employee->pdsGovId->signature_path) : null);
     $isApproved = $leaveRequest->status === 'approved';
     $isRejected = $leaveRequest->status === 'rejected';
     // Section 7.B is the Division Chief's recommendation, independent of

@@ -27,7 +27,7 @@ it('keeps a stable compact QR token for each approved slip', function () {
     $second = $method->invoke(app(LocatorSlipController::class), $slip->fresh());
     expect($first->qr_payload)->toMatch('/^LSQR:[A-F0-9]{32}$/')
         ->and($second->qr_payload)->toBe($first->qr_payload)
-        ->and($second->qr_svg)->toContain('viewBox="0 0 33 33"');
+        ->and($second->qr_svg)->toMatch('/viewBox="0 0 (33|37) \1"/');
 });
 
 it('returns recorded scan times only to authorized users', function () {

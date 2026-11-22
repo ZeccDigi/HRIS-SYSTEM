@@ -369,50 +369,11 @@ class LocatorSlipController extends Controller
     public function scan(Request $request, LocatorSlip $locatorSlip)
     {
         abort_unless($request->hasValidSignature(), 403);
-
-        if (! in_array(strtolower((string) $locatorSlip->status), ['approved', 'approved by chief'], true)) {
-            return response()->view('locator-slip.scan', [
-                'title' => 'Locator Slip QR',
-                'message' => 'This locator slip is not approved for QR scanning yet.',
-                'status' => 'warning',
-                'locatorSlip' => $locatorSlip->load('employee'),
-            ], 422);
-        }
-
-        $now = now('Asia/Manila');
-
-        if ($locatorSlip->date_covered->toDateString() !== $now->toDateString()) {
-            return response()->view('locator-slip.scan', [
-                'title' => 'Locator Slip QR',
-                'message' => 'This locator slip can only be scanned on its scheduled date.',
-                'status' => 'warning',
-                'locatorSlip' => $locatorSlip->load('employee'),
-            ], 422);
-        }
-
-        if (! $locatorSlip->time_from) {
-            $locatorSlip->time_from = $now->format('H:i:s');
-            $locatorSlip->out_scanned_at = $now;
-            $locatorSlip->save();
-
-            $message = 'OUT time recorded successfully. You may scan IN until the end of this scheduled date.';
-            $status = 'success';
-        } elseif (! $locatorSlip->time_to) {
-            $locatorSlip->time_to = $now->format('H:i:s');
-            $locatorSlip->save();
-
-            $message = 'IN time recorded successfully.';
-            $status = 'success';
-        } else {
-            $message = 'Both OUT and IN times have already been recorded for this locator slip.';
-            $status = 'info';
-        }
-
-        return view('locator-slip.scan', [
+        return response()->view('locator-slip.scan', [
             'title' => 'Locator Slip QR',
-            'message' => $message,
-            'status' => $status,
-            'locatorSlip' => $locatorSlip->fresh()->load('employee'),
+            'message' => 'Open the current QR in HRIS and present it to the locator-slip kiosk camera. Opening this link does not record OUT or IN time.',
+            'status' => 'info',
+            'locatorSlip' => $locatorSlip->load('employee'),
         ]);
     }
 

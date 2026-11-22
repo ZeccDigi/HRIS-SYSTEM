@@ -13,7 +13,7 @@ class CtoPdfExporter
         $ctoRequest->loadMissing(['employee.user', 'chief', 'hrstaff', 'regionalDirector']);
 
         $signaturePath = $ctoRequest->applicant_signature_path
-            ? public_path('storage/'.$ctoRequest->applicant_signature_path)
+            ? SignatureStorage::path($ctoRequest->applicant_signature_path)
             : $ctoRequest->employee?->e_signature_absolute_path;
 
         $pdf = Pdf::loadView($ctoRequest->type === 'earn' ? 'my-cto.print-coc-certificate' : 'my-cto.print-availment-new', [

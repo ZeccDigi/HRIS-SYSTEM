@@ -226,7 +226,7 @@
         $lessThisApplicationDisplay = $ctoRequest->type === 'use' ? $hoursDisplay : '';
         $balanceDisplay = $formatHours($balanceAfter);
         $cocAsOf = $ctoRequest->created_at?->format('F j, Y') ?? now()->format('F j, Y');
-        $applicantSignatureUrl = $ctoRequest->applicant_signature_path ? asset('storage/' . $ctoRequest->applicant_signature_path) : ($employee?->effective_signature_url ?? null);
+        $applicantSignatureUrl = $ctoRequest->applicant_signature_path ? \App\Services\SignatureStorage::image($ctoRequest->applicant_signature_path) : ($employee?->effective_signature_url ?? null);
         $chiefName = $ctoRequest->chief ? trim($ctoRequest->chief->firstname . ' ' . ($ctoRequest->chief->middlename ? mb_substr($ctoRequest->chief->middlename, 0, 1) . '. ' : '') . $ctoRequest->chief->lastname) : 'LOUIE JAY C. LOSARIA';
         $chiefPosition = $ctoRequest->chief?->position ?: 'Chief Labor and Employment Officer';
         $hrName = $ctoRequest->hrstaff ? trim($ctoRequest->hrstaff->firstname . ' ' . ($ctoRequest->hrstaff->middlename ? mb_substr($ctoRequest->hrstaff->middlename, 0, 1) . '. ' : '') . $ctoRequest->hrstaff->lastname) : 'MANILYN JOY P. VELITA';

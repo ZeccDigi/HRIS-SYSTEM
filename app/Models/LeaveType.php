@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class LeaveType extends Model
 {
+    use \Illuminate\Database\Eloquent\SoftDeletes;
     protected $fillable = [
         'name',
         'description',

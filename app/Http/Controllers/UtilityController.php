@@ -13,19 +13,21 @@ use Illuminate\View\View;
 
 class UtilityController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|\Illuminate\Http\JsonResponse
     {
-        UtilityOptionRegistry::ensureDefaults();
+        if (! $request->expectsJson()) UtilityOptionRegistry::ensureDefaults();
 
         $tabs = UtilityOptionRegistry::tabs();
-        $tab = $request->string('tab')->toString() ?: 'leave-types';
+        $tab = $request->query('tab', $request->session()->get('utilities.tab', 'leave-types'));
+        if (! is_string($tab)) $tab = 'leave-types';
         if (! array_key_exists($tab, $tabs)) {
             $tab = 'leave-types';
         }
 
         $groups = UtilityOptionRegistry::groups();
-        $leaveTypes = LeaveType::query()->latest()->get();
-        $optionsByGroup = UtilityOption::query()
+        $request->session()->put('utilities.tab', $tab);
+        $leaveTypes = $request->expectsJson() ? collect() : LeaveType::query()->latest()->get();
+        $optionsByGroup = $request->expectsJson() ? collect() : UtilityOption::query()
             ->orderBy('sort_order')
             ->orderBy('label')
             ->get()
@@ -49,6 +51,10 @@ class UtilityController extends Controller
         if (filled($salaryFilters['salary_status'] ?? null)) $query->where('is_active', $salaryFilters['salary_status'] === 'active');
         $salaryRates = $query->orderBy('monthly_salary', ($salaryFilters['salary_sort'] ?? 'salary_asc') === 'salary_desc' ? 'desc' : 'asc')
             ->orderByDesc('year')->orderBy('id')->paginate(20, ['*'], 'salary_page')->withQueryString();
+        if ($request->expectsJson() && $tab === 'salary-schedule') {
+            $canManageSalary = in_array(strtolower($request->user()->role), ['admin', 'hrstaff'], true);
+            return response()->json(['html' => view('utilities.salary-rate-results', compact('salaryRates', 'canManageSalary'))->render()]);
+        }
         return view('utilities.index', compact('tab', 'tabs', 'groups', 'leaveTypes', 'optionsByGroup', 'salaryRates', 'salaryYears', 'salaryFilters'));
     }
 
@@ -121,6 +127,12 @@ class UtilityController extends Controller
             ->with('success', 'Utility option updated.');
     }
 
+    public function destroySalaryRate(SalaryRate $salaryRate): RedirectResponse
+    {
+        $salaryRate->delete();
+        return redirect()->route('utilities.index', ['tab' => 'salary-schedule'])->with('success', 'Salary rate archived.');
+    }
+
     public function destroyOption(UtilityOption $utilityOption): RedirectResponse
     {
         $tab = $utilityOption->group_key;
@@ -128,6 +140,6 @@ class UtilityController extends Controller
 
         return redirect()
             ->route('utilities.index', ['tab' => $tab])
-            ->with('success', 'Utility option removed.');
+            ->with('success', 'Utility option archived.');
     }
 }

@@ -37,7 +37,7 @@ class LeaveCredit extends Model
 
     public function leaveType()
     {
-        return $this->belongsTo(LeaveType::class);
+        return $this->belongsTo(LeaveType::class)->withTrashed();
     }
 
     public function transactions()

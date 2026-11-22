@@ -83,6 +83,6 @@ class LeaveTypeController extends Controller
     {
         $leaveType->delete();
 
-        return redirect()->route('utilities.index', ['tab' => 'leave-types'])->with('success', 'Leave type deleted successfully.');
+        return redirect()->route('utilities.index', ['tab' => 'leave-types'])->with('success', 'Leave type archived successfully.');
     }
 }

@@ -713,7 +713,7 @@ class EmployeeController extends Controller
      */
     public function uploadESignature(Request $request, Employee $employee): RedirectResponse
     {
-        if (!in_array(auth()->user()->role, ['admin', 'hrstaff', 'chief', 'regionaldirector']) && auth()->user()->employee?->id !== $employee->id) {
+        if (!in_array(auth()->user()->role, ['admin', 'hrstaff']) && auth()->user()->employee?->id !== $employee->id) {
             abort(403);
         }
 
@@ -728,7 +728,7 @@ class EmployeeController extends Controller
             }
             $this->deleteESignature($employee->e_signature_path);
 
-            $path = $request->file('e_signature')->store('employee-signatures', 'public');
+            $path = $request->file('e_signature')->store('employee-signatures', 'signatures');
             $employee->update(['e_signature_path' => $path]);
 
             $employee->pdsGovId()->updateOrCreate(
@@ -742,7 +742,7 @@ class EmployeeController extends Controller
 
     public function destroyESignature(Employee $employee): RedirectResponse
     {
-        if (!in_array(auth()->user()->role, ['admin', 'hrstaff', 'chief', 'regionaldirector']) && auth()->user()->employee?->id !== $employee->id) {
+        if (!in_array(auth()->user()->role, ['admin', 'hrstaff']) && auth()->user()->employee?->id !== $employee->id) {
             abort(403);
         }
 
@@ -781,8 +781,8 @@ class EmployeeController extends Controller
             return;
         }
 
-        if (Storage::disk('public')->exists($path)) {
-            Storage::disk('public')->delete($path);
+        if (Storage::disk('signatures')->exists($path)) {
+            Storage::disk('signatures')->delete($path);
         }
     }
 

@@ -19,6 +19,7 @@ function purposeTestEmployee(): array
         'user_id' => $user->id,
     ]);
 
+    $employee->forceFill(['pds_approved_data'=>['relations'=>['pdsWorkExperiences'=>[['company'=>'DMW','is_gov_service'=>1,'monthly_salary'=>35000,'date_from'=>'2025-01-01']]]]])->save();
     return [$user->fresh(), $employee];
 }
 
@@ -49,7 +50,7 @@ test('legacy date-based monetization requires the new financial fields', functio
         'leave_detail' => 'Davao City',
         'monetization_requested' => 1,
         'commutation_requested' => 0,
-    ])->assertSessionHasErrors(['monetization_basis', 'monetization_days', 'monetization_salary']);
+    ])->assertSessionHasErrors(['monetization_basis', 'monetization_days']);
     expect($employee->leaveRequests()->count())->toBe(0);
 });
 
@@ -87,7 +88,7 @@ test('sick leave monetization cannot be submitted as an ordinary dated absence',
         'leave_detail' => 'Medical consultation',
         'monetization_requested' => 1,
         'commutation_requested' => 0,
-    ])->assertSessionHasErrors(['monetization_basis', 'monetization_days', 'monetization_salary']);
+    ])->assertSessionHasErrors(['monetization_basis', 'monetization_days']);
     expect($employee->leaveRequests()->count())->toBe(0);
 });
 

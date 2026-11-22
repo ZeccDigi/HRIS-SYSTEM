@@ -44,7 +44,7 @@ class PdsPdfExporter
             '--print-to-pdf='.$pdfPath,
             '--print-to-pdf-no-header',
             '--user-data-dir='.$profilePath,
-            'file:///'.str_replace('\\', '/', $htmlPath),
+            (PHP_OS_FAMILY === 'Windows' ? 'file:///' : 'file://').str_replace('\\', '/', $htmlPath),
         ]);
         $process->setTimeout(90);
         $process->run();
@@ -71,6 +71,9 @@ class PdsPdfExporter
     private function browserPath(): string
     {
         $candidates = [
+            config('services.pdf.browser_path'),
+            '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome',
+            '/opt/google/chrome/chrome',
             'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
             'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
             'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
@@ -78,11 +81,11 @@ class PdsPdfExporter
         ];
 
         foreach ($candidates as $path) {
-            if (file_exists($path)) {
+            if (is_string($path) && is_file($path) && is_executable($path)) {
                 return $path;
             }
         }
 
-        throw new RuntimeException('Chrome or Microsoft Edge is required to download the PDS PDF from the preview layout.');
+        throw new RuntimeException('A PDF browser is required. Install Chromium and configure PDF_BROWSER_PATH.');
     }
 }

@@ -1,13 +1,14 @@
 <x-app-layout>
     <x-slot name="title">{{ __('Archive') }}</x-slot>
 
-    <div class="space-y-4 p-4 sm:p-6">
+    <div class="space-y-4 p-4 sm:p-6" x-data="{ tabSearch: '' }">
         @if(session('success'))
             <p role="status" class="text-sm font-semibold text-emerald-700">{{ session('success') }}</p>
         @endif
+        <input type="search" x-model="tabSearch" placeholder="Search archive tabs…" aria-label="Search archive tabs" class="h-9 w-full max-w-sm rounded-lg border-slate-300 text-sm">
         <nav aria-label="Archive categories" class="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto border-b border-slate-200">
             @foreach($tabs as $key => $label)
-                <a href="{{ route('archive.index', ['tab' => $key]) }}"
+                <a data-label="{{ strtolower($label) }}" x-show="$el.dataset.label.includes(tabSearch.toLowerCase())" href="{{ route('archive.index', ['tab' => $key]) }}"
                    @if($tab === $key) aria-current="page" @endif
                    class="shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold {{ $tab === $key ? 'border-indigo-700 text-indigo-700' : 'border-transparent text-slate-600 hover:text-indigo-700' }}">
                     {{ $label }}
@@ -24,7 +25,7 @@
                 <thead class="bg-slate-50 text-slate-600">
                     <tr>
                         <th scope="col" class="px-4 py-3">Record</th>
-                        <th scope="col" class="px-4 py-3">{{ $tab === 'announcements' ? 'Posted by' : 'Employee' }}</th>
+                        <th scope="col" class="px-4 py-3">{{ str_starts_with($tab, 'utility-') ? 'Category' : ($tab === 'announcements' ? 'Posted by' : 'Employee') }}</th>
                         <th scope="col" class="px-4 py-3">Original date</th>
                         <th scope="col" class="px-4 py-3">Archived on</th>
                         <th scope="col" class="px-4 py-3 text-center">Actions</th>
@@ -34,7 +35,10 @@
                     @forelse($records as $record)
                         <tr class="align-top">
                             <td class="px-4 py-3">
-                                @if($tab === 'announcements')
+                                @if(str_starts_with($tab, 'utility-'))
+                                    <span class="font-semibold">{{ $record->name ?? $record->label ?? ($record->year.' · '.$record->salary_grade.' · '.$record->salary_step) }}</span>
+                                    <div class="text-xs text-slate-600">{{ $record->monthly_salary !== null ? '₱'.number_format((float)$record->monthly_salary, 2) : ($record->legal_basis ?? $record->value) }}</div>
+                                @elseif($tab === 'announcements')
                                     <details>
                                         <summary class="cursor-pointer font-semibold">{{ $record->title }}</summary>
                                         <div class="mt-2 whitespace-pre-line break-words text-slate-600">{{ $record->content }}</div>
@@ -83,7 +87,7 @@
                                     @case('saln')
                                     @case('pds')
                                     @case('cto') {{ $record->employee ? trim($record->employee->firstname.' '.$record->employee->lastname) : '—' }} @break
-                                    @default {{ $record->user_name }}
+                                    @default {{ str_starts_with($tab, 'utility-') ? $tabs[$tab] : $record->user_name }}
                                 @endswitch
                             </td>
                             <td class="px-4 py-3">{{ $record->created_at?->format('M j, Y · g:i A') ?? '—' }}</td>

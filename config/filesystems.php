@@ -29,6 +29,7 @@ return [
     */
 
     'disks' => [
+        'signatures' => ['driver'=>'local', 'root'=>storage_path('app/private/signatures'), 'visibility'=>'private', 'throw'=>true],
         'documents' => [
             'driver' => 'local',
             'root' => storage_path('app/private/documents'),

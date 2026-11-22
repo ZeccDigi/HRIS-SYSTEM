@@ -42,5 +42,5 @@ test('October demo preserves existing records and November schedule and posts cr
         ->and(DtrRecord::where('employee_id', $employee->id)->count())->toBe($recordCount)
         ->and(ActivityAudit::where('action', 'Create October Attendance Demo')->count())->toBe(1);
     $this->actingAs($user)->get(route('my-dtr.index', ['month' => 10, 'year' => 2026]))
-        ->assertOk()->assertSee('TA-DEMO-2026-10-09')->assertSee('TA-EXISTING-COMPANION')->assertSee('Incomplete')->assertSee('25.00 min');
+        ->assertOk()->assertSee('TA-DEMO-2026-10-09')->assertSee('TA-EXISTING-COMPANION')->assertDontSee('Incomplete')->assertSee('25.00 min');
 });

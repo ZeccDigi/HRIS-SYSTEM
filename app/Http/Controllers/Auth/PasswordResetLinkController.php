@@ -50,13 +50,14 @@ class PasswordResetLinkController extends Controller
             ]);
         }
 
+        if (!\Illuminate\Support\Facades\Cache::add('password-reset-otp-cooldown:'.$user->id, true, 30)) {
+            throw ValidationException::withMessages(['email'=>'Please wait 30 seconds before requesting another OTP.']);
+        }
+
         $otp = (string) random_int(100000, 999999);
 
-        $user->forceFill([
-            'otp' => $otp,
-            'otp_expires_at' => now()->addMinutes(10),
-        ])->save();
 
+        try {
         Mail::raw(
             "Your DMW-HRIS password reset OTP is {$otp}.\n\nThis code expires in 10 minutes. If you did not request a password reset, please ignore this message or contact HR.",
             function ($message) use ($recoveryEmail) {
@@ -65,6 +66,15 @@ class PasswordResetLinkController extends Controller
                     ->subject('DMW-HRIS Password Reset OTP');
             }
         );
+
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::warning('Password reset OTP delivery failed.', ['user_id'=>$user->id, 'exception'=>$exception::class]);
+            throw ValidationException::withMessages(['email'=>'The OTP email could not be sent. Please try again or contact HR.']);
+        }
+        $user->forceFill([
+            'otp' => $otp,
+            'otp_expires_at' => now()->addMinutes(10),
+        ])->save();
 
         return redirect()
             ->route('password.otp.reset', ['email' => $user->email])

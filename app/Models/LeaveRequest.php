@@ -56,7 +56,7 @@ class LeaveRequest extends Model
 
     public function leaveType()
     {
-        return $this->belongsTo(LeaveType::class);
+        return $this->belongsTo(LeaveType::class)->withTrashed();
     }
 
     public function chief()

@@ -463,7 +463,7 @@ class PdsController extends Controller
 
             $govIdData = $request->input('gov_id', []);
             if ($request->hasFile('pds_signature')) {
-                $signaturePath = $request->file('pds_signature')->store('employee-signatures', 'public');
+                $signaturePath = $request->file('pds_signature')->store('employee-signatures', 'signatures');
                 $govIdData['signature_path'] = $signaturePath;
                 $employee->update(['e_signature_path' => $signaturePath]);
             }

@@ -228,49 +228,16 @@ class Employee extends Model
 
     public function getESignatureUrlAttribute(): ?string
     {
-        if (! $this->e_signature_path) {
-            return null;
-        }
-
-        if (Storage::disk('public')->exists($this->e_signature_path)) {
-            return asset('storage/'.$this->e_signature_path);
-        }
-
-        return null;
+        return \App\Services\SignatureStorage::image($this->e_signature_path);
     }
-
     public function getEffectiveSignatureUrlAttribute(): ?string
     {
-        if ($this->e_signature_url) {
-            return $this->e_signature_url;
-        }
-
-        $pdsSignature = $this->pdsGovId?->signature_path;
-        if ($pdsSignature && Storage::disk('public')->exists($pdsSignature)) {
-            return asset('storage/'.$pdsSignature);
-        }
-
-        return null;
+        return $this->e_signature_url ?? \App\Services\SignatureStorage::image($this->pdsGovId?->signature_path);
     }
-
     public function getESignatureAbsolutePathAttribute(): ?string
     {
-        if ($this->e_signature_path) {
-            $storagePath = storage_path('app/public/'.$this->e_signature_path);
-            if (file_exists($storagePath)) {
-                return $storagePath;
-            }
-        }
-
-        $pdsSignature = $this->pdsGovId?->signature_path;
-        if ($pdsSignature) {
-            $storagePath = storage_path('app/public/'.$pdsSignature);
-            if (file_exists($storagePath)) {
-                return $storagePath;
-            }
-        }
-
-        return null;
+        return \App\Services\SignatureStorage::path($this->e_signature_path)
+            ?? \App\Services\SignatureStorage::path($this->pdsGovId?->signature_path);
     }
 
     public function getInitialsAttribute(): string

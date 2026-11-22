@@ -95,6 +95,12 @@ class PasswordController extends Controller
 
     public function confirm(Request $request): RedirectResponse|JsonResponse
     {
+        $attemptKey = 'otp-update-verify:'.hash('sha256', (string)$request->user()->id);
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($attemptKey, 5)) {
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['message'=>'Too many OTP attempts. Please wait before trying again.'], 429)->header('Retry-After', (string)\Illuminate\Support\Facades\RateLimiter::availableIn($attemptKey)));
+        }
+        \Illuminate\Support\Facades\RateLimiter::hit($attemptKey, 600);
+
         $user = $request->user();
 
         $validated = $request->validateWithBag('updatePassword', [
@@ -121,6 +127,7 @@ class PasswordController extends Controller
             'must_change_password' => false,
         ]);
 
+        \Illuminate\Support\Facades\RateLimiter::clear($attemptKey);
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'Password updated successfully.',

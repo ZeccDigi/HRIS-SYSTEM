@@ -100,7 +100,7 @@ class LeaveTypeSeeder extends Seeder
         ];
 
         foreach ($leaveTypes as $leaveType) {
-            LeaveType::updateOrCreate(
+            LeaveType::withTrashed()->updateOrCreate(
                 ['name' => $leaveType['name']],
                 $leaveType
             );

@@ -321,7 +321,7 @@ class MyCtoController extends Controller
                 'dmwLogoPath' => asset('images/official DMW.png'),
                 'bagongPilipinasLogoPath' => asset('images/bagong-pilipinas-logo.png'),
                 'applicantSignaturePath' => $ctoRequest->applicant_signature_path
-                    ? asset('storage/'.$ctoRequest->applicant_signature_path)
+                    ? \App\Services\SignatureStorage::image($ctoRequest->applicant_signature_path)
                     : $ctoRequest->employee?->effective_signature_url,
             ]);
         }

@@ -36,7 +36,7 @@ test('owners can edit pending applications only before the first review', functi
     $initial = match ($form) {
         'leaves' => ['date_filed' => now()],
         'travel-orders' => ['ta_number' => 'TA-2026-11-17-001'],
-        'my-cto' => ['date_end' => $date],
+        'my-cto' => ['date_end' => $date, 'attachment_path' => 'cto-attachments/approved-overtime.pdf'],
         default => [],
     };
     $request = $model::create([...$fields, ...$initial, 'employee_id' => $employee->id, 'status' => 'pending', $form === 'leaves' ? 'reason' : 'purpose' => 'Original application']);
@@ -51,9 +51,10 @@ test('owners can edit pending applications only before the first review', functi
     $this->actingAs($user)->get($edit)->assertOk();
     $this->put($update, $fields)->assertSessionHasNoErrors()->assertRedirect();
     expect($request->fresh()->{$form === 'leaves' ? 'reason' : 'purpose'})
-        ->toBe($form === 'leaves' ? 'Updated leave detail' : 'Updated application');
+        ->toBe($form === 'leaves' ? 'Updated leave detail' : ($form === 'my-cto' ? 'Original application' : 'Updated application'));
 
     $request->forceFill($firstReview)->save();
     $this->get($edit)->assertForbidden();
     $this->put($update, $fields)->assertForbidden();
 })->with(['leaves', 'locator-slips', 'travel-orders', 'my-cto']);
+
