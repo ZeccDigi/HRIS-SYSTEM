@@ -36,6 +36,7 @@ class AnnouncementController extends Controller
             ->visibleTo($request->user())
             ->latest()
             ->get(['created_at'])
+            ->toBase()
             ->map(fn ($announcement) => (int) $announcement->created_at->format('Y'))
             ->push(now()->year)
             ->unique()
