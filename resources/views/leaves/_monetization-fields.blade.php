@@ -19,7 +19,8 @@
         </div>
         <div>
             <label class="mb-1 block text-sm font-semibold" for="monetization_salary">Highest monthly salary received (₱)</label>
-            <input id="monetization_salary" name="monetization_salary" type="number" min="0.01" step="0.01" x-model="monetizationSalary" readonly :required="monetization" class="w-full rounded-lg border-slate-300 bg-slate-50 text-sm">
+            <input id="monetization_salary" type="text" :value="monetizationSalary === '' || monetizationSalary == null ? '' : Number(monetizationSalary).toLocaleString('en-PH', { maximumFractionDigits: 2 })" readonly class="w-full rounded-lg border-slate-300 bg-slate-50 text-sm">
+            <input name="monetization_salary" type="hidden" :value="monetizationSalary">
             @if($monetizationSalarySource)
                 <p class="mt-1 text-xs text-slate-600">{{ collect([$monetizationSalarySource['grade'], $monetizationSalarySource['step'], $monetizationSalarySource['year'] ? $monetizationSalarySource['year'].' schedule' : null])->filter()->implode(' · ') }}{{ filled($monetizationSalarySource['grade']) || filled($monetizationSalarySource['step']) || filled($monetizationSalarySource['year']) ? ' — ' : '' }}HR-approved PDS</p>
             @else
