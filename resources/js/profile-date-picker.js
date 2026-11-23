@@ -1,7 +1,7 @@
 import '../css/profile-date-picker.css';
 
 // Keep the original date inputs so Alpine bindings, validation and submitted dates stay intact.
-const selector = '.pds-form-body input[type="date"], input[type="date"][name="service_start_date"], .reports-main-filters input[type="date"]';
+const selector = '.pds-form-body input[type="date"], input[type="date"][name="service_start_date"], .reports-main-filters input[type="date"], input[type="date"][data-profile-date-picker]';
 let input = null;
 let month = new Date();
 const popup = document.createElement('div');
@@ -56,7 +56,8 @@ function render() {
     months.addEventListener('change', () => { month = new Date(month.getFullYear(), Number(months.value), 1); render(); });
     const years = document.createElement('select');
     years.setAttribute('aria-label', 'Year');
-    const maxYear = input.max ? parse(input.max).getFullYear() : Number(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Manila', year: 'numeric' }).format(new Date()));
+    const currentYear = Number(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Manila', year: 'numeric' }).format(new Date()));
+    const maxYear = input.max ? parse(input.max).getFullYear() : input.hasAttribute('data-allow-future') ? Math.max(currentYear + 10, month.getFullYear()) : currentYear;
     const minYear = input.min ? parse(input.min).getFullYear() : Math.min(1900, month.getFullYear());
     for (let y = maxYear; y >= minYear; y--) years.add(new Option(y, y));
     years.value = month.getFullYear();
@@ -97,7 +98,7 @@ function open(target) {
     if (target.matches(':disabled') || target.readOnly) return;
     const currentYear = Number(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Manila', year: 'numeric' }).format(new Date()));
     const yearEnd = `${currentYear}-12-31`;
-    target.max = target.max && target.max < yearEnd ? target.max : yearEnd;
+    if (!target.hasAttribute('data-allow-future')) target.max = target.max && target.max < yearEnd ? target.max : yearEnd;
     input = target;
     const value = input.value;
     const date = parse(input.max && value > input.max ? input.max : input.min && value && value < input.min ? input.min : value);

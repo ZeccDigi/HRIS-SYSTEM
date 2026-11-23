@@ -30,12 +30,12 @@
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
             <x-input-label for="core_time_start_date" :value="__('Effective From')" />
-            <x-text-input id="core_time_start_date" name="core_time_start_date" type="date" class="mt-1 block w-full" :value="old('core_time_start_date', optional($coreTimeEmployee?->core_time_start_date)->format('Y-m-d'))" x-bind:disabled="!coreTimeEditing" x-bind:class="{ 'cursor-not-allowed bg-gray-50 text-gray-500': !coreTimeEditing }" />
+            <x-text-input id="core_time_start_date" name="core_time_start_date" type="date" data-profile-date-picker data-allow-future class="mt-1 block w-full" :value="old('core_time_start_date', optional($coreTimeEmployee?->core_time_start_date)->format('Y-m-d'))" x-bind:disabled="!coreTimeEditing" x-bind:class="{ 'cursor-not-allowed bg-gray-50 text-gray-500': !coreTimeEditing }" />
             <x-input-error class="mt-2" :messages="$errors->get('core_time_start_date')" />
         </div>
         <div>
             <x-input-label for="core_time_end_date" :value="__('Effective To')" />
-            <x-text-input id="core_time_end_date" name="core_time_end_date" type="date" class="mt-1 block w-full" :value="old('core_time_end_date', optional($coreTimeEmployee?->core_time_end_date)->format('Y-m-d'))" x-bind:disabled="!coreTimeEditing" x-bind:class="{ 'cursor-not-allowed bg-gray-50 text-gray-500': !coreTimeEditing }" />
+            <x-text-input id="core_time_end_date" name="core_time_end_date" type="date" data-profile-date-picker data-allow-future class="mt-1 block w-full" :value="old('core_time_end_date', optional($coreTimeEmployee?->core_time_end_date)->format('Y-m-d'))" x-bind:disabled="!coreTimeEditing" x-bind:class="{ 'cursor-not-allowed bg-gray-50 text-gray-500': !coreTimeEditing }" />
             <x-input-error class="mt-2" :messages="$errors->get('core_time_end_date')" />
         </div>
     </div>

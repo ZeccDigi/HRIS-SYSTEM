@@ -1,3 +1,4 @@
+input[type="date"][data-profile-date-picker]::-webkit-calendar-picker-indicator,
 .pds-form-body input[type="date"]::-webkit-calendar-picker-indicator,
 .reports-main-filters input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="date"][name="service_start_date"]::-webkit-calendar-picker-indicator {
