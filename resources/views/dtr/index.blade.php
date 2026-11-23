@@ -150,7 +150,7 @@
                 return $periods ? $label.' '.implode(' | ', $periods) : null;
             })->filter()->implode('; ');
             return ['period' => $days->first()->format('M. d, Y').' to '.$days->last()->format('M. d, Y'), 'lines' => $lines];
-        });
+        })->filter(fn ($section) => $section['lines'] !== '')->values();
     @endphp
 
     <style>
@@ -637,11 +637,11 @@
                             </table>
 
                             <div class="mt-5 text-xs leading-6 text-slate-800">
-                                @if($coreTimeSections->count() > 1)
+                                @if($coreTimeSections->count() > 1 || ($coreTimeLines->isEmpty() && $coreTimeSections->isNotEmpty()))
                                     <p class="font-bold">Approved Core Time:</p>
                                     @foreach($coreTimeSections as $section)
                                         <p class="font-semibold">{{ $section['period'] }}</p>
-                                        <p>{{ $section['lines'] ?: 'No weekday core-time schedule assigned.' }}</p>
+                                        <p>{{ $section['lines'] }}</p>
                                     @endforeach
                                 @else
                                 <p>
