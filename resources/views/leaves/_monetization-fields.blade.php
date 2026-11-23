@@ -22,7 +22,7 @@
             <input id="monetization_salary" type="text" :value="monetizationSalary === '' || monetizationSalary == null ? '' : Number(monetizationSalary).toLocaleString('en-PH', { maximumFractionDigits: 2 })" readonly class="w-full rounded-lg border-slate-300 bg-slate-50 text-sm">
             <input name="monetization_salary" type="hidden" :value="monetizationSalary">
             @if($monetizationSalarySource)
-                <p class="mt-1 text-xs text-slate-600">{{ collect([$monetizationSalarySource['grade'], $monetizationSalarySource['step'], $monetizationSalarySource['year'] ? $monetizationSalarySource['year'].' schedule' : null])->filter()->implode(' · ') }}{{ filled($monetizationSalarySource['grade']) || filled($monetizationSalarySource['step']) || filled($monetizationSalarySource['year']) ? ' — ' : '' }}HR-approved PDS</p>
+                <p class="mt-1 text-xs text-slate-600">{{ collect([$monetizationSalarySource['grade'], $monetizationSalarySource['step'], $monetizationSalarySource['year'] ? $monetizationSalarySource['year'] : null])->filter()->implode(' · ') }}</p>
             @else
                 <p role="status" class="mt-1 text-xs text-amber-700">No salary recorded in the PDS</p>
             @endif
@@ -33,5 +33,5 @@
         <div><p class="text-xs text-slate-500">Estimated gross amount</p><p class="font-bold text-blue-900" x-text="(Number(monetizationSalary || 0) * Number(monetizationDays || 0) * 0.0481927).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })"></p></div>
         <div><p class="text-xs text-slate-500">Estimated remaining credits</p><p class="font-bold" x-text="Math.max(0, Number(info?.balance || 0) - Number(monetizationDays || 0)).toFixed(3) + ' days'"></p></div>
     </div>
-    <p class="text-xs text-slate-600">Salary × days × 0.0481927. Amount is subject to HR verification and approval. Credits are deducted after final approval; attendance is unaffected.</p>
+    <p class="text-xs text-slate-600">Salary × days × 0.0481927. Amount is subject to HR verification and approval. Credits are deducted after final approval.</p>
 </fieldset>
