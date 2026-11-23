@@ -246,9 +246,12 @@ class LocatorSlipController extends Controller
             abort(403);
         }
 
+        if (is_string($request->input('remarks'))) {
+            $request->merge(['remarks' => trim($request->input('remarks'))]);
+        }
         $validated = $request->validate([
-            'remarks' => 'nullable|string|max:1000',
-        ]);
+            'remarks' => 'required|string|max:1000',
+        ], ['remarks.required' => 'Remarks are required when rejecting a locator slip.']);
 
         $locatorSlip->status = 'rejected';
         $locatorSlip->chief_remarks = $validated['remarks'] ?? null;

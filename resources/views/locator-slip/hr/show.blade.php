@@ -211,7 +211,21 @@
             }
         }
 
+        function validateLocatorDecisionRemarks(action) {
+            const field = document.getElementById('locator_review_remarks');
+            if (!field) return action !== 'rejected';
+            field.required = action === 'rejected';
+            field.setCustomValidity(action === 'rejected' && !field.value.trim()
+                ? 'Remarks are required when rejecting a locator slip.' : '');
+            if (!field.checkValidity()) { field.reportValidity(); field.focus(); return false; }
+            return true;
+        }
+        document.getElementById('locator_review_remarks')?.addEventListener('input', function () {
+            this.setCustomValidity('');
+        });
+
         function openLocatorDecisionModal(action) {
+            if (!validateLocatorDecisionRemarks(action)) return;
             locatorDecisionAction = action;
 
             const modal = document.getElementById('locatorDecisionModal');
@@ -254,6 +268,7 @@
         }
 
         document.getElementById('locatorDecisionConfirmButton')?.addEventListener('click', function () {
+            if (!validateLocatorDecisionRemarks(locatorDecisionAction)) return;
             const remarks = document.getElementById('locator_review_remarks')?.value || '';
             const approveRemarks = document.getElementById('locator_approve_remarks');
 
@@ -265,7 +280,7 @@
                 ? document.getElementById('locator-approve-form')
                 : document.getElementById('locator-reject-form');
 
-            form?.submit();
+            form?.requestSubmit();
         });
 
         document.getElementById('locatorDecisionModalBackdrop')?.addEventListener(
