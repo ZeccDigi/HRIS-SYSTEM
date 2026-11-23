@@ -450,7 +450,7 @@
             aria-labelledby="submit-tar-modal-title"
         >
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeTarModal()" aria-hidden="true"></div>
-            <div @click.stop class="relative z-10 flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div @click.stop class="relative z-10 flex h-[94dvh] max-h-[94dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
                 <div class="flex shrink-0 items-center justify-between border-b border-blue-950 bg-blue-900 px-5 py-4 text-white">
                     <div>
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200">{{ __('Travel Authority Report (TAR)') }}</p>
@@ -539,11 +539,11 @@
                             <div>
                                 <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('Supporting PDF (optional)') }}</label>
                                 <div x-data="{ attachmentName: '' }" class="flex min-h-11 items-center gap-3 rounded-lg border border-slate-300 bg-white px-3 py-2">
-                                    <input id="tar_attachment" type="file" name="tar_attachment" accept="application/pdf,.pdf" class="sr-only" @change="attachmentName = $event.target.files[0]?.name || ''">
-                                    <label for="tar_attachment" class="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black uppercase tracking-wider text-blue-900 transition hover:bg-blue-100">
+                                    <input id="tar_attachment" x-ref="tarAttachment" type="file" name="tar_attachment" accept="application/pdf,.pdf" class="hidden" @change="attachmentName = $event.target.files[0]?.name || ''">
+                                    <button type="button" @click="$refs.tarAttachment.click()" class="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black uppercase tracking-wider text-blue-900 transition hover:bg-blue-100">
                                         <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
                                         {{ __('Attach PDF') }}
-                                    </label>
+                                    </button>
                                     <span class="min-w-0 truncate text-xs text-slate-500" x-text="attachmentName || @js(__('No file selected'))"></span>
                                 </div>
                             </div>
