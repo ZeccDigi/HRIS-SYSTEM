@@ -89,7 +89,7 @@
             @endif
 
             @if($isApproved)
-                @if(in_array(strtolower($sidebarRole), ['employee', 'chief', 'regionaldirector', 'regional director', 'recordofficer', 'record officer'], true))
+                @if($sidebarRole === 'employee')
                     <x-sidebar-dropdown label="{{ __('My Account') }}" :active="request()->routeIs(['pds.*', 'salns.*', 'ildp.*', 'leaves.*', 'my-dtr.*', 'locator-slips.*']) || (request()->routeIs('travel-orders.*') && ! $isTarManagementView) || (request()->routeIs('my-cto.*') && ! $isCtoManagedDetail)">
                         <x-slot name="icon">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"

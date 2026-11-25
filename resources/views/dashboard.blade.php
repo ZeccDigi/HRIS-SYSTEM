@@ -10,7 +10,7 @@
                 <!-- Leave Calendar and Recent Requests -->
                 <div class="min-w-0 space-y-3">
                     @if($employee)
-                        @if(!$isHrAdmin)
+                        @if(strtolower(auth()->user()->role ?? '') === 'employee')
                             @php
                                 $formatRange = function ($start, $end = null) {
                                     $startDate = $start ? \Carbon\Carbon::parse($start) : null;
@@ -170,9 +170,11 @@
                                     </div>
                                 @endif
 
+                                @if($isHrAdmin)
                                 <div id="dashboardLeaveCalendar" class="w-full" style="width: 760px; max-width: 100%;" data-calendar-container>
                                     @include('dashboard._leave-calendar')
                                 </div>
+                                @endif
                             </div>
                         @endif
                     @endif
